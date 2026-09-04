@@ -1,6 +1,5 @@
 import { ThemeProvider } from "expo-router/react-navigation";
 import * as SystemUI from 'expo-system-ui';
-import { PostHogProvider } from 'posthog-react-native';
 import React, { useEffect, useMemo } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,7 +9,6 @@ import { DEFAULT_MATERIAL_YOU_ENABLED, useSettingsStore } from '@/stores/setting
 import { AlertProvider } from '@/ui/components/AlertProvider';
 import { runsIOS26 } from '@/ui/utils/IsLiquidGlass';
 import { AppColors } from "@/utils/colors";
-import { posthog } from '@/utils/logger/posthog';
 import { createDarkTheme, createDefaultTheme } from '@/utils/theme/Theme';
 
 interface AppProvidersProps {
@@ -53,15 +51,13 @@ export function AppProviders({ children }: AppProvidersProps) {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "black" }}>
-      <PostHogProvider client={posthog} autocapture={false}>
-        <DatabaseProvider>
-          <ThemeProvider value={theme}>
-            <AlertProvider>
-              {children}
-            </AlertProvider>
-          </ThemeProvider>
-        </DatabaseProvider>
-      </PostHogProvider>
+      <DatabaseProvider>
+        <ThemeProvider value={theme}>
+          <AlertProvider>
+            {children}
+          </AlertProvider>
+        </ThemeProvider>
+      </DatabaseProvider>
     </GestureHandlerRootView>
   );
 }

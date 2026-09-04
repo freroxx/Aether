@@ -3,16 +3,13 @@ import 'react-native-reanimated';
 import "@/utils/i18n";
 
 import { Buffer } from 'buffer';
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useSegments } from 'expo-router';
+import React, { useEffect } from 'react';
 
 import { AppProviders } from '@/components/AppProviders';
 import FakeSplash from '@/components/FakeSplash';
 import { RootNavigator } from '@/components/RootNavigator';
 import { useAppInitialization } from '@/hooks/useAppInitialization';
 import { useNetworkStore } from '@/stores/logs';
-import { checkConsent } from '@/utils/logger/consent';
-import { posthog } from '@/utils/logger/posthog';
 import uuid from '@/utils/uuid/uuid';
 import { LogBox } from 'react-native';
 
@@ -34,37 +31,9 @@ LogBox.ignoreLogs([
 
 export default function RootLayout() {
   const { isAppReady, fontsLoaded } = useAppInitialization();
-  const segments = useSegments();
-  const lastTrackedView = useRef<string | null>(null);
-
-  const analyticsView = useMemo(() => {
-    if (segments.length < 2) return null;
-
-    if (segments[0] === '(tabs)') {
-      return `tab:${segments[1]}`;
-    }
-
-    if (segments[0] === '(features)') {
-      return `feature:${segments.slice(1).join('/')}`;
-    }
-
-    return null;
-  }, [segments]);
 
   useEffect(() => {
-    if (!analyticsView || lastTrackedView.current === analyticsView) return;
-
-    const trackView = async () => {
-      const consent = await checkConsent();
-      if (!consent.given || consent.level !== "advanced") return;
-      posthog.screen(analyticsView);
-      lastTrackedView.current = analyticsView;
-    };
-
-    trackView();
-  }, [analyticsView]);
-
-  useEffect(() => {
+    if (!__DEV__) { return; }
     const originalFetch = window.fetch;
 
     window.fetch = async (...args) => {

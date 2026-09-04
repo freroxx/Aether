@@ -42,7 +42,7 @@ export default function SettingsIndex() {
 
   const settingsStore = useSettingsStore(state => state.personalization);
   const currentVersion = packagejson.version;
-  const releaseNotesUrl = `https://papillon.bzh/release-notes/${currentVersion}`;
+  const releaseNotesUrl = `https://github.com/aether-app/releases/tag/v${currentVersion}`;
 
   const account = accounts.find((a) => a.id === lastUsedAccount);
 
@@ -117,15 +117,6 @@ export default function SettingsIndex() {
             WebBrowser.openBrowserAsync(releaseNotesUrl, {
               presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
             }),
-        },
-        {
-          title: t("Settings_Donate_Title"),
-          description: t("Settings_Donate_Description"),
-          papicon: <Papicons name={"Heart"} />,
-          icon: <HeartIcon />,
-          color: "#EFA400",
-          onPress: () =>
-            WebBrowser.openBrowserAsync("https://go.papillon.bzh/donate"),
         },
         {
           title: t("Settings_About_Title"),

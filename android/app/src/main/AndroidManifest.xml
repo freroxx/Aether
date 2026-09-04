@@ -33,10 +33,7 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="papillon"/>
-        <data android:scheme="izly"/>
-        <data android:scheme="skoapp-prod"/>
-        <data android:scheme="exp+papillon"/>
+        <data android:scheme="aether"/>
       </intent-filter>
     </activity>
     <uses-native-library android:name="libOpenCL.so" android:required="false"/>

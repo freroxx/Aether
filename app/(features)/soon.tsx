@@ -26,14 +26,14 @@ export default function Soon() {
           Promis, ça arrive (vraiment) bientôt !
         </Typography>
         <Typography variant="body1" color="secondary" align="center">
-          L'onglet est toujours en cours de développement. Il arrivera prochainement dans une version future de Papillon.
+          L'onglet est toujours en cours de développement. Il arrivera prochainement dans une version future de Aether.
         </Typography>
         <Typography variant="body1" color="primary" align="center" onPress={() => {
-          Linking.openURL("https://www.instagram.com/thepapillonapp/");
+          Linking.openURL("https://github.com/aether-app/");
         }} style={{
           textDecorationLine: "underline",
         }}>
-          Et pour rester au courant, tu peux nous suivre sur les réseaux sociaux !
+          Et pour rester au courant, tu peux suivre le projet sur GitHub !
         </Typography>
       </Stack>
     </View>

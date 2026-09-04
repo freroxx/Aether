@@ -5,12 +5,12 @@ const androidVersionCode = Math.floor(Date.now() / 1000) - 1577836800;
 
 export default {
   expo: {
-    name: "Papillon",
-    slug: "papillon",
+    name: "Aether",
+    slug: "aether",
     version: PackageJSON.version,
     orientation: "both",
     icon: "./assets/images/icon.png",
-    scheme: ["papillon", "izly", "skoapp-prod"],
+    scheme: ["aether"],
     platforms: ["ios", "android"],
     userInterfaceStyle: "automatic",
     ios: {
@@ -82,7 +82,7 @@ export default {
     },
     android: {
       versionCode: androidVersionCode,
-      package: "xyz.getpapillon.app",
+      package: "com.aether.app",
       blockedPermissions: [
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
@@ -128,7 +128,7 @@ export default {
         "expo-image-picker",
         {
           photosPermission:
-            "Papillon utilise ta galerie pour te permettre de personnaliser ta photo de profil",
+            "Aether utilise ta galerie pour te permettre de personnaliser ta photo de profil",
         },
       ],
       "expo-web-browser",
@@ -145,9 +145,9 @@ export default {
         "expo-location",
         {
           locationWhenInUsePermission:
-            "Papillon utilise ton emplacement pour trouver les établissements autour de toi.",
+            "Aether utilise ton emplacement pour trouver les établissements autour de toi.",
           cameraPermission:
-            "Papillon utilise ta caméra pour scanner des QR-codes pour te connecter, pour capturer des documents, ou pour des fonctionnalités amusantes telles que les réactions.",
+            "Aether utilise ta caméra pour scanner des QR-codes pour te connecter, pour capturer des documents, ou pour des fonctionnalités amusantes telles que les réactions.",
         },
       ],
       [
