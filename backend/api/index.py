@@ -65,6 +65,16 @@ class SendMessageRequest(BaseModel):
     content: str
     child_name: Optional[str] = None
 
+class CreateChatRequest(BaseModel):
+    subject: str
+    content: str
+    recipient_ids: List[str]
+    child_name: Optional[str] = None
+
+class NewsReadRequest(BaseModel):
+    news_id: str
+    child_name: Optional[str] = None
+
 class SetChildRequest(BaseModel):
     child_name: str
 
@@ -332,9 +342,33 @@ def get_grades(
             "is_significant": getattr(g, "is_significant", True),
         })
 
+    def parse_float_safe(v):
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        try:
+            return float(str(v).replace(",", ".").strip())
+        except Exception:
+            return None
+
+    subject_averages = {}
+    if hasattr(target_period, "averages"):
+        for avg in target_period.averages:
+            s_name = getattr(avg.subject, "name", "") if hasattr(avg, "subject") else ""
+            if s_name:
+                subject_averages[s_name] = {
+                    "student": parse_float_safe(getattr(avg, "student", None)),
+                    "class_average": parse_float_safe(getattr(avg, "class_average", None)),
+                    "max": parse_float_safe(getattr(avg, "max", None)),
+                    "min": parse_float_safe(getattr(avg, "min", None)),
+                    "out_of": parse_float_safe(getattr(avg, "out_of", 20.0)) or 20.0,
+                }
+
     period_averages = {
-        "overall": getattr(target_period, "overall_average", None),
-        "class_overall": getattr(target_period, "class_overall_average", None),
+        "overall": parse_float_safe(getattr(target_period, "overall_average", None)),
+        "class_overall": parse_float_safe(getattr(target_period, "class_overall_average", None)),
+        "subjects": subject_averages,
     }
 
     return {
@@ -417,36 +451,60 @@ def get_attendance(
     delays = []
     punishments = []
 
-    if hasattr(client, "absences"):
-        for a in client.absences:
-            absences.append({
-                "id": getattr(a, "id", str(a.from_date)),
-                "from": a.from_date.isoformat() if hasattr(a, "from_date") else None,
-                "to": a.to_date.isoformat() if hasattr(a, "to_date") else None,
-                "justified": getattr(a, "justified", False),
-                "hours": getattr(a, "hours", ""),
-                "reason": getattr(a, "reason", "")
-            })
+    periods = getattr(client, "periods", [])
+    if not periods and hasattr(client, "current_period") and client.current_period:
+        periods = [client.current_period]
 
-    if hasattr(client, "delays"):
-        for d in client.delays:
-            delays.append({
-                "id": getattr(d, "id", str(d.date)),
-                "date": d.date.isoformat() if hasattr(d, "date") else None,
-                "duration": getattr(d, "duration", 0),
-                "justified": getattr(d, "justified", False),
-                "reason": getattr(d, "reason", "")
-            })
+    for p in periods:
+        if hasattr(p, "absences"):
+            for a in p.absences:
+                reason_str = ""
+                if hasattr(a, "reasons"):
+                    reasons = a.reasons
+                    reason_str = ", ".join(reasons) if isinstance(reasons, list) else str(reasons)
+                elif hasattr(a, "reason"):
+                    reason_str = str(a.reason)
 
-    if hasattr(client, "punishments"):
-        for p in client.punishments:
-            punishments.append({
-                "id": getattr(p, "id", str(p.date)),
-                "date": p.date.isoformat() if hasattr(p, "date") else None,
-                "reason": getattr(p, "reason", ""),
-                "giver": getattr(p, "giver", ""),
-                "nature": getattr(p, "nature", ""),
-            })
+                absences.append({
+                    "id": getattr(a, "id", str(getattr(a, "from_date", ""))),
+                    "from": a.from_date.isoformat() if hasattr(a, "from_date") and a.from_date else None,
+                    "to": a.to_date.isoformat() if hasattr(a, "to_date") and a.to_date else None,
+                    "justified": getattr(a, "justified", False),
+                    "hours": getattr(a, "hours", ""),
+                    "reason": reason_str
+                })
+
+        if hasattr(p, "delays"):
+            for d in p.delays:
+                reason_str = ""
+                if hasattr(d, "reasons"):
+                    reasons = d.reasons
+                    reason_str = ", ".join(reasons) if isinstance(reasons, list) else str(reasons)
+                elif hasattr(d, "reason"):
+                    reason_str = str(d.reason)
+
+                mins = getattr(d, "minutes", getattr(d, "duration", 0))
+
+                delays.append({
+                    "id": getattr(d, "id", str(getattr(d, "date", ""))),
+                    "date": d.date.isoformat() if hasattr(d, "date") and d.date else None,
+                    "duration": mins,
+                    "justified": getattr(d, "justified", False),
+                    "reason": reason_str
+                })
+
+        if hasattr(p, "punishments"):
+            for pun in p.punishments:
+                pun_reason = getattr(pun, "reason", "")
+                if not pun_reason and hasattr(pun, "reasons") and isinstance(pun.reasons, list):
+                    pun_reason = ", ".join(pun.reasons)
+                punishments.append({
+                    "id": getattr(pun, "id", str(getattr(pun, "date", ""))),
+                    "date": pun.date.isoformat() if hasattr(pun, "date") and pun.date else None,
+                    "reason": pun_reason,
+                    "giver": getattr(pun, "giver", ""),
+                    "nature": getattr(pun, "nature", ""),
+                })
 
     return {
         "absences": absences,
@@ -462,16 +520,32 @@ def get_news(
     client = init_client(auth, child_name=child)
     news_list = []
     if hasattr(client, "information_and_surveys"):
-        for item in client.information_and_surveys():
+        items = client.information_and_surveys() if callable(client.information_and_surveys) else client.information_and_surveys
+        for item in items:
+            start_d = getattr(item, "start_date", getattr(item, "creation_date", None))
             news_list.append({
-                "id": getattr(item, "id", str(item.start_date)),
+                "id": getattr(item, "id", str(start_d or "")),
                 "title": getattr(item, "title", "Actualité"),
                 "author": getattr(item, "author", ""),
                 "content": getattr(item, "content", ""),
-                "date": item.start_date.isoformat() if hasattr(item, "start_date") else None,
+                "date": start_d.isoformat() if start_d else None,
                 "acknowledged": getattr(item, "read", True),
             })
     return {"news": news_list}
+
+@app.post("/news/read")
+def mark_news_as_read(
+    req: NewsReadRequest,
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    client = init_client(auth, child_name=req.child_name)
+    if hasattr(client, "information_and_surveys"):
+        items = client.information_and_surveys() if callable(client.information_and_surveys) else client.information_and_surveys
+        target = next((x for x in items if getattr(x, "id", None) == req.news_id), None)
+        if target and hasattr(target, "mark_as_read"):
+            target.mark_as_read()
+            return {"success": True}
+    return {"success": True}
 
 @app.get("/canteen")
 def get_canteen(
@@ -486,15 +560,50 @@ def get_canteen(
 
     menus = []
     if hasattr(client, "menus"):
-        for m in client.menus(start_d, end_d):
+        menus_list = client.menus(start_d, end_d) if callable(client.menus) else client.menus
+        for m in menus_list:
+            def extract_foods(food_list):
+                if not food_list:
+                    return []
+                res = []
+                for f in food_list:
+                    name = getattr(f, "name", str(f))
+                    labels = [getattr(l, "name", str(l)) for l in getattr(f, "labels", [])] if hasattr(f, "labels") else []
+                    res.append({"name": name, "labels": labels})
+                return res
+
+            first_meal = extract_foods(getattr(m, "first_meal", []))
+            main_meal = extract_foods(getattr(m, "main_meal", []))
+            side_meal = extract_foods(getattr(m, "side_meal", []))
+            cheese_meal = extract_foods(getattr(m, "cheese", []))
+            dessert_meal = extract_foods(getattr(m, "dessert", []))
+            other_meal = extract_foods(getattr(m, "other_meal", []))
+
+            # Build both detailed categories and flat meals list for backward compatibility
+            all_items = [f["name"] for f in first_meal + main_meal + side_meal + cheese_meal + dessert_meal + other_meal]
+            
+            structured_meal = {
+                "entry": first_meal,
+                "main": main_meal,
+                "side": side_meal,
+                "cheese": cheese_meal,
+                "dessert": dessert_meal,
+                "other": other_meal,
+            }
+
             meals = []
-            for meal in getattr(m, "meals", []):
-                meals.append({
-                    "name": getattr(meal, "name", "Repas"),
-                    "items": [getattr(food, "name", str(food)) for food in getattr(meal, "foods", [])]
-                })
+            if getattr(m, "is_lunch", True):
+                meals.append({"name": "Déjeuner", "items": all_items})
+            if getattr(m, "is_dinner", False):
+                meals.append({"name": "Dîner", "items": all_items})
+            if not meals:
+                meals.append({"name": "Repas", "items": all_items})
+
             menus.append({
                 "date": m.date.isoformat() if hasattr(m, "date") else from_date,
+                "is_lunch": getattr(m, "is_lunch", True),
+                "is_dinner": getattr(m, "is_dinner", False),
+                "meal": structured_meal,
                 "meals": meals
             })
     return {"menus": menus}
@@ -507,15 +616,22 @@ def get_chats(
     client = init_client(auth, child_name=child)
     discussions = []
     if hasattr(client, "discussions"):
-        for d in client.discussions:
-            discussions.append({
-                "id": getattr(d, "id", f"disc_{d.subject}"),
-                "subject": getattr(d, "subject", "Discussion"),
-                "creator": getattr(d, "creator", ""),
-                "recipient": getattr(d, "recipient", ""),
-                "unread": getattr(d, "unread", 0),
-                "date": getattr(d, "date", datetime.now()).isoformat() if hasattr(d, "date") else datetime.now().isoformat(),
-            })
+        try:
+            disc_list = client.discussions() if callable(client.discussions) else client.discussions
+            for d in disc_list:
+                msgs = getattr(d, "messages", [])
+                latest_date = msgs[-1].created.isoformat() if msgs and hasattr(msgs[-1], "created") else datetime.now().isoformat()
+                discussions.append({
+                    "id": getattr(d, "id", f"disc_{getattr(d, 'subject', '')}"),
+                    "subject": getattr(d, "subject", "Discussion"),
+                    "creator": getattr(d, "creator", ""),
+                    "recipient": getattr(d, "recipient", ""),
+                    "unread": getattr(d, "unread", 0),
+                    "closed": getattr(d, "closed", False),
+                    "date": latest_date,
+                })
+        except Exception:
+            pass
     return {"chats": discussions}
 
 @app.get("/chats/{chat_id}/messages")
@@ -527,15 +643,20 @@ def get_chat_messages(
     client = init_client(auth, child_name=child)
     messages = []
     if hasattr(client, "discussions"):
-        d = next((x for x in client.discussions if getattr(x, "id", None) == chat_id), None)
-        if d and hasattr(d, "messages"):
-            for m in d.messages:
-                messages.append({
-                    "id": getattr(m, "id", str(m.date)),
-                    "author": getattr(m, "author", ""),
-                    "content": getattr(m, "content", ""),
-                    "date": m.date.isoformat() if hasattr(m, "date") else datetime.now().isoformat(),
-                })
+        try:
+            disc_list = client.discussions() if callable(client.discussions) else client.discussions
+            d = next((x for x in disc_list if getattr(x, "id", None) == chat_id), None)
+            if d and hasattr(d, "messages"):
+                for m in d.messages:
+                    messages.append({
+                        "id": getattr(m, "id", str(getattr(m, "created", ""))),
+                        "author": getattr(m, "author", "") or "Moi",
+                        "content": getattr(m, "content", ""),
+                        "date": m.created.isoformat() if hasattr(m, "created") and m.created else datetime.now().isoformat(),
+                        "seen": getattr(m, "seen", True),
+                    })
+        except Exception:
+            pass
     return {"messages": messages}
 
 @app.post("/chats/send")
@@ -545,9 +666,54 @@ def send_chat_message(
 ):
     client = init_client(auth, child_name=req.child_name)
     if hasattr(client, "discussions"):
-        d = next((x for x in client.discussions if getattr(x, "id", None) == req.chat_id), None)
+        disc_list = client.discussions() if callable(client.discussions) else client.discussions
+        d = next((x for x in disc_list if getattr(x, "id", None) == req.chat_id), None)
         if not d:
             raise HTTPException(status_code=404, detail="Discussion introuvable")
-        d.reply(req.content)
+        if hasattr(d, "reply") and callable(d.reply):
+            d.reply(req.content)
+        elif hasattr(d, "messages") and d.messages and hasattr(d.messages[-1], "reply"):
+            d.messages[-1].reply(req.content)
         return {"success": True}
     raise HTTPException(status_code=400, detail="Messagerie non disponible")
+
+@app.get("/chats/recipients")
+def get_chat_recipients(
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    client = init_client(auth, child_name=child)
+    recipients = []
+    if hasattr(client, "get_recipients"):
+        try:
+            r_list = client.get_recipients()
+            for r in r_list:
+                recipients.append({
+                    "id": getattr(r, "id", r.name),
+                    "name": getattr(r, "name", "Destinataire"),
+                    "type": getattr(r, "type", ""),
+                    "email": getattr(r, "email", ""),
+                    "with_discussion": getattr(r, "with_discussion", True),
+                })
+        except Exception:
+            pass
+    return {"recipients": recipients}
+
+@app.post("/chats/new")
+def create_new_chat(
+    req: CreateChatRequest,
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    client = init_client(auth, child_name=req.child_name)
+    if hasattr(client, "new_discussion") and hasattr(client, "get_recipients"):
+        try:
+            all_r = client.get_recipients()
+            target_r = [r for r in all_r if getattr(r, "id", r.name) in req.recipient_ids]
+            new_disc = client.new_discussion(req.subject, req.content, target_r if target_r else all_r[:1])
+            return {
+                "success": True,
+                "chat_id": getattr(new_disc, "id", f"disc_{req.subject}")
+            }
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Impossible d'initier la discussion: {str(e)}")
+    raise HTTPException(status_code=400, detail="Fonctionnalité non supportée par cet établissement")

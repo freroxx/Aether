@@ -12,15 +12,20 @@ export async function fetchPronoteAttendance(
   try {
     const data = await PronoteApiClient.getAttendance(authToken, childName);
 
-    const absences: Absence[] = (data.absences || []).map((a: any) => ({
-      id: a.id,
-      from: new Date(a.from || Date.now()),
-      to: new Date(a.to || Date.now()),
-      justified: a.justified ?? false,
-      reason: a.reason || "",
-      timeMissed: 0,
-      createdByAccount: accountId,
-    }));
+    const absences: Absence[] = (data.absences || []).map((a: any) => {
+      const fromDate = new Date(a.from || Date.now());
+      const toDate = new Date(a.to || Date.now());
+      const diffMins = Math.max(0, Math.round((toDate.getTime() - fromDate.getTime()) / 60000));
+      return {
+        id: a.id,
+        from: fromDate,
+        to: toDate,
+        justified: a.justified ?? false,
+        reason: a.reason || "",
+        timeMissed: diffMins || 60, // default 1 hour if same start/end
+        createdByAccount: accountId,
+      };
+    });
 
     const delays: Delay[] = (data.delays || []).map((d: any) => ({
       id: d.id,

@@ -209,7 +209,12 @@ export class Pronote implements SchoolServicePlugin {
   }
 
   async getChatRecipients(chat: Chat): Promise<Recipient[]> {
-    return [];
+    await this.checkTokenValidty();
+    return fetchPronoteChatRecipients(
+      this.getAuthToken(),
+      chat,
+      this.getSelectedChildName()
+    );
   }
 
   async getChatMessages(chat: Chat): Promise<Message[]> {
@@ -223,7 +228,11 @@ export class Pronote implements SchoolServicePlugin {
   }
 
   async getRecipientsAvailableForNewChat(): Promise<Recipient[]> {
-    return [];
+    await this.checkTokenValidty();
+    return fetchPronoteRecipients(
+      this.getAuthToken(),
+      this.getSelectedChildName()
+    );
   }
 
   async sendMessageInChat(chat: Chat, content: string): Promise<void> {
@@ -238,7 +247,11 @@ export class Pronote implements SchoolServicePlugin {
 
   async setNewsAsAcknowledged(news: News): Promise<News> {
     await this.checkTokenValidty();
-    return setPronoteNewsAsAcknowledged(this.getAuthToken(), news);
+    return setPronoteNewsAsAcknowledged(
+      this.getAuthToken(),
+      news,
+      this.getSelectedChildName()
+    );
   }
 
   async setHomeworkCompletion(homework: Homework, state?: boolean): Promise<Homework> {

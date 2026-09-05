@@ -25,9 +25,21 @@ export async function fetchPronoteChats(
 
 export async function fetchPronoteChatRecipients(
   authToken: string,
-  chat: Chat
+  chat: Chat,
+  childName?: string
 ): Promise<Recipient[]> {
-  return [];
+  try {
+    const data = await PronoteApiClient.getChatRecipients(authToken, childName);
+    return (data.recipients || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      type: r.type,
+    }));
+  } catch (err) {
+    error(`Failed to fetch chat recipients: ${err}`, "fetchPronoteChatRecipients");
+    return [];
+  }
 }
 
 export async function fetchPronoteChatMessages(
@@ -62,9 +74,21 @@ export async function sendPronoteMessageInChat(
 }
 
 export async function fetchPronoteRecipients(
-  authToken: string
+  authToken: string,
+  childName?: string
 ): Promise<Recipient[]> {
-  return [];
+  try {
+    const data = await PronoteApiClient.getChatRecipients(authToken, childName);
+    return (data.recipients || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      type: r.type,
+    }));
+  } catch (err) {
+    error(`Failed to fetch recipients: ${err}`, "fetchPronoteRecipients");
+    return [];
+  }
 }
 
 export async function createPronoteMail(
@@ -75,12 +99,31 @@ export async function createPronoteMail(
   recipients: Recipient[],
   childName?: string
 ): Promise<Chat> {
-  return {
-    id: `chat_${Date.now()}`,
-    subject,
-    recipient: recipients.map(r => r.name).join(", "),
-    creator: "Moi",
-    date: new Date(),
-    createdByAccount: accountId,
-  };
+  try {
+    const res = await PronoteApiClient.createChat(
+      authToken,
+      subject,
+      content,
+      recipients.map(r => r.id),
+      childName
+    );
+    return {
+      id: res.chat_id || `chat_${Date.now()}`,
+      subject,
+      recipient: recipients.map(r => r.name).join(", "),
+      creator: "Moi",
+      date: new Date(),
+      createdByAccount: accountId,
+    };
+  } catch (err) {
+    error(`Failed to create mail: ${err}`, "createPronoteMail");
+    return {
+      id: `chat_${Date.now()}`,
+      subject,
+      recipient: recipients.map(r => r.name).join(", "),
+      creator: "Moi",
+      date: new Date(),
+      createdByAccount: accountId,
+    };
+  }
 }

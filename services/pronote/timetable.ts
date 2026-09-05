@@ -11,7 +11,8 @@ export async function fetchPronoteWeekTimetable(
   childName?: string
 ): Promise<CourseDay[]> {
   try {
-    const { start, end } = getDateRangeOfWeek(weekNumberRaw);
+    const year = date ? date.getFullYear() : new Date().getFullYear();
+    const { start, end } = getDateRangeOfWeek(weekNumberRaw, year);
     const fromStr = start.toISOString().split("T")[0];
     const toStr = end.toISOString().split("T")[0];
 

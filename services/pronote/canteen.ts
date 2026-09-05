@@ -10,35 +10,57 @@ export async function fetchPronoteCanteenMenu(
 ): Promise<CanteenMenu[]> {
   try {
     const fromStr = date.toISOString().split("T")[0];
-    const data = await PronoteApiClient.getCanteen(authToken, fromStr, undefined, childName);
+    const toDate = new Date(date);
+    toDate.setDate(toDate.getDate() + 6);
+    const toStr = toDate.toISOString().split("T")[0];
+
+    const data = await PronoteApiClient.getCanteen(authToken, fromStr, toStr, childName);
 
     return (data.menus || []).map((m: any) => {
-      const lunchMeal = m.meals?.[0];
-      const dinnerMeal = m.meals?.[1];
+      let lunchMeal = undefined;
+      let dinnerMeal = undefined;
+
+      if (m.meal) {
+        const mealObj = {
+          entry: (m.meal.entry || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
+          main: (m.meal.main || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
+          side: (m.meal.side || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
+          cheese: (m.meal.cheese || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
+          dessert: (m.meal.dessert || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
+          drink: [],
+        };
+        if (m.is_lunch ?? true) lunchMeal = mealObj;
+        if (m.is_dinner ?? false) dinnerMeal = mealObj;
+      } else if (m.meals) {
+        const rawLunch = m.meals?.[0];
+        const rawDinner = m.meals?.[1];
+        if (rawLunch) {
+          lunchMeal = {
+            entry: (rawLunch.items || []).slice(0, 2).map((name: string) => ({ name })),
+            main: (rawLunch.items || []).slice(2, 4).map((name: string) => ({ name })),
+            side: [],
+            cheese: [],
+            dessert: (rawLunch.items || []).slice(4).map((name: string) => ({ name })),
+            drink: [],
+          };
+        }
+        if (rawDinner) {
+          dinnerMeal = {
+            entry: (rawDinner.items || []).slice(0, 2).map((name: string) => ({ name })),
+            main: (rawDinner.items || []).slice(2, 4).map((name: string) => ({ name })),
+            side: [],
+            cheese: [],
+            dessert: (rawDinner.items || []).slice(4).map((name: string) => ({ name })),
+            drink: [],
+          };
+        }
+      }
 
       return {
         date: new Date(m.date),
         createdByAccount: accountId,
-        lunch: lunchMeal
-          ? {
-              entry: (lunchMeal.items || []).slice(0, 2).map((name: string) => ({ name })),
-              main: (lunchMeal.items || []).slice(2, 4).map((name: string) => ({ name })),
-              side: [],
-              cheese: [],
-              dessert: (lunchMeal.items || []).slice(4).map((name: string) => ({ name })),
-              drink: [],
-            }
-          : undefined,
-        dinner: dinnerMeal
-          ? {
-              entry: (dinnerMeal.items || []).slice(0, 2).map((name: string) => ({ name })),
-              main: (dinnerMeal.items || []).slice(2, 4).map((name: string) => ({ name })),
-              side: [],
-              cheese: [],
-              dessert: (dinnerMeal.items || []).slice(4).map((name: string) => ({ name })),
-              drink: [],
-            }
-          : undefined,
+        lunch: lunchMeal,
+        dinner: dinnerMeal,
       };
     });
   } catch (err) {

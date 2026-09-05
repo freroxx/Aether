@@ -15,13 +15,14 @@ export async function fetchPronoteGrades(
     for (const g of data.grades || []) {
       const subjectName = g.subject || "Matière";
       const subjectId = subjectName.toLowerCase().replace(/\s+/g, "_");
+      const subjAvg = data.averages?.subjects?.[subjectName];
 
       if (!subjectsMap[subjectId]) {
         subjectsMap[subjectId] = {
           id: subjectId,
           name: subjectName,
-          classAverage: { value: 0 },
-          outOf: { value: 20 },
+          classAverage: { value: subjAvg?.class_average ?? 0 },
+          outOf: { value: subjAvg?.out_of ?? 20 },
           grades: [],
         };
       }

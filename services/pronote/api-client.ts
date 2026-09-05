@@ -250,6 +250,43 @@ export const PronoteApiClient = {
     });
   },
 
+  async getChatRecipients(authToken: string, child?: string): Promise<{ recipients: any[] }> {
+    return request("/chats/recipients", {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async createChat(
+    authToken: string,
+    subject: string,
+    content: string,
+    recipientIds: string[],
+    child?: string
+  ): Promise<{ success: boolean; chat_id: string }> {
+    return request("/chats/new", {
+      method: "POST",
+      authToken,
+      body: {
+        subject,
+        content,
+        recipient_ids: recipientIds,
+        child_name: child,
+      },
+    });
+  },
+
+  async markNewsRead(authToken: string, newsId: string, child?: string): Promise<{ success: boolean }> {
+    return request("/news/read", {
+      method: "POST",
+      authToken,
+      body: {
+        news_id: newsId,
+        child_name: child,
+      },
+    });
+  },
+
   async geolocation(coords: { latitude: number; longitude: number }): Promise<Array<{ name: string; url: string; distance: number; postalCode?: string }>> {
     return pronoteGeolocation(coords);
   }

@@ -28,8 +28,14 @@ export async function fetchPronoteNews(
 
 export async function setPronoteNewsAsAcknowledged(
   authToken: string,
-  news: News
+  news: News,
+  childName?: string
 ): Promise<News> {
+  try {
+    await PronoteApiClient.markNewsRead(authToken, news.id, childName);
+  } catch (err) {
+    error(`Failed to mark news read: ${err}`, "setPronoteNewsAsAcknowledged");
+  }
   return {
     ...news,
     acknowledged: true,
