@@ -132,6 +132,15 @@ export default function Layout() {
             headerLargeTitle: false,
           }}
         />
+        <Stack.Screen
+          name="android-calendars"
+          options={{
+            headerTitle: "Calendriers Android",
+            headerBackButtonDisplayMode: "minimal",
+            headerTransparent: false,
+            headerLargeTitle: false,
+          }}
+        />
       </Stack>
     </>
   );
