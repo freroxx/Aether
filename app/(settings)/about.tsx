@@ -218,6 +218,25 @@ export default function SettingsAbout() {
           </Typography>
         </List.Item>
 
+        <List.Item
+          onPress={() => Linking.openURL("https://github.com/freroxx/Aether/blob/main/privacy.md")}
+        >
+          <List.Leading>
+            <View style={styles.iconCircle}>
+              <ShieldCheck size={20} color="#29947A" />
+            </View>
+          </List.Leading>
+          <Typography variant="title" weight="bold">
+            Politique de confidentialité
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Zéro pistage, chiffrement local et respect de votre vie privée
+          </Typography>
+          <List.Trailing>
+            <Papicons name="ChevronRight" opacity={0.5} size={20} />
+          </List.Trailing>
+        </List.Item>
+
         <List.Item>
           <List.Leading>
             <View style={styles.iconCircle}>
