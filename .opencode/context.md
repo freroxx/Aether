@@ -1,6 +1,11 @@
 # Project Context (Aether fork — updated 2026-09-05)
 
-## Current Status
+## Current Status (updated 2026-09-05, head b0ce8f56)
+- Aether fork todo 16/16 [x]; follow-up fix b0ce8f56 committed, tree clean.
+- BUILD IN PROGRESS by user: bun install OK, prebuild OK, keystore ~/aether-release.keystore created, assembleRelease failed twice: (1) Skia prebuilts missing → fixed via `bunx install-skia`; (2) JS bundle error `../ed/credentials` from pronote/2fa.tsx → fixed by inlining PlatformPressable (Pressable on Android, AnimatedPressable else); accounts.tsx add-service rerouted to /(onboarding)/serviceSelection. User re-running assembleRelease.
+- Prebuild warning (non-blocking): EDGE_TO_EDGE_PLUGIN edgeToEdgeEnabled obsolete on Android 16; strip from app.config.ts in cleanup.
+- Material-symbols Metro WARN (exports subpath fallback) — warning only.
+- task_c4b987d2 (stuck Worker test) — cancel on resume.
 - Mission: Fork Papillon → Aether (Android-only FOSS, Pronote-only, M3 icons, no telemetry). Todo 16/16 [x], tree clean, head e84f2b10.
 - M1 Rebrand DONE (eb915e7b): Aether/aether, com.aether.app, aether://, strings, GitHub URLs.
 - M2 Debloat DONE: telemetry purge (posthog/analytics/consent files + provider + gate + track* calls + logger upload + CI secrets step; Magic default false) in eb915e7b+7dbd7b42; Pronote-only cut (9 service dirs + 5 onboarding dirs deleted, loader/enum/types/fetchSchools/constants trimmed, 8 deps dropped, pawnote-lts KEPT) + cards/transport/restaurants/address-modal/store-fields removed in 28d40367.
@@ -12,7 +17,12 @@
 - Review report: /home/frerox/Aether-Review.md (39KB).
 - Open task IDs: none. task_c4b987d2 (atomic Worker test) left RUNNING — cancel on resume.
 
-## Pending Tasks (follow-ups, not blockers)
+## Pending Tasks (updated 2026-09-05)
+- Confirm user release build passes; fix any further bundle errors the same way (grep deleted-dir imports).
+- Cleanup commit: remove edgeToEdgeEnabled from app.config.ts; untrack .opencode (committed by accident).
+- New keystore secrets for com.aether.app CI before public release.
+- Full Papicons/Lucide→Symbols codemod (~80 files), locales Papillon→Aether bulk, message create-mail UI.
+- Device test menu/messages on live Pronote; run quality.yml gates.
 - Device/CI: bun install, tsc --noEmit, eslint, prebuild android, test menu/messages on live Pronote.
 - New keystore secrets for com.aether.app before public release.
 - Full Papicons/Lucide→Symbols codemod (~80 files), locales Papillon→Aether bulk, message create-mail UI, .opencode untrack (committed by accident).
