@@ -209,6 +209,39 @@ function RootNavigatorContent() {
             presentation: "modal",
           }}
         />
+
+        <Stack.Screen
+          name="(features)/menu"
+          options={{
+            headerShown: false,
+            headerTitle: "Cantine",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+            presentation: "modal",
+          }}
+        />
+
+        <Stack.Screen
+          name="(features)/messages"
+          options={{
+            headerShown: false,
+            headerTitle: "Messages",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+            presentation: "modal",
+          }}
+        />
+
+        <Stack.Screen
+          name="(features)/message"
+          options={{
+            headerShown: false,
+            headerTitle: "Messages",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+            presentation: "modal",
+          }}
+        />
       </Stack>
     </View>
   );

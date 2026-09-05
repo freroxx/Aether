@@ -11,7 +11,7 @@ export default {
     orientation: "both",
     icon: "./assets/images/icon.png",
     scheme: ["aether"],
-    platforms: ["ios", "android"],
+    platforms: ["android"],
     userInterfaceStyle: "automatic",
     ios: {
       appleTeamId: "7RXNP6V83P",
@@ -102,7 +102,6 @@ export default {
       favicon: "./assets/images/favicon.png",
     },
     plugins: [
-      "expo-ios-scene-lifecycle-plugin",
       "expo-router",
       "expo-status-bar",
       "expo-font",
@@ -174,7 +173,6 @@ export default {
           },
         },
       ],
-      "./plugins/with-ios-native-files",
     ],
     experiments: {
       typedRoutes: true,

@@ -1,4 +1,3 @@
-import { LiquidGlassContainer } from '@sbaiahmed1/react-native-blur';
 import { router } from 'expo-router';
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useMemo } from 'react';
@@ -8,18 +7,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import packageJson from '@/package.json';
 import Icon from '@/ui/components/Icon';
+import MaterialIcon from '@/ui/components/MaterialIcon';
 import Stack from '@/ui/components/Stack';
 import Typography from '@/ui/components/Typography';
 import { useSettingsStore } from '@/stores/settings';
 import { getCurrentPeriod } from '@/utils/grades/helper/period';
-import { Papicons } from '@getpapillon/papicons';
 
 import HomeHeaderButton, { HomeHeaderButtonItem } from '../components/HomeHeaderButton';
 import { useHomeHeaderData } from '../hooks/useHomeHeaderData';
 import WrappedBanner from './WrappedBanner';
 import { useTheme } from "expo-router/react-navigation";
-import AnimatedPressable from '@/ui/components/AnimatedPressable';
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition';
 import { ListTouchable } from '@/ui/new/List';
 
 const HomeHeader = () => {
@@ -60,9 +57,9 @@ const HomeHeader = () => {
       color: "#c800ad",
       description: t("Home_Chats_Button_Description_None"),
       onPress: () => {
-        router.push("/(features)/soon");
+        router.push("/(features)/messages");
       },
-      route: "/(features)/soon"
+      route: "/(features)/messages"
     },
     {
       title: t("Home_Menu_Button_Title"),
@@ -71,9 +68,9 @@ const HomeHeader = () => {
       color: "#46c700",
       description: t("Home_Menu_Button_Description"),
       onPress: () => {
-        router.push("/(features)/soon");
+        router.push("/(features)/menu");
       },
-      route: "/(features)/soon"
+      route: "/(features)/menu"
     },
     {
       title: t("Home_Attendance_Title"),
@@ -120,7 +117,7 @@ const HomeHeader = () => {
   return (
     <View style={{ paddingHorizontal: 0, width: "100%", flex: 1, overflow: "visible" }}>
       <View style={{ height: insets.top + 56 }} />
-      <LiquidGlassContainer spacing={8} style={{ overflow: "visible" }}>
+      <View style={{ overflow: "visible" }}>
         <Stack inline flex width={"100%"} style={{ overflow: "visible" }}>
           <View style={{ width: '100%', gap: 6, overflow: "visible" }}>
             {Array.from({ length: Math.ceil(HomeHeaderButtons.length / 2) }).map((_, i) => (
@@ -136,7 +133,7 @@ const HomeHeader = () => {
             ))}
           </View>
         </Stack>
-      </LiquidGlassContainer>
+      </View>
 
       {showReleaseNotesBanner && (
         <ListTouchable
@@ -148,7 +145,7 @@ const HomeHeader = () => {
         >
           <Stack card style={{ marginTop: 12, elevation: 2, backgroundColor: (!theme.dark && Platform.OS === 'android') ? '#FFF' : theme.colors.item, overflow: Platform.OS === 'android' ? 'hidden' : 'visible' }} padding={0}>
             <Stack padding={[12, 10]} gap={8} direction='horizontal'>
-              <Papicons name="sparkles" size={24} color={colors.tint} />
+              <MaterialIcon name="sparkles" size={24} color={colors.tint} />
               
               <Stack inline flex style={{ marginRight: 32 }}>
                 <Typography variant='title'>
@@ -170,7 +167,7 @@ const HomeHeader = () => {
                   style={{ width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.text + '11', position: "absolute", right: 0 }}
                 >
                   <Icon size={16}>
-                    < Papicons name="Cross" />
+                    <MaterialIcon name="close" />
                   </Icon>
                 </View>
               </ListTouchable>

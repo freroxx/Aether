@@ -43,16 +43,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Create secrets.json
-        env:
-          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
-          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
-        run: |
-          jq -n \
-            --arg api_key "$POSTHOG_API_KEY" \
-            --arg host "$POSTHOG_HOST" \
-            '{POSTHOG_API_KEY: $api_key, POSTHOG_HOST: $host}' > secrets.json
-
       - name: Prebuild Android
         run: bunx expo prebuild --platform android --clean
 

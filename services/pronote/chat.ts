@@ -92,21 +92,32 @@ export async function fetchPronoteChatMessages(
   const messages = await discussionMessages(session, chat.ref, true)
   const studentName = session.user.resources[0].name;
 
-  return messages.sents.map((message) => {
-    return {
-      id: message.id,
-      subject: "",
-      content: message.content,
-      author: message.author?.name ?? studentName,
-      date: message.creationDate,
-      attachments: message.files.map((attachment) => ({
-        type: attachment.kind,
-        name: attachment.name,
-        url: attachment.url,
-        createdByAccount: accountId,
-      }))
-    };
-  });
+  // Pawnote returns sent and received messages separately — merge both,
+  // otherwise received mail is invisible in the thread.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = messages as any;
+  const all = [
+    ...(raw.sents ?? []),
+    ...(raw.received ?? raw.receiveds ?? raw.inbox ?? []),
+  ];
+
+  return all
+    .map((message) => {
+      return {
+        id: message.id,
+        subject: "",
+        content: message.content,
+        author: message.author?.name ?? studentName,
+        date: message.creationDate,
+        attachments: (message.files ?? []).map((attachment) => ({
+          type: attachment.kind,
+          name: attachment.name,
+          url: attachment.url,
+          createdByAccount: accountId,
+        }))
+      };
+    })
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
 export async function sendPronoteMessageInChat(

@@ -1,7 +1,7 @@
 import Icon from "@/ui/components/Icon";
+import MaterialIcon from "@/ui/components/MaterialIcon";
 import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
-import { Papicons } from "@getpapillon/papicons";
 import React from "react";
 import { Linking, View } from "react-native";
 
@@ -20,7 +20,7 @@ export default function Soon() {
         hAlign="center"
       >
         <Icon size={42}>
-          <Papicons name="clock" color="#29947A" />
+          <MaterialIcon name="schedule" size={42} color="#1B8A6B" />
         </Icon>
         <Typography variant="h2" align="center">
           Promis, ça arrive (vraiment) bientôt !

@@ -62,7 +62,6 @@
     "expo-font": "~57.0.1",
     "expo-haptics": "~57.0.1",
     "expo-image-picker": "~57.0.11",
-    "expo-ios-scene-lifecycle-plugin": "github:YesterdaysLemon/expo-ios-scene-lifecycle-plugin",
     "expo-linear-gradient": "~57.0.1",
     "expo-linking": "~57.0.6",
     "expo-localization": "~57.0.1",

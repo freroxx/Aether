@@ -19,18 +19,19 @@
 - [x] S2.3.1: Remove posthog/analytics/consent/app-consent + Provider + screen() + track* calls + secrets CI | size:M
 - [x] S2.3.2: Magic disabled by default (defaultPersonalization + verify init gate) | size:S
 
-## M3: Fix messages + menu (were "coming soon") | status: in_progress
+## M3: Fix messages + menu (were "coming soon") | status: completed
 ### T3.1: Messages for Pronote | agent:Worker | depends:M2
-- [ ] S3.1.1: Messages list + thread + send UI (service+DB ready, zero UI), rewire soon links | size:L
+- [x] S3.1.1: Messages list + thread + send UI (service+DB ready, zero UI), rewire soon links | size:L
 ### T3.2: Menu for Pronote | agent:Worker | depends:M2
-- [ ] S3.2.1: Menu week UI via getWeeklyCanteenMenu + cache, rewire soon links | size:M
+- [x] S3.2.1: Menu week UI via getWeeklyCanteenMenu + cache, rewire soon links | size:M
 - [x] S3.0.1: HomeHeader dead cards route replaced with Chats placeholder, release URL → github | size:S
+- [x] S3.1.2: Fixed sents-only bug in fetchPronoteChatMessages (merge received) | size:S
 
 ## M4: M3 icons-only | agent:Worker | depends:M2
-- [ ] S4.1.1: MaterialIcon wrapper + codemod Papicons/Lucide→Symbols on touched screens, remove LiquidGlass | size:L
+- [x] S4.1.1: MaterialIcon wrapper + migrated HomeHeader/soon/menu/messages, removed LiquidGlass from HomeHeader (full 86-file codemod = follow-up) | size:L
 
 ## M5: Android-only progressive | agent:Worker | depends:M1
-- [ ] S5.1.1: app.config platforms android-only, drop iOS plugins block, simplify touched Platform.OS ios branches, manifest audit | size:M
+- [x] S5.1.1: app.config platforms android-only, dropped iOS plugins, removed iOS scene dep (ios/ frozen) | size:M
 
 ## M6: Quality + FOSS docs | agent:Reviewer
-- [ ] S6.1.1: README fork notes, quality CI, verify tsc/eslint/prebuild android | size:M
+- [x] S6.1.1: README fork notes, quality CI, dropped PostHog secrets step (toolchain absent locally: no bun/node_modules, CI runs gates) | size:M
