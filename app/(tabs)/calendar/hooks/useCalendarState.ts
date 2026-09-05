@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Dimensions, FlatList } from 'react-native';
 import { getWeekNumberFromDate } from "@/database/useHomework";
 import { warn } from "@/utils/logger/logger";
-import { trackAdvancedEvent } from "@/utils/logger/analytics";
 
 const INITIAL_INDEX = 10000;
 
@@ -25,7 +24,6 @@ export function useCalendarState() {
       return;
     }
     lastTrackedDateKey.current = dateKey;
-    trackAdvancedEvent("calendar_day_changed");
   }, [date]);
 
   const getDateFromIndex = useCallback((index: number) => {

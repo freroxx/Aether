@@ -20,7 +20,6 @@ import { FadeIn, FadeOut } from "react-native-reanimated";
 import List from "@/ui/new/List";
 import NativeSwitch from "@/ui/native/NativeSwitch";
 import Picker from "@/ui/components/Picker";
-import { trackOptionalEvent } from "@/utils/logger/analytics";
 
 const FONT_OPTIONS = [
   { label: "SN Pro", value: "sn-pro" as const },
@@ -146,9 +145,6 @@ const PersonalizationSettings = () => {
                 vAlign={"center"}
               >
                 <AnimatedPressable onPress={() => {
-                  if (selectedTheme !== "light") {
-                    trackOptionalEvent("color_theme_changed", { theme: "light" });
-                  }
                   setSelectedTheme("light");
                 }}
                   style={{ overflow: "hidden", height: "100%" }}
@@ -166,9 +162,6 @@ const PersonalizationSettings = () => {
                   </Stack>
                 </AnimatedPressable>
                 <AnimatedPressable onPress={() => {
-                  if (selectedTheme !== "dark") {
-                    trackOptionalEvent("color_theme_changed", { theme: "dark" });
-                  }
                   setSelectedTheme("dark");
                 }}
                   style={{ overflow: "hidden", height: "100%" }}
@@ -186,9 +179,6 @@ const PersonalizationSettings = () => {
                   </Stack>
                 </AnimatedPressable>
                 <AnimatedPressable onPress={() => {
-                  if (selectedTheme !== "auto") {
-                    trackOptionalEvent("color_theme_changed", { theme: "auto" });
-                  }
                   setSelectedTheme("auto");
                 }}
                   style={{ overflow: "hidden", height: "100%" }}

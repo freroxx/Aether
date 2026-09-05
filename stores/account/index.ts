@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 import { log } from "@/utils/logger/logger";
-import { trackAdvancedEvent, trackOptionalEvent } from "@/utils/logger/analytics";
 import { initializeTransport } from "@/utils/transport";
 
 import { createMMKVStorage } from '../global'
@@ -33,7 +32,6 @@ export const useAccountStore = create<AccountsStorage>()(
       },
       addAccount: account => {
         set({ accounts: [...get().accounts, account] });
-        trackOptionalEvent("new_account_logged_in");
       },
       updateServiceAuthData: (serviceId: string, authData: Auth) =>
         set({
@@ -66,7 +64,6 @@ export const useAccountStore = create<AccountsStorage>()(
             return account;
           }),
         });
-        trackAdvancedEvent("external_account_added");
       },
       removeServiceFromAccount: serviceId =>
         set({

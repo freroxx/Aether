@@ -29,7 +29,6 @@ import { PapillonZoomIn, PapillonZoomOut } from "@/ui/utils/Transition";
 import { ListTouchable } from "@/ui/new/List";
 import { LegendList, LegendListRef } from "@legendapp/list";
 import { FlashList } from "@shopify/flash-list";
-import { trackAdvancedEvent } from "@/utils/logger/analytics";
 
 const EmojiItem = memo(({ item, onPress, isSelected }: {item: string, onPress: (emoji: string) => void, isSelected: boolean}) => {
   const theme = useTheme();
@@ -326,11 +325,6 @@ export default function EditSubject() {
             store.setSubjectName(String(params.id), selectedName);
             store.setSubjectEmoji(String(params.id), selectedEmoji);
             store.setSubjectColor(String(params.id), selectedColor);
-            trackAdvancedEvent("subject_info_changed", {
-              name_changed: selectedName !== originalName,
-              emoji_changed: selectedEmoji !== originalEmoji,
-              color_changed: selectedColor !== originalColor,
-            });
 
             router.back();
           }}

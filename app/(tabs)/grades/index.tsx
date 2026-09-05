@@ -32,7 +32,6 @@ import { SubjectItem } from './atoms/Subject';
 import List from '@/ui/new/List';
 import ActionMenu from '@/ui/components/ActionMenu';
 import MainTabErrorBoundary from '@/ui/components/MainTabErrorBoundary';
-import { trackAdvancedEvent } from '@/utils/logger/analytics';
 import useResizable from "@/ui/utils/Resizable";
 import { CompactGradeList } from "@/components/CompactGradeList";
 
@@ -447,9 +446,6 @@ const GradesView: React.FC = () => {
                 const selectedPeriodId = actionId.replace("period:", "");
                 const newPeriod = periods.find(period => period.id === selectedPeriodId);
                 setCurrentPeriod(newPeriod);
-                if (newPeriod?.id) {
-                  trackAdvancedEvent("grades_period_changed");
-                }
               }
             }}
             actions={

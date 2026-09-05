@@ -35,15 +35,6 @@ export const DEMO_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: "minimal" as const,
 };
 
-export const CONSENT_SCREEN_OPTIONS = {
-  gesturesEnabled: false,
-  fullScreenGestureEnabled: false,
-  presentation: "fullScreenModal" as const,
-  backButtonVisible: false,
-  headerLargeTitle: false,
-  headerShown: false,
-} as const;
-
 export const CHANGELOG_SCREEN_OPTIONS = {
   headerTitle: t("Changelog_Title"),
   headerLargeTitle: false,

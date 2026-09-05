@@ -40,7 +40,6 @@ import {
 
 import { calculateAmplifiedGraphPoints, GraphPoint } from "../utils/graph";
 import ActionMenu from "@/ui/components/ActionMenu";
-import { trackAdvancedEvent } from "@/utils/logger/analytics";
 import {
   Animation,
   animation,
@@ -530,12 +529,6 @@ const Averages = ({
                       );
                       if (nextAlgorithm) {
                         setAlgorithm(nextAlgorithm);
-                        trackAdvancedEvent(
-                          "grades_calculation_method_changed",
-                          {
-                            method: nextAlgorithm.key,
-                          }
-                        );
                       }
                     }
                   }}

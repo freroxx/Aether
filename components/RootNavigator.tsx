@@ -8,7 +8,6 @@ import {
   AI_SCREEN_OPTIONS,
   ALERT_SCREEN_OPTIONS,
   CHANGELOG_SCREEN_OPTIONS,
-  CONSENT_SCREEN_OPTIONS,
   DEMO_SCREEN_OPTIONS,
   DEVMODE_REQUESTS_SCREEN_OPTIONS,
   DEVMODE_SCREEN_OPTIONS,
@@ -67,7 +66,6 @@ function RootNavigatorContent() {
         />
         <Stack.Screen name="page" />
         <Stack.Screen name="demo" options={DEMO_SCREEN_OPTIONS} />
-        <Stack.Screen name="consent" options={CONSENT_SCREEN_OPTIONS} />
         <Stack.Screen name="changelog" options={CHANGELOG_SCREEN_OPTIONS} />
         <Stack.Screen name="ai" options={AI_SCREEN_OPTIONS} />
         <Stack.Screen name="devmode" options={DEVMODE_SCREEN_OPTIONS} />

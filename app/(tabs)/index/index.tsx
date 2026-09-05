@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccountStore } from '@/stores/account';
 import { useSettingsStore } from '@/stores/settings';
-import { checkConsent } from '@/utils/logger/consent';
 
 import HomeHeader from './atoms/HomeHeader';
 import HomeTopBar from './atoms/HomeTopBar';
@@ -46,14 +45,6 @@ const HomeScreen = () => {
       store.initializeTransport(account.schoolName);
     }
   }, [account, accounts.length, router, store]);
-
-  React.useEffect(() => {
-    checkConsent().then(consent => {
-      if (!consent.given) {
-        router.push("../consent");
-      }
-    });
-  }, []);
 
   useHomeData();
   const { courses } = useTimetableWidgetData();
