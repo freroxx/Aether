@@ -145,7 +145,7 @@ const HomeHeader = () => {
         >
           <Stack card style={{ marginTop: 12, elevation: 2, backgroundColor: (!theme.dark && Platform.OS === 'android') ? '#FFF' : theme.colors.item, overflow: Platform.OS === 'android' ? 'hidden' : 'visible' }} padding={0}>
             <Stack padding={[12, 10]} gap={8} direction='horizontal'>
-              <MaterialIcon name="sparkles" size={24} color={colors.tint} />
+              <MaterialIcon name="auto-awesome" size={24} color={colors.tint} />
               
               <Stack inline flex style={{ marginRight: 32 }}>
                 <Typography variant='title'>

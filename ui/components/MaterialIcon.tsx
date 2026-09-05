@@ -1,9 +1,9 @@
-import { MaterialSymbols } from "@expo/material-symbols";
+import { MaterialIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleProp, TextStyle } from "react-native";
 
 export type MaterialIconName = React.ComponentProps<
-  typeof MaterialSymbols
+  typeof MaterialIcons
 >["name"];
 
 interface MaterialIconProps {
@@ -14,10 +14,11 @@ interface MaterialIconProps {
 }
 
 /**
- * Aether icon wrapper (Material 3 Expressive, Android-only).
+ * Aether icon wrapper (Material 3, Android-only).
  * Use this instead of Papicons/Lucide for all new or touched screens.
- * Name mapping examples: Papicons "Sparkles" -> "sparkles",
- * "Cross" -> "close", "clock" -> "schedule", "Check" -> "check".
+ * Backed by @expo/vector-icons MaterialIcons (bundled font, no native link).
+ * NOTE: @expo/material-symbols ships XML assets only (no JS component),
+ * so it cannot be imported from JS — hence this wrapper.
  */
 export default function MaterialIcon({
   name,
@@ -26,7 +27,7 @@ export default function MaterialIcon({
   style,
 }: MaterialIconProps) {
   return (
-    <MaterialSymbols
+    <MaterialIcons
       name={name}
       size={size}
       color={color}
