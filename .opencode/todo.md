@@ -19,11 +19,12 @@
 - [x] S2.3.1: Remove posthog/analytics/consent/app-consent + Provider + screen() + track* calls + secrets CI | size:M
 - [x] S2.3.2: Magic disabled by default (defaultPersonalization + verify init gate) | size:S
 
-## M3: Fix messages + menu (were "coming soon") | status: pending
+## M3: Fix messages + menu (were "coming soon") | status: in_progress
 ### T3.1: Messages for Pronote | agent:Worker | depends:M2
-- [ ] S3.1.1: Fix useChat id mismatch + fetch sents-only bug, add messages list + thread + send UI, rewire soon links | size:L
+- [ ] S3.1.1: Messages list + thread + send UI (service+DB ready, zero UI), rewire soon links | size:L
 ### T3.2: Menu for Pronote | agent:Worker | depends:M2
-- [ ] S3.2.1: Verify pronote canteen service + build menu week UI, drop balances, rewire soon links | size:M
+- [ ] S3.2.1: Menu week UI via getWeeklyCanteenMenu + cache, rewire soon links | size:M
+- [x] S3.0.1: HomeHeader dead cards route replaced with Chats placeholder, release URL → github | size:S
 
 ## M4: M3 icons-only | agent:Worker | depends:M2
 - [ ] S4.1.1: MaterialIcon wrapper + codemod Papicons/Lucide→Symbols on touched screens, remove LiquidGlass | size:L
