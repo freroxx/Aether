@@ -27,11 +27,11 @@ const HomeHeader = () => {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { colors } = theme;
-  const { availableCanteenCards, attendancesPeriods, attendances, absencesCount, news } = useHomeHeaderData();
+  const { attendancesPeriods, attendances, absencesCount, news } = useHomeHeaderData();
   const settingsStore = useSettingsStore(state => state.personalization);
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
   const currentVersion = packageJson.version;
-  const releaseNotesUrl = `https://papillon.bzh/release-notes/${currentVersion}`;
+  const releaseNotesUrl = `https://github.com/aether-app/releases/tag/v${currentVersion}`;
   const currentAttendancePeriod = attendancesPeriods.length > 0
     ? getCurrentPeriod(attendancesPeriods)
     : undefined;
@@ -54,17 +54,15 @@ const HomeHeader = () => {
 
   const HomeHeaderButtons: HomeHeaderButtonItem[] = useMemo(() => [
     {
-      title: t("Home_Cards_Button_Title"),
-      image: require("@/assets/shaded_icons/cards.png"),
-      icon: "card",
+      title: t("Home_Chats_Button_Title"),
+      image: require("@/assets/shaded_icons/actu.png"),
+      icon: "newspaper",
       color: "#c800ad",
-      description: availableCanteenCards.length > 0 ?
-        (availableCanteenCards.length > 1 ? t("Home_Cards_Button_Description_Number", { number: availableCanteenCards.length }) :
-          t("Home_Cards_Button_Description_Singular")) : t("Home_Cards_Button_Description_None"),
+      description: t("Home_Chats_Button_Description_None"),
       onPress: () => {
-        router.push("/(features)/(cards)/cards");
+        router.push("/(features)/soon");
       },
-      route: "/(features)/(cards)/cards"
+      route: "/(features)/soon"
     },
     {
       title: t("Home_Menu_Button_Title"),
@@ -117,7 +115,7 @@ const HomeHeader = () => {
       },
       route: "/(features)/(news)/news"
     }
-  ], [availableCanteenCards, absencesCount, news, currentAttendancePeriod, attendancesPeriods, attendances, t]);
+  ], [absencesCount, news, currentAttendancePeriod, attendancesPeriods, attendances, t]);
 
   return (
     <View style={{ paddingHorizontal: 0, width: "100%", flex: 1, overflow: "visible" }}>
