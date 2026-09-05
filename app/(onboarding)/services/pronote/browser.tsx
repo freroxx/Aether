@@ -27,7 +27,9 @@ export default function PronoteENTLogin() {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const { params } = useRoute<any>();
-  const { url = "", school, accountType = "eleve" } = (params as any) || {};
+  const { url: rawUrl = "", school, accountType = "eleve" } = (params as any) || {};
+  // Normalize: strip trailing slash so all URL constructions are consistent
+  const url = rawUrl.replace(/\/+$/, "");
   const isParent = accountType === "parent";
   const targetHtml = isParent ? "mobile.parent.html" : "mobile.eleve.html";
   const baseURL = url.split("/pronote")[0] || "";
@@ -320,8 +322,8 @@ export default function PronoteENTLogin() {
     if (url === infoMobileURL) {
       console.log("Injecting JSON script for InfoMobileURL");
       webViewRef.current?.injectJavaScript(INJECT_PRONOTE_JSON);
-    } else if (url.includes("mobile.eleve.html")) {
-      console.log("Injecting login state scripts for student account");
+    } else if (url.includes("mobile.eleve.html") || url.includes("mobile.parent.html")) {
+      console.log("Injecting login state scripts for account type:", isParent ? "parent" : "eleve");
       webViewRef.current?.injectJavaScript(
         INJECT_PRONOTE_INITIAL_LOGIN_HOOK,
       );
