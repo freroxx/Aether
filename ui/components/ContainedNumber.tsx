@@ -13,6 +13,11 @@ const ContainedNumber: React.FC<ContainedNumberProps> = ({ denominator, color, c
   const theme = useTheme();
   const finalColor = color || theme.colors.tint;
 
+  const normalizedDenominator =
+    !denominator || denominator === "/" || denominator === "/undefined" || denominator === "/null"
+      ? (denominator ? "/20" : undefined)
+      : denominator;
+
   return (
     <View
       style={{
@@ -35,9 +40,9 @@ const ContainedNumber: React.FC<ContainedNumberProps> = ({ denominator, color, c
           {children}
         </Typography>
       )}
-      {denominator && (
+      {normalizedDenominator && (
         <Typography variant='body2' color={finalColor + "a6"} style={{ marginBottom: 3 }}>
-          {denominator}
+          {normalizedDenominator}
         </Typography>
       )}
     </View>

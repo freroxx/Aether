@@ -1,5 +1,3 @@
-import { SessionHandle } from "@blockshub/pawnote-lts";
-
 import type { MockData } from "@/services/mock";
 import { Pronote } from "@/services/pronote";
 import { Attendance } from "@/services/shared/attendance";
@@ -33,10 +31,7 @@ export interface SchoolServicePlugin {
   capabilities: Capabilities[];
   authData: Auth;
   requiresInternet?: boolean;
-  session:
-    | any
-    | SessionHandle
-    | undefined;
+  session: any;
 
   refreshAccount: (
     credentials: Auth

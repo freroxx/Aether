@@ -1,154 +1,83 @@
-import {
-  notebook,
-  NotebookAbsence,
-  NotebookDelay,
-  NotebookObservation,
-  NotebookPunishment,
-  SessionHandle,
-  TabLocation,
-} from "@blockshub/pawnote-lts";
-
+import { PronoteApiClient } from "@/services/pronote/api-client";
 import { Absence, Attendance, Delay, Observation, Punishment } from "@/services/shared/attendance";
 import { Period } from "@/services/shared/grade";
 import { error } from "@/utils/logger/logger";
 
-/**
- * Fetches student Notebook from PRONOTE for a specified periot.
- * @param {SessionHandle} session - The session handle for the PRONOTE session.
- * @param {string} period - The name of the period to fetch attendance for.
- * @param {string} accountId - The ID of the account making the request.
- * @return {Promise<Attendance>} - A promise that resolves to the attendance data for the specified period.
- */
-export async function fetchPronoteAttendance(session: SessionHandle, accountId: string, period: string): Promise<Attendance> {
-  if (!session) {
-    error("Session is undefined", "fetchPronoteAttendance");
-  }
+export async function fetchPronoteAttendance(
+  authToken: string,
+  accountId: string,
+  period: string,
+  childName?: string
+): Promise<Attendance> {
+  try {
+    const data = await PronoteApiClient.getAttendance(authToken, childName);
 
-  const attendanceTab = session.user.resources[0].tabs.get(TabLocation.Notebook);
-  if (!attendanceTab) {
-    error("Attendance tab not found in session", "fetchPronoteAttendance");
-  }
+    const absences: Absence[] = (data.absences || []).map((a: any) => ({
+      id: a.id,
+      from: new Date(a.from || Date.now()),
+      to: new Date(a.to || Date.now()),
+      justified: a.justified ?? false,
+      reason: a.reason || "",
+      timeMissed: 0,
+      createdByAccount: accountId,
+    }));
 
-  const pawnotePeriod = attendanceTab.periods.find(p => p.name === period);
-  if (!pawnotePeriod) {
-    error(`Period "${period}" not found in attendance tab`, "fetchPronoteGrades");
-  }
+    const delays: Delay[] = (data.delays || []).map((d: any) => ({
+      id: d.id,
+      givenAt: new Date(d.date || Date.now()),
+      duration: d.duration || 0,
+      justified: d.justified ?? false,
+      reason: d.reason || "",
+      createdByAccount: accountId,
+    }));
 
-  const attendance = await notebook(session, pawnotePeriod);
-  const delays = mapDelays(attendance.delays, accountId).sort((a, b) => a.givenAt.getTime() - b.givenAt.getTime());
-  const absences = mapAbsences(attendance.absences, accountId).sort((a, b) => a.from.getTime() - b.from.getTime());
-  const punishments = mapPunishments(attendance.punishments, accountId).sort((a, b) => a.givenAt.getTime() - b.givenAt.getTime());
-  const observations = mapObservations(attendance.observations).sort((a, b) => a.givenAt.getTime() - b.givenAt.getTime());
+    const punishments: Punishment[] = (data.punishments || []).map((p: any) => ({
+      id: p.id,
+      givenAt: new Date(p.date || Date.now()),
+      givenBy: p.giver || "",
+      exclusion: false,
+      duringLesson: false,
+      homework: { text: "", documents: [] },
+      reason: { text: p.reason || "", circumstances: "", documents: [] },
+      nature: p.nature || "",
+      duration: 0,
+    }));
 
-  return {
-    delays: delays,
-    absences: absences,
-    punishments: punishments,
-    observations: observations,
-    createdByAccount: accountId
+    return {
+      absences,
+      delays,
+      punishments,
+      observations: [],
+      createdByAccount: accountId,
+    };
+  } catch (err) {
+    error(`Failed to fetch attendance: ${err}`, "fetchPronoteAttendance");
+    return {
+      absences: [],
+      delays: [],
+      punishments: [],
+      observations: [],
+      createdByAccount: accountId,
+    };
   }
 }
 
-/**
- * Fetches all attendance periods from PRONOTE.
- * @param {SessionHandle} session - The session handle for the PRONOTE session.
- * @param {string} accountId - The ID of the account making the request.
- * @return {Promise<Array<Period>>} - A promise that resolves to an array of attendance periods.
- */
-export async function fetchPronoteAttendancePeriods(session: SessionHandle, accountId: string): Promise<Period[]> {
-  const attendanceTab = session.user.resources[0].tabs.get(TabLocation.Notebook);
-  if (!attendanceTab) {
-    error("Attendance tab not found in session", "fetchPronotePeriods");
+export async function fetchPronoteAttendancePeriods(
+  authToken: string,
+  accountId: string,
+  childName?: string
+): Promise<Period[]> {
+  try {
+    const data = await PronoteApiClient.getGradePeriods(authToken, childName);
+    return (data.periods || []).map((p: any) => ({
+      id: p.id || p.name,
+      name: p.name,
+      start: p.start ? new Date(p.start) : new Date(),
+      end: p.end ? new Date(p.end) : new Date(),
+      createdByAccount: accountId,
+    }));
+  } catch (err) {
+    error(`Failed to fetch attendance periods: ${err}`, "fetchPronoteAttendancePeriods");
+    return [];
   }
-
-  return attendanceTab.periods.map(p => ({
-    id: p.id,
-    name: p.name,
-    start: p.startDate,
-    end: p.endDate,
-    createdByAccount: accountId
-  }));
-}
-
-/**
- * Maps a NotebookObservation[] to a shared Observation[].
- * @param observations
- */
-function mapObservations(observations: NotebookObservation[]): Observation[] {
-  return observations.map(o => ({
-    id: o.id,
-    givenAt: o.date,
-    sectionName: o.name,
-    sectionType: o.kind,
-    subjectName: o.subject?.name,
-    shouldParentsJustify: o.shouldParentsJustify,
-    reason: o.reason,
-  }));
-}
-
-/**
- * Maps NotebookDelay[] to shared Delay[].
- * @param delays
- */
-function mapDelays(delays: NotebookDelay[], accountId: string): Delay[] {
-  return delays.map(d => ({
-    id: d.id,
-    givenAt: d.date,
-    reason: d.reason,
-    justified: d.justified,
-    duration: d.minutes,
-    createdByAccount: accountId
-  }));
-}
-
-/**
- * Maps NotebookAbsence[] to shared Absence[].
- * @param absences
- */
-function mapAbsences(absences: NotebookAbsence[], accountId: string): Absence[] {
-  return absences.map(a => ({
-    id: a.id,
-    from: a.startDate,
-    to: a.endDate,
-    reason: a.reason,
-    justified: a.justified,
-    timeMissed: a.hoursMissed * 60 + a.minutesMissed,
-    createdByAccount: accountId
-  }));
-}
-
-/**
- * Maps NotebookPunishment[] to shared Punishment[].
- * @param punishments
- * @param accountId
- */
-function mapPunishments(punishments: NotebookPunishment[], accountId: string): Punishment[] {
-  return punishments.map(p => ({
-    id: p.id,
-    givenAt: p.dateGiven,
-    givenBy: p.giver,
-    exclusion: p.exclusion,
-    duringLesson: p.isDuringLesson,
-    homework: {
-      text: p.workToDo,
-      documents: p.workToDoDocuments.map((attachment) => ({
-        type: attachment.kind,
-        name: attachment.name,
-        url: attachment.url,
-        createdByAccount: accountId,
-      }))
-    },
-    reason: {
-      text: p.reasons.join(", "),
-      circumstances: p.circumstances,
-      documents: p.circumstancesDocuments.map((attachment) => ({
-        type: attachment.kind,
-        name: attachment.name,
-        url: attachment.url,
-        createdByAccount: accountId,
-      }))
-    },
-    nature: p.title,
-    duration: p.durationMinutes
-  }));
 }

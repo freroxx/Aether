@@ -32,7 +32,10 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
     return rawTimetable.map(day => ({
       ...day,
       courses: day.courses.filter(course =>
-        services.includes(course.createdByAccount) || course.createdByAccount.startsWith('ical_')
+        services.includes(course.createdByAccount) ||
+        course.createdByAccount.startsWith('ical_') ||
+        course.createdByAccount === 'android_calendar' ||
+        course.createdByAccount.startsWith('calendar_')
       )
     })).filter(day => day.courses.length > 0);
   }, [rawTimetable, services]);

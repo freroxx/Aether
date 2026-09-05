@@ -1,150 +1,84 @@
-import {
-  GradeKind,
-  GradesOverview,
-  gradesOverview,
-  GradeValue,
-  SessionHandle,
-  TabLocation,
-} from "@blockshub/pawnote-lts";
-
-import { AttachmentType } from "@/services/shared/attachment";
+import { PronoteApiClient } from "@/services/pronote/api-client";
 import { Grade, GradeScore, Period, PeriodGrades, Subject } from "@/services/shared/grade";
 import { error } from "@/utils/logger/logger";
 
-/**
- * Fetches grades from PRONOTE for a specified period.
- * @param {SessionHandle} session - The session handles for the PRONOTE account.
- * @param {string} accountId - The ID of the account requesting the homeworks.
- * @param {string} period - The name of the period for which to fetch grades.
- * @returns {Promise<PeriodGrades>} A promise that resolves to PeriodGrades.
- */
-export async function fetchPronoteGrades(session: SessionHandle, accountId: string, period: Period): Promise<PeriodGrades> {
-  if (!session) {
-    error("Session is undefined", "fetchPronoteGrades");
+export async function fetchPronoteGrades(
+  authToken: string,
+  accountId: string,
+  period: Period,
+  childName?: string
+): Promise<PeriodGrades> {
+  try {
+    const data = await PronoteApiClient.getGrades(authToken, period.name, childName);
+    const subjectsMap: Record<string, Subject> = {};
+
+    for (const g of data.grades || []) {
+      const subjectName = g.subject || "Matière";
+      const subjectId = subjectName.toLowerCase().replace(/\s+/g, "_");
+
+      if (!subjectsMap[subjectId]) {
+        subjectsMap[subjectId] = {
+          id: subjectId,
+          name: subjectName,
+          classAverage: { value: 0 },
+          outOf: { value: 20 },
+          grades: [],
+        };
+      }
+
+      const mappedGrade: Grade = {
+        id: g.id,
+        subjectId,
+        subjectName,
+        description: g.description || "",
+        givenAt: new Date(g.date),
+        outOf: g.out_of !== undefined ? { value: g.out_of } : { value: 20 },
+        coefficient: g.coefficient || 1,
+        studentScore: g.value !== null && g.value !== undefined ? { value: g.value } : { value: 0, disabled: true, status: "Abs/Non noté" },
+        averageScore: g.average !== null && g.average !== undefined ? { value: g.average } : undefined,
+        maxScore: g.max !== null && g.max !== undefined ? { value: g.max } : undefined,
+        minScore: g.min !== null && g.min !== undefined ? { value: g.min } : undefined,
+        createdByAccount: accountId,
+      };
+
+      subjectsMap[subjectId].grades?.push(mappedGrade);
+    }
+
+    const subjects = Object.values(subjectsMap);
+
+    return {
+      studentOverall: { value: data.averages?.overall ?? 0 },
+      classAverage: { value: data.averages?.class_overall ?? 0 },
+      subjects,
+      createdByAccount: accountId,
+    };
+  } catch (err) {
+    error(`Failed to fetch grades: ${err}`, "fetchPronoteGrades");
+    return {
+      studentOverall: { value: 0 },
+      classAverage: { value: 0 },
+      subjects: [],
+      createdByAccount: accountId,
+    };
   }
-
-  const gradeTab = session.user.resources[0].tabs.get(TabLocation.Grades);
-  if (!gradeTab) {
-    error("Grades tab not found in session", "fetchPronoteGrades");
-  }
-
-  const pawnotePeriod = gradeTab.periods.find(p => p.name === period.name);
-  if (!pawnotePeriod) {
-    error(`Period "${period}" not found in grades tab`, "fetchPronoteGrades");
-  }
-
-  const grades = await gradesOverview(session, pawnotePeriod);
-
-  return {
-    studentOverall: mapGradeValueToScore(grades.overallAverage),
-    classAverage: mapGradeValueToScore(grades.classAverage),
-    subjects: mapSubjectGrades(grades, accountId),
-    createdByAccount: accountId
-  };
 }
 
-/**
- * Fetches all grade periods from PRONOTE.
- * @param {SessionHandle} session - The session handle for the PRONOTE session.
- * @param {string} accountId - The ID of the account making the request.
- * @return {Promise<Array<Period>>} - A promise that resolves to an array of grade periods.
- */
-export async function fetchPronoteGradePeriods(session: SessionHandle, accountId: string): Promise<Period[]> {
-  const accountTab = session.user.resources[0].tabs.get(TabLocation.Grades);
-  if (!accountTab) {
-    error("Grades tab not found in session", "fetchPronotePeriods");
-  }
-
-  return accountTab.periods.map(p => ({
-    id: p.id,
-    name: p.name,
-    start: p.startDate,
-    end: p.endDate,
-    createdByAccount: accountId
-  }));
-}
-
-/**
- * Maps the grade overview to an array of subjects with their respective grades.
- * @param grades
- * @param accountId
- */
-function mapSubjectGrades(grades: GradesOverview, accountId: string): Subject[] {
-  const subjects: Subject[] = [];
-  
-  const allMappedGrades: Grade[] = grades.grades.map(g => ({
-    id: g.id,
-    subjectId: g.subject.id,
-    subjectName: g.subject.name,
-    description: g.comment,
-    givenAt: g.date,
-    subjectFile: g.subjectFile ? {
-      ...g.subjectFile,
-      type: AttachmentType.FILE,
-      createdByAccount: accountId
-    } : undefined,
-    correctionFile: g.correctionFile ? {
-      ...g.correctionFile,
-      type: AttachmentType.FILE,
-      createdByAccount: accountId
-    } : undefined,
-    bonus: g.isBonus ?? false,
-    optional: g.isOptional ?? false,
-    outOf: mapGradeValueToScore(g.outOf),
-    coefficient: g.coefficient,
-    studentScore: mapGradeValueToScore(g.value),
-    averageScore: mapGradeValueToScore(g.average),
-    minScore: mapGradeValueToScore(g.min),
-    maxScore: mapGradeValueToScore(g.max),
-    createdByAccount: accountId
-  }));
-
-  for (const average of grades.subjectsAverages) {
-    const subjectId = average.subject.id;
-
-    const subjectGrades = allMappedGrades.filter(g => g.subjectId === subjectId);
-
-    subjects.push({
-      id: subjectId,
-      name: average.subject.name,
-      studentAverage: mapGradeValueToScore(average.student),
-      classAverage: mapGradeValueToScore(average.class_average),
-      maximum: mapGradeValueToScore(average.max),
-      minimum: mapGradeValueToScore(average.min),
-      outOf: mapGradeValueToScore(average.outOf),
-      grades: subjectGrades
-    });
-  }
-
-  return subjects;
-}
-
-/**
- * Maps a GradeValue to a GradeScore.
- * @param grade
- */
-function mapGradeValueToScore(grade: GradeValue | undefined): GradeScore {
-  if (typeof grade === "undefined")
-  {return { value: 0, disabled: true, status: "Inconnu" };}
-
-  switch (grade.kind) {
-  case GradeKind.Grade:
-    return { value: grade.points ?? 0 };
-  case GradeKind.NotGraded:
-    return { value: 0, disabled: true, status: "N. Not." };
-  case GradeKind.Absent:
-    return { value: 0, disabled: true, status: "Abs." };
-  case GradeKind.AbsentZero:
-    return { value: 0, disabled: false, status: "Abs.*" };
-  case GradeKind.Exempted:
-    return { value: 0, disabled: true, status: "Disp." };
-  case GradeKind.Unfit:
-    return { value: 0, disabled: true, status: "Disp." };
-  case GradeKind.Unreturned:
-    return { value: 0, disabled: true, status: "N. Rendu" };
-  case GradeKind.UnreturnedZero:
-    return { value: 0, disabled: false, status: "N. Rendu*" };
-  default:
-    return { value: 0, disabled: true, status: "Inconnu" };
+export async function fetchPronoteGradePeriods(
+  authToken: string,
+  accountId: string,
+  childName?: string
+): Promise<Period[]> {
+  try {
+    const data = await PronoteApiClient.getGradePeriods(authToken, childName);
+    return (data.periods || []).map((p: any) => ({
+      id: p.id || p.name,
+      name: p.name,
+      start: p.start ? new Date(p.start) : new Date(),
+      end: p.end ? new Date(p.end) : new Date(),
+      createdByAccount: accountId,
+    }));
+  } catch (err) {
+    error(`Failed to fetch grade periods: ${err}`, "fetchPronoteGradePeriods");
+    return [];
   }
 }

@@ -2,11 +2,37 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Dimensions, FlatList } from 'react-native';
 import { getWeekNumberFromDate } from "@/database/useHomework";
 import { warn } from "@/utils/logger/logger";
+import { useSettingsStore } from "@/stores/settings";
 
 const INITIAL_INDEX = 10000;
 
 export function useCalendarState() {
-  const [date, setDate] = useState(new Date());
+  const showWeekends = useSettingsStore(
+    state => state.personalization.showWeekendsOnTimetable ?? false
+  );
+
+  const getBaseMonday = useCallback(() => {
+    const d = new Date(referenceDate.current);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay(); // 0 is Sun, 1 is Mon, ... 6 is Sat
+    const diffToMon = day === 0 ? -6 : (1 - day);
+    d.setDate(d.getDate() + diffToMon);
+    return d;
+  }, []);
+
+  const getInitialDate = useCallback(() => {
+    const now = new Date();
+    if (!showWeekends) {
+      if (now.getDay() === 6) {
+        now.setDate(now.getDate() + 2); // Sat -> Mon
+      } else if (now.getDay() === 0) {
+        now.setDate(now.getDate() + 1); // Sun -> Mon
+      }
+    }
+    return now;
+  }, [showWeekends]);
+
+  const [date, setDate] = useState(getInitialDate);
   const [weekNumber, setWeekNumber] = useState(getWeekNumberFromDate(date));
   const [currentIndex, setCurrentIndex] = useState(INITIAL_INDEX);
   const lastTrackedDateKey = useRef<string>("");
@@ -27,27 +53,62 @@ export function useCalendarState() {
   }, [date]);
 
   const getDateFromIndex = useCallback((index: number) => {
-    const d = new Date(referenceDate.current);
-    d.setDate(referenceDate.current.getDate() + (index - INITIAL_INDEX));
+    if (showWeekends) {
+      const d = new Date(referenceDate.current);
+      d.setDate(referenceDate.current.getDate() + (index - INITIAL_INDEX));
+      return d;
+    }
+
+    const baseMon = getBaseMonday();
+    const offset = index - INITIAL_INDEX;
+    const weekOffset = Math.floor(offset / 5);
+    const dayInWeek = ((offset % 5) + 5) % 5;
+    const d = new Date(baseMon);
+    d.setDate(baseMon.getDate() + weekOffset * 7 + dayInWeek);
     return d;
-  }, []);
+  }, [showWeekends, getBaseMonday]);
 
   const getIndexFromDate = useCallback((d: Date) => {
-    const base = new Date(referenceDate.current);
-    base.setHours(0, 0, 0, 0);
+    if (showWeekends) {
+      const base = new Date(referenceDate.current);
+      base.setHours(0, 0, 0, 0);
+      const target = new Date(d);
+      target.setHours(0, 0, 0, 0);
+      const diff = Math.round((target.getTime() - base.getTime()) / (1000 * 60 * 60 * 24));
+      return INITIAL_INDEX + diff;
+    }
+
+    const baseMon = getBaseMonday();
     const target = new Date(d);
     target.setHours(0, 0, 0, 0);
-    const diff = Math.round((target.getTime() - base.getTime()) / (1000 * 60 * 60 * 24));
-    return INITIAL_INDEX + diff;
-  }, []);
+    if (target.getDay() === 6) {
+      target.setDate(target.getDate() + 2);
+    } else if (target.getDay() === 0) {
+      target.setDate(target.getDate() + 1);
+    }
+
+    const diffDays = Math.round((target.getTime() - baseMon.getTime()) / (1000 * 60 * 60 * 24));
+    const weekOffset = Math.floor(diffDays / 7);
+    const dayInWeek = ((diffDays % 7) + 7) % 7;
+    const offset = weekOffset * 5 + dayInWeek;
+    return INITIAL_INDEX + offset;
+  }, [showWeekends, getBaseMonday]);
 
   const handleDateChange = useCallback((newDate: Date) => {
-    setDate(newDate);
-    const newWeekNumber = getWeekNumberFromDate(newDate);
+    const adjustedDate = new Date(newDate);
+    if (!showWeekends) {
+      if (adjustedDate.getDay() === 6) {
+        adjustedDate.setDate(adjustedDate.getDate() + 2);
+      } else if (adjustedDate.getDay() === 0) {
+        adjustedDate.setDate(adjustedDate.getDate() + 1);
+      }
+    }
+    setDate(adjustedDate);
+    const newWeekNumber = getWeekNumberFromDate(adjustedDate);
     if (newWeekNumber !== weekNumber) {
       setWeekNumber(newWeekNumber);
     }
-  }, [weekNumber]);
+  }, [weekNumber, showWeekends]);
 
   // Sync FlatList with date
   useEffect(() => {

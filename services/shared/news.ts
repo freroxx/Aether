@@ -1,5 +1,3 @@
-import { NewsInformation } from "@blockshub/pawnote-lts";
-
 import { Attachment } from "@/services/shared/attachment";
 import { GenericInterface } from "@/services/shared/types";
 
@@ -24,5 +22,5 @@ export interface News extends GenericInterface {
   author: string;
   category: string;
   question?: boolean;
-  ref?: NewsInformation;
+  ref?: any;
 }

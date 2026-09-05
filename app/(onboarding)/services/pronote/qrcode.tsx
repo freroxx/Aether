@@ -4,25 +4,19 @@ import { useTheme } from "expo-router/react-navigation";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import {
-  AuthenticateError,
-  createSessionHandle,
-  loginQrCode,
-  SecurityError,
-} from "@blockshub/pawnote-lts";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, StyleSheet, TextInput, View } from "react-native";
 import Reanimated, { FadeInUp, FadeOutUp, LinearTransition } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
+import { PronoteApiClient } from "@/services/pronote/api-client";
 import Button from "@/ui/components/Button";
 import Icon from "@/ui/components/Icon";
 import Typography from "@/ui/components/Typography";
 import { URLToBase64 } from "@/utils/attachments/helper";
-import { customFetcher } from "@/utils/pronote/fetcher";
 import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
 import uuid from "@/utils/uuid/uuid";
 
@@ -49,7 +43,7 @@ export default function PronoteLoginWithQR() {
     setLoadingModalVisible(true);
 
     if (QRValidationCode === "" || QRValidationCode.length !== 4) {
-      // Handle error
+      setLoadingModalVisible(false);
       return;
     }
 
@@ -58,42 +52,27 @@ export default function PronoteLoginWithQR() {
     try {
       const decodedJSON = JSON.parse(QRData!);
 
-      const data = {
-        jeton: decodedJSON.jeton,
-        login: decodedJSON.login,
-        url: decodedJSON.url,
-      };
+      const res = await PronoteApiClient.qrCodeLogin(
+        {
+          jeton: decodedJSON.jeton,
+          login: decodedJSON.login,
+          url: decodedJSON.url,
+        },
+        QRValidationCode,
+        accountID
+      );
 
-      const session = createSessionHandle(customFetcher);
-      const refresh = await loginQrCode(session, {
-        qr: data,
-        pin: QRValidationCode,
-        deviceUUID: accountID
-      }).catch((error) => {
-        if (error instanceof SecurityError && !error.handle.shouldCustomPassword && !error.handle.shouldCustomDoubleAuth) {
-          router.push({
-            pathname: "/(onboarding)/services/pronote/2fa",
-            params: {
-              error: JSON.stringify(error),
-              session: JSON.stringify(session),
-              deviceId: accountID
-            }
-          });
-        } else {
-          throw error;
-        }
-      });
-
-      if (!refresh) { throw AuthenticateError; }
-
-      const user = session.user.resources[0];
-      const schoolName = user.establishmentName;
-      const className = user.className;
-      const { firstName, lastName } = GetIdentityFromPronoteUsername(session.user.name)
-      let pp = "";
-      if (session.user.resources[0].profilePicture?.url) {
-        pp = await URLToBase64(session.user.resources[0].profilePicture?.url)
+      if (!res.success) {
+        throw new Error("Échec de connexion QR Code");
       }
+
+      const { firstName, lastName } = GetIdentityFromPronoteUsername(res.user?.name || decodedJSON.login);
+      const schoolName = res.user?.establishment || "Pronote";
+      const className = res.user?.class_name || "";
+      const isParent = res.user?.account_type === "parent" || (res.children && res.children.length > 0);
+      const accountType = isParent ? "parent" : "eleve";
+      const children = res.children || [];
+      const selectedChild = children.length > 0 ? children[0].name : undefined;
 
       useAccountStore.getState().addAccount({
         id: accountID,
@@ -101,20 +80,24 @@ export default function PronoteLoginWithQR() {
         lastName,
         schoolName,
         className,
+        accountType,
+        children,
+        selectedChild,
         customisation: {
-          profilePicture: pp,
+          profilePicture: "",
           subjects: {}
         },
         services: [{
           id: accountID,
           auth: {
-            accessToken: refresh.token,
-            refreshToken: refresh.token,
+            accessToken: res.auth_token,
+            refreshToken: res.auth_token,
             additionals: {
-              instanceURL: refresh.url,
-              kind: refresh.kind,
-              username: refresh.username,
-              deviceUUID: accountID
+              instanceURL: decodedJSON.url,
+              username: decodedJSON.login,
+              deviceUUID: accountID,
+              authToken: res.auth_token,
+              accountType,
             }
           },
           serviceId: Services.PRONOTE,
@@ -124,7 +107,7 @@ export default function PronoteLoginWithQR() {
         createdAt: (new Date()).toISOString(),
         updatedAt: (new Date()).toISOString()
       });
-      useAccountStore.getState().setLastUsedAccount(accountID)
+      useAccountStore.getState().setLastUsedAccount(accountID);
       setTimeout(() => {
         setLoadingModalVisible(false);
         router.push({
@@ -134,9 +117,13 @@ export default function PronoteLoginWithQR() {
           }
         });
       }, 1000);
-    } catch (error) {
-      console.error(error);
-      // Handle error
+    } catch (error: any) {
+      console.error("QR Login Error:", error);
+      setLoadingModalVisible(false);
+      Alert.alert(
+        "Erreur de connexion",
+        error?.message || "Code PIN incorrect ou QR Code expiré. Veuillez générer un nouveau QR Code."
+      );
     }
   }
 

@@ -1,6 +1,6 @@
 import { useHeaderHeight, useRoute } from "expo-router/react-navigation";
 import { useNavigation } from "expo-router";
-import { geolocation } from "@blockshub/pawnote-lts";
+import { pronoteGeolocation } from "@/services/pronote/api-client";
 import React, { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image, KeyboardAvoidingView, Platform } from "react-native";
@@ -61,8 +61,8 @@ export default function PronoteLoginSelectEtab() {
   const navigation = useNavigation();
   const { t } = useTranslation();
 
-  const { params } = useRoute();
-  const { city } = params;
+  const { params } = useRoute<any>();
+  const { city } = (params as any) || {};
 
   const [search, setSearch] = useState<string>("");
   const [schools, setSchools] = useState<Array<School>>([]);
@@ -71,7 +71,7 @@ export default function PronoteLoginSelectEtab() {
   useEffect(() => {
     if(!city) {return;}
     navigation.setOptions({ headerTitle: t("ONBOARDING_SCHOOLS_IN_CITY", { city: city.city }) });
-    geolocation({ latitude: city?.latitude ?? 0, longitude: city?.longitude ?? 0 }).then((schoolsFound) => {
+    pronoteGeolocation({ latitude: city?.latitude ?? 0, longitude: city?.longitude ?? 0 }).then((schoolsFound) => {
       setSchools(schoolsFound);
       setLoading(false);
     });

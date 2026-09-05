@@ -19,12 +19,23 @@ export interface Path {
   name: string;
 }
 
+export type WallpaperType = "image" | "gradient";
+
+export interface WallpaperGradient {
+  colors: string[];
+  angle?: number;
+  name?: string;
+}
+
 export interface Wallpaper {
   id: string;
+  type?: WallpaperType;
+  gradient?: WallpaperGradient;
   url?: string;
   path?: Path;
   thumbnail?: string;
   credit?: string;
+  isBundled?: boolean;
 }
 
 export interface Personalization {
@@ -48,4 +59,7 @@ export interface Personalization {
   installedVersion?: string;
   releaseNotesSeenForVersion?: string;
   welcomeModalSeen?: boolean;
+  enabledCalendarIds?: string[];
+  showWeekendsOnTimetable?: boolean;
+  pronoteApiUrl?: string;
 }

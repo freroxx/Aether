@@ -1,63 +1,44 @@
-import {
-  AccountKind,
-  BusyPageError,
-  createSessionHandle,
-  loginToken,
-  PageUnavailableError,
-  RateLimitedError,
-  ServerSideError,
-  SessionHandle,
-  TokenAuthenticationParams,
-  UnreachableError,
-} from "@blockshub/pawnote-lts";
-
+import { PronoteApiClient } from "@/services/pronote/api-client";
 import { useAccountStore } from "@/stores/account";
 import { Auth } from "@/stores/account/types";
-import { customFetcher } from "@/utils/pronote/fetcher";
-
-const isRetryable = (e: unknown): boolean =>
-  e instanceof UnreachableError ||
-  e instanceof BusyPageError ||
-  e instanceof RateLimitedError ||
-  e instanceof ServerSideError ||
-  e instanceof PageUnavailableError ||
-  e instanceof TypeError;
+import { error } from "@/utils/logger/logger";
 
 export async function refreshPronoteAccount(
   accountId: string,
   credentials: Auth
-): Promise<{auth: Auth, session: SessionHandle}> {
-  const handle = createSessionHandle(customFetcher);
+): Promise<{ auth: Auth; session: any }> {
+  const token = credentials.accessToken || (credentials.additionals?.auth_token as string);
+  const creds = credentials.additionals || {};
 
-  const loginParams = {
-    ...credentials.additionals,
-    kind: (credentials.additionals?.["kind"] as AccountKind) || AccountKind.STUDENT,
-    deviceUUID: String(credentials.additionals?.["deviceUUID"] || ""),
-  };
-
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  if (creds.url && creds.username && creds.token && creds.uuid) {
     try {
-      const refresh = await loginToken(handle, loginParams as TokenAuthenticationParams);
+      const res = await PronoteApiClient.tokenLogin(
+        String(creds.url),
+        String(creds.username),
+        String(creds.token),
+        String(creds.uuid),
+        (creds.account_type as any) || "eleve"
+      );
 
-      const auth: Auth = {
-        accessToken: refresh.token,
-        refreshToken: refresh.token,
+      const updatedAuth: Auth = {
+        accessToken: res.auth_token,
+        refreshToken: res.auth_token,
         additionals: {
-          ...refresh,
-          deviceUUID: String(credentials.additionals?.["deviceUUID"] || ""),
+          ...creds,
+          auth_token: res.auth_token,
         },
       };
 
-      useAccountStore.getState().updateServiceAuthData(accountId, auth);
-
-      return { auth, session: handle };
+      useAccountStore.getState().updateServiceAuthData(accountId, updatedAuth);
+      return { auth: updatedAuth, session: { authToken: res.auth_token } };
     } catch (e) {
-      lastError = e;
-      if (!isRetryable(e)) throw e;
-      if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
+      error(`Failed to refresh token: ${e}`, "refreshPronoteAccount");
     }
   }
 
-  throw lastError;
+  // Fallback to existing token
+  return {
+    auth: credentials,
+    session: { authToken: token },
+  };
 }

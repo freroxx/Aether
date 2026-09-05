@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 import { log } from "@/utils/logger/logger";
 
 import { createMMKVStorage } from '../global'
-import { AccountsStorage, Auth } from "./types";
+import { AccountsStorage, Auth, CustomisableSubject } from "./types";
 
 export const useAccountStore = create<AccountsStorage>()(
   persist(
@@ -183,7 +183,7 @@ export const useAccountStore = create<AccountsStorage>()(
             return account;
           }),
         }),
-      setSubjects: (subjects: Record<string, Subject>) =>
+      setSubjects: (subjects: Record<string, { color: string; emoji: string; name: string }>) =>
         set({
           accounts: get().accounts.map(account => {
             if (account.id === get().lastUsedAccount) {
@@ -194,6 +194,18 @@ export const useAccountStore = create<AccountsStorage>()(
                   profilePicture: account.customisation?.profilePicture ?? "",
                   subjects: subjects,
                 },
+              };
+            }
+            return account;
+          }),
+        }),
+      setSelectedChild: (accountId: string, childName: string) =>
+        set({
+          accounts: get().accounts.map(account => {
+            if (account.id === accountId) {
+              return {
+                ...account,
+                selectedChild: childName,
               };
             }
             return account;

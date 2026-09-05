@@ -55,31 +55,6 @@ export default function SettingsFeatures() {
           <List.Label>{t("Settings_Features_TabBar")}</List.Label>
         </List.SectionTitle>
 
-        {Platform.OS === "ios" && (
-          <List.Item>
-            <List.Leading>
-              <Icon>
-                <Papicons name={"Sunrise"} />
-              </Icon>
-            </List.Leading>
-            <Typography variant="title">{t("Settings_Features_BottomAccessory")}</Typography>
-            <Typography color="textSecondary" numberOfLines={2}>
-              {t("Settings_Features_BottomAccessory_Description")}
-            </Typography>
-            <List.Trailing>
-              <NativeSwitch
-                value={Platform.OS !== "ios" ? false : iOSBottomAccessoryEnabled}
-                disabled={Platform.OS !== "ios"}
-                onValueChange={(value) =>
-                  mutateProperty("personalization", {
-                    ...settingsStore,
-                    iOSBottomAccessoryEnabled: value,
-                  })
-                }
-              />
-            </List.Trailing>
-          </List.Item>
-        )}
         <List.Item>
           <List.Leading>
             <Icon>
@@ -95,8 +70,34 @@ export default function SettingsFeatures() {
               value={showTabBarLabels}
               onValueChange={(value) =>
                 mutateProperty("personalization", {
-                  ...settingsStore,
                   showTabBarLabels: value,
+                })
+              }
+            />
+          </List.Trailing>
+        </List.Item>
+      </List.Section>
+
+      <List.Section>
+        <List.SectionTitle>
+          <List.Label>Mode Démonstration & Invité</List.Label>
+        </List.SectionTitle>
+        <List.Item>
+          <List.Leading>
+            <Icon>
+              <Papicons name={"Sparkles"} />
+            </Icon>
+          </List.Leading>
+          <Typography variant="title">Données de démonstration</Typography>
+          <Typography color="textSecondary" numberOfLines={2}>
+            Génère des données fictives pour tester la cantine, la messagerie et l&apos;emploi du temps.
+          </Typography>
+          <List.Trailing>
+            <NativeSwitch
+              value={settingsStore.mockDataEnabled ?? false}
+              onValueChange={(value) =>
+                mutateProperty("personalization", {
+                  mockDataEnabled: value,
                 })
               }
             />

@@ -251,7 +251,7 @@ export const CompactGrade = ({
                         color={trailingForeground + "99"}
                         variant="body2"
                       >
-                        /{outOf}
+                        /{outOf ?? 20}
                       </Typography>
                     </>
                   ) : (

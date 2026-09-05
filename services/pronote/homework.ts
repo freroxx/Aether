@@ -1,65 +1,59 @@
-import {
-  assignmentsFromWeek,
-  assignmentStatus,
-  SessionHandle,
-  translateToWeekNumber,
-} from "@blockshub/pawnote-lts";
-
+import { PronoteApiClient } from "@/services/pronote/api-client";
 import { getDateRangeOfWeek } from "@/database/useHomework";
 import { Homework, ReturnFormat } from "@/services/shared/homework";
 import { error } from "@/utils/logger/logger";
 
-/**
-  * Fetches homework assignments from PRONOTE for the current week.
-  * @param {SessionHandle} session - The session handle for the PRONOTE account.
-  * @param {string} accountId - The ID of the account requesting the homeworks.
-  * @returns {Promise<Homework[]>} A promise that resolves to an array of Homework objects.
- */
-export async function fetchPronoteHomeworks(session: SessionHandle, accountId: string, weekNumberRaw: number): Promise<Homework[]> {
-  const result: Homework[] = [];
+export async function fetchPronoteHomeworks(
+  authToken: string,
+  accountId: string,
+  weekNumberRaw: number,
+  childName?: string
+): Promise<Homework[]> {
+  try {
+    const { start, end } = getDateRangeOfWeek(weekNumberRaw);
+    const fromStr = start.toISOString().split("T")[0];
+    const toStr = end.toISOString().split("T")[0];
 
-  const { start } = getDateRangeOfWeek(weekNumberRaw)
-  const weekNumber = translateToWeekNumber(start, session.instance.firstMonday);
-  if (session) {
-    const homeworks = await assignmentsFromWeek(session, weekNumber);
-    for (const homework of homeworks) {
-      result.push({
-        id: homework.id,
-        subject: homework.subject.name,
-        content: homework.description,
-        dueDate: homework.deadline,
-        isDone: homework.done,
-        returnFormat:
-          homework.return.kind === 1 ? ReturnFormat.PAPER : ReturnFormat.FILE_UPLOAD,
-        attachments: homework.attachments.map((attachment) => ({
-          type: attachment.kind,
-          name: attachment.name,
-          url: attachment.url,
-          createdByAccount: accountId,
-        })),
-        evaluation: false,
-        custom: false,
+    const data = await PronoteApiClient.getHomework(authToken, fromStr, toStr, childName);
+    return (data.homework || []).map((h: any) => ({
+      id: h.id,
+      subject: h.subject || "Matière",
+      content: h.description || "",
+      dueDate: new Date(h.date),
+      isDone: h.done ?? false,
+      returnFormat: ReturnFormat.PAPER,
+      attachments: (h.files || []).map((f: any) => ({
+        type: "file",
+        name: f.name,
+        url: f.url,
         createdByAccount: accountId,
-      });
-    }
+      })),
+      evaluation: false,
+      custom: false,
+      createdByAccount: accountId,
+    }));
+  } catch (err) {
+    error(`Failed to fetch homework: ${err}`, "fetchPronoteHomeworks");
+    return [];
   }
-
-  return result;
 }
 
-export async function setPronoteHomeworkAsDone(session: SessionHandle, homework: Homework, status?: boolean): Promise<Homework> {
-  if (homework.fromCache) {
-    error("You can't set data from cache as done.")
+export async function setPronoteHomeworkAsDone(
+  authToken: string,
+  homework: Homework,
+  status?: boolean,
+  childName?: string
+): Promise<Homework> {
+  const nextStatus = status !== undefined ? status : !homework.isDone;
+  try {
+    await PronoteApiClient.setHomeworkDone(authToken, homework.id, nextStatus, childName);
+  } catch (err) {
+    error(`Failed to set homework done: ${err}`, "setPronoteHomeworkAsDone");
   }
 
-  try {
-    await assignmentStatus(session, homework.id, status || !homework.isDone)
-  } catch (err) {
-    error(String(err))
-  }
   return {
     ...homework,
-    isDone: status || !homework.isDone,
-    progress: (status || !homework.isDone) ? 1 : 0
-  }
+    isDone: nextStatus,
+    progress: nextStatus ? 1 : 0,
+  };
 }

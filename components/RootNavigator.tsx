@@ -95,6 +95,7 @@ function RootNavigatorContent() {
         <Stack.Screen
           name="(modals)/wallpaper"
           options={{
+            headerShown: Platform.OS === "ios",
             presentation: "formSheet",
             sheetGrabberVisible: true,
             sheetAllowedDetents: [0.5, 1],
@@ -104,6 +105,9 @@ function RootNavigatorContent() {
             headerTitle: t("Modal_Wallpaper_Title"),
             contentStyle: {
               backgroundColor: theme.colors.card,
+              borderTopLeftRadius: Platform.OS === "android" ? 28 : 0,
+              borderTopRightRadius: Platform.OS === "android" ? 28 : 0,
+              overflow: "hidden",
             },
             headerBackground: AndroidHeaderBackground,
           }}

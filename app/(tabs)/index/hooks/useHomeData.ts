@@ -1,6 +1,5 @@
 import { router } from 'expo-router';
 import { t } from 'i18next';
-import { instance } from "@blockshub/pawnote-lts";
 import { useCallback, useEffect } from 'react';
 
 import { getWeekNumberFromDate } from '@/database/useHomework';
@@ -138,20 +137,12 @@ export const useHomeData = () => {
               }
 
               const authUrl = instanceURL;
-              const instanceInfo = await instance(authUrl as string);
-
-              if (instanceInfo && instanceInfo.name) {
-                return setTimeout(() => {
-                  router.navigate("/(onboarding)/ageSelection");
-                  setTimeout(() => {
-                  router.navigate({ pathname: "/(onboarding)/services/pronote/browser", params: { url: authUrl, school: instanceInfo.name } })
-                }, 400)
-                }, 100)
-              }
-
               setTimeout(() => {
-                router.navigate({ pathname: "/(onboarding)/services/pronote/browser", params: { url: authUrl, school: "N/A" } })
-              }, 200)
+                router.navigate("/(onboarding)/ageSelection");
+                setTimeout(() => {
+                  router.navigate({ pathname: "/(onboarding)/services/pronote/browser", params: { url: authUrl, school: "Pronote" } });
+                }, 400);
+              }, 100);
             }
           } : undefined,
           technical: error.message

@@ -497,12 +497,124 @@ export function generateMockChatMessages(
   });
 }
 
-const MOCK_MENUS: Array<[string, string[], string[], string[], string[], string[], string[]]> = [
-  ["Lundi", ["Salade verte", "Tomates mozzarella"], ["Poulet rôti", "Steak végétal"], ["Riz pilaf"], ["Yaourt"], ["Fruit de saison"], []],
-  ["Mardi", ["Soupe de légumes"], ["Poisson pané"], ["Purée"], [], ["Compote"], []],
-  ["Mercredi", [], [], [], [], [], []],
-  ["Jeudi", ["Carottes râpées"], ["Bœuf bourguignon", "Omelette"], ["Coquillettes"], ["Fromage"], ["Tarte aux pommes"], []],
-  ["Vendredi", ["Concombre"], ["Pizza"], ["Salade"], [], ["Glace"], []],
+interface MockDish {
+  name: string;
+  allergens?: string[];
+}
+
+const MOCK_MENUS_DATA: Array<{
+  entry: MockDish[];
+  main: MockDish[];
+  side: MockDish[];
+  cheese: MockDish[];
+  dessert: MockDish[];
+  drink: MockDish[];
+}> = [
+  {
+    entry: [
+      { name: "Salade de tomates et mozzarella di bufala", allergens: ["Lait"] },
+      { name: "Salade de lentilles corail au vinaigre de cidre" },
+    ],
+    main: [
+      { name: "Filet de poulet rôti fermier au thym" },
+      { name: "Steak végétal aux céréales et légumes du soleil", allergens: ["Gluten", "Soja"] },
+    ],
+    side: [
+      { name: "Riz pilaf aux petits légumes" },
+      { name: "Haricots verts extra-fins persillés" },
+    ],
+    cheese: [
+      { name: "Brie de Meaux AOP", allergens: ["Lait"] },
+      { name: "Yaourt nature bio local", allergens: ["Lait"] },
+    ],
+    dessert: [
+      { name: "Tartelette aux pommes caramélisées", allergens: ["Gluten", "Œufs", "Lait"] },
+      { name: "Fruit de saison bio (Pomme ou Poire)" },
+    ],
+    drink: [{ name: "Eau micro-filtrée fraîche" }],
+  },
+  {
+    entry: [
+      { name: "Velouté de potimarron et graines de courge", allergens: ["Lait"] },
+      { name: "Betteraves rôties à l'huile de noisette", allergens: ["Fruits à coque"] },
+    ],
+    main: [
+      { name: "Pavé de colin d'Alaska MSC sauce citronnée", allergens: ["Poisson", "Lait"] },
+      { name: "Dahl de lentilles corail au lait de coco" },
+    ],
+    side: [
+      { name: "Purée maison de pommes de terre au beurre", allergens: ["Lait"] },
+      { name: "Poêlée de carottes au cumin" },
+    ],
+    cheese: [{ name: "Emmental français râpé ou portion", allergens: ["Lait"] }],
+    dessert: [
+      { name: "Compote de pommes et châtaignes sans sucre ajouté" },
+      { name: "Mousse au chocolat noir maison", allergens: ["Œufs", "Lait"] },
+    ],
+    drink: [{ name: "Eau micro-filtrée fraîche" }],
+  },
+  {
+    entry: [
+      { name: "Taboulé libanais à la menthe fraîche", allergens: ["Gluten"] },
+    ],
+    main: [
+      { name: "Lasagnes aux légumes d'été et parmesan", allergens: ["Gluten", "Lait", "Œufs"] },
+      { name: "Rôti de dinde braisé au jus" },
+    ],
+    side: [
+      { name: "Gratin de courgettes", allergens: ["Lait"] },
+      { name: "Semoule semi-complète bio", allergens: ["Gluten"] },
+    ],
+    cheese: [{ name: "Fromage blanc bio au coulis de fruits rouges", allergens: ["Lait"] }],
+    dessert: [
+      { name: "Salade de fruits frais maison" },
+      { name: "Cookie artisanal aux pépites de chocolat", allergens: ["Gluten", "Œufs", "Lait"] },
+    ],
+    drink: [{ name: "Eau micro-filtrée fraîche" }],
+  },
+  {
+    entry: [
+      { name: "Carottes râpées bio à la vinaigrette d'agrumes" },
+      { name: "Feuilleté chèvre et miel chaud", allergens: ["Gluten", "Lait"] },
+    ],
+    main: [
+      { name: "Sauté de bœuf mijoté à la provençale" },
+      { name: "Omelette fermière bio aux herbes fraîches", allergens: ["Œufs"] },
+    ],
+    side: [
+      { name: "Coquillettes au blé complet bio", allergens: ["Gluten"] },
+      { name: "Brocolis vapeur et touche d'huile d'olive" },
+    ],
+    cheese: [
+      { name: "Cantal jeune AOP", allergens: ["Lait"] },
+      { name: "Petit suisse aux fruits", allergens: ["Lait"] },
+    ],
+    dessert: [
+      { name: "Éclair au chocolat de notre boulanger", allergens: ["Gluten", "Œufs", "Lait"] },
+      { name: "Banane équitable" },
+    ],
+    drink: [{ name: "Eau micro-filtrée fraîche" }],
+  },
+  {
+    entry: [
+      { name: "Concombre à la crème ciboulette", allergens: ["Lait"] },
+      { name: "Salade piémontaise traditionnelle", allergens: ["Œufs", "Moutarde"] },
+    ],
+    main: [
+      { name: "Pizza margherita cuite au four pierre", allergens: ["Gluten", "Lait"] },
+      { name: "Filet de merlu rôti au basilic", allergens: ["Poisson"] },
+    ],
+    side: [
+      { name: "Salade mesclun aux jeunes pousses" },
+      { name: "Frites de patates douces au four" },
+    ],
+    cheese: [{ name: "Saint-Nectaire fermier", allergens: ["Lait"] }],
+    dessert: [
+      { name: "Crème glacée vanille artisanale", allergens: ["Lait"] },
+      { name: "Orange pressée ou kiwi bio" },
+    ],
+    drink: [{ name: "Eau micro-filtrée fraîche" }],
+  },
 ];
 
 export function generateMockCanteenMenu(accountId: string, startDate: Date): CanteenMenu[] {
@@ -510,20 +622,19 @@ export function generateMockCanteenMenu(accountId: string, startDate: Date): Can
   monday.setHours(0, 0, 0, 0);
   const weekday = (monday.getDay() + 6) % 7;
   monday.setDate(monday.getDate() - weekday);
-  return MOCK_MENUS.map(([dayName, entry, main, side, dessert, drink], index) => {
-    void dayName;
+  return MOCK_MENUS_DATA.map((dayData, index) => {
     const date = new Date(monday);
     date.setDate(date.getDate() + index);
-    const foods = (names: string[]) => names.map(name => ({ name }));
     return {
       date,
       createdByAccount: accountId,
       lunch: {
-        entry: foods(entry),
-        main: foods(main),
-        side: foods(side),
-        dessert: foods(dessert),
-        drink: foods(drink),
+        entry: dayData.entry,
+        main: dayData.main,
+        side: dayData.side,
+        cheese: dayData.cheese,
+        dessert: dayData.dessert,
+        drink: dayData.drink,
       },
       dinner: undefined,
     };

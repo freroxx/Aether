@@ -83,7 +83,11 @@ export default function Typography({ variant = "body1", color = "textPrimary", a
   const COLORS: Record<string, string> = {
     "textPrimary": colors.text,
     "textSecondary": colors.text + "88",
+    "secondary": colors.text + "88",
+    "text": colors.text,
     "primary": colors.tint,
+    "danger": "#E05D34",
+    "light": "#FFFFFF",
   }
 
   const variantStyle = fixLineHeight(variant in VARIANTS ? VARIANTS[variant] : VARIANTS["body1"]);

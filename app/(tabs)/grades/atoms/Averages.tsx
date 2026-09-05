@@ -267,8 +267,8 @@ const Averages = ({
           width: "100%",
           paddingTop: inline ? 0 : 220 + paddingTop + 20,
           marginBottom: inline ? 0 : -30,
-          borderRadius: inline ? 25 : 0,
-          overflow: inline ? "hidden" : "visible",
+          borderRadius: 24,
+          overflow: "hidden",
           height: inline ? undefined : isLargeLayout ? 420 : 220,
         }}
         entering={!inline ? AetherAppearIn : undefined}
@@ -284,7 +284,9 @@ const Averages = ({
               Platform.OS === "android" && {
                 borderWidth: 0,
                 backgroundColor: theme.colors.card,
-                elevation: 0,
+                borderRadius: 24,
+                overflow: "hidden",
+                elevation: 2,
               },
               inline
                 ? {
@@ -296,8 +298,10 @@ const Averages = ({
                 : {
                     position: "absolute",
                     top: paddingTop,
-                    left: -16,
-                    right: -16,
+                    left: 0,
+                    right: 0,
+                    borderRadius: 24,
+                    overflow: "hidden",
                   },
             ]}
           >

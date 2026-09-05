@@ -11,6 +11,9 @@ interface MaterialIconProps {
   size?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   color?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fill?: any;
+  opacity?: number;
   style?: StyleProp<TextStyle>;
 }
 
@@ -25,14 +28,17 @@ export default function MaterialIcon({
   name,
   size = 24,
   color,
+  fill,
+  opacity,
   style,
 }: MaterialIconProps) {
+  const flattened = (Array.isArray(style) ? style : [style]).filter(Boolean);
   return (
     <MaterialIcons
       name={name}
       size={size}
-      color={color}
-      style={style}
+      color={color ?? fill}
+      style={[{ opacity }, ...flattened] as StyleProp<TextStyle>}
     />
   );
 }

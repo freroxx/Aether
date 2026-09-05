@@ -103,11 +103,15 @@ const ModalOverHeadScore = ({ color, score, outOf }: { color: string, score?: st
       >
         {score}
       </Typography>
-      {outOf && (
+      {outOf ? (
         <Typography variant='h3' weight='semibold' color={adjust(color, theme.dark ? 0.3 : -0.3)} style={{ marginBottom: 7, opacity: 0.5 }}>
           {typeof outOf === "string" && outOf.startsWith("%") ? outOf : `/${outOf}`}
         </Typography>
-      )}
+      ) : score && !isNaN(Number(score)) ? (
+        <Typography variant='h3' weight='semibold' color={adjust(color, theme.dark ? 0.3 : -0.3)} style={{ marginBottom: 7, opacity: 0.5 }}>
+          /20
+        </Typography>
+      ) : null}
     </Stack>
   );
 }

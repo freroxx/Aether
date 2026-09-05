@@ -1,45 +1,34 @@
 import { Papicons } from '@getpapillon/papicons';
 import { useTheme, useHeaderHeight } from "expo-router/react-navigation";
-import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { t } from "i18next";
-import { BusIcon, HeartIcon, InfoIcon } from "lucide-react-native";
+import { Calendar, InfoIcon, Palette, Sparkles, User, ShieldCheck } from "lucide-react-native";
 import React, { useCallback, useMemo } from "react";
-import { Alert, Image, Platform, Pressable, View } from "react-native";
+import { Alert, Platform, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ClearDatabaseForAccount } from "@/database/DatabaseProvider";
 import { useAccountStore } from "@/stores/account";
 import { useSettingsStore } from "@/stores/settings";
-import AnimatedPressable from "@/ui/components/AnimatedPressable";
 import Avatar from "@/ui/components/Avatar";
 import Icon from "@/ui/components/Icon";
 import MaterialIcon from "@/ui/components/MaterialIcon";
-import { NativeHeaderSide } from "@/ui/components/NativeHeader";
 import Stack from "@/ui/components/Stack";
-import TableFlatList from "@/ui/components/TableFlatList";
-import TypographyLegacy from "@/ui/components/Typography";
 import adjust from "@/utils/adjustColor";
 import { getInitials } from "@/utils/chats/initials";
-import { error } from "@/utils/logger/logger";
-
-import packagejson from "../../package.json"
+import packagejson from "../../package.json";
 import { formatSchoolName } from '@/utils/format/formatSchoolName';
 import List, { ListTouchable } from '@/ui/new/List';
 import Typography from '@/ui/new/Typography';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsIndex() {
   const router = useRouter();
-  const navigation = useNavigation();
-
   const theme = useTheme();
-  const { colors } = theme;
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
 
-  const accountStore = useAccountStore();
   const accounts = useAccountStore((state) => state.accounts);
   const lastUsedAccount = useAccountStore((state) => state.lastUsedAccount);
-
   const settingsStore = useSettingsStore(state => state.personalization);
   const currentVersion = packagejson.version;
   const releaseNotesUrl = `https://github.com/aether-app/releases/tag/v${currentVersion}`;
@@ -48,109 +37,100 @@ export default function SettingsIndex() {
 
   const [firstName, lastName, level, establishment] = useMemo(() => {
     if (!account) { return [null, null, null, null]; }
-
-    const firstName = account.firstName;
-    const lastName = account.lastName;
-    const level = account.className;
-    const establishment = account.schoolName;
-
-    return [firstName, lastName, level, establishment];
+    return [account.firstName, account.lastName, account.className, account.schoolName];
   }, [account]);
 
   const logout = useCallback(() => {
-    const accounts = useAccountStore.getState().accounts;
-    for (const account of accounts) {
-      useAccountStore.getState().removeAccount(account);
+    const allAccounts = useAccountStore.getState().accounts;
+    for (const acc of allAccounts) {
+      useAccountStore.getState().removeAccount(acc);
     }
     router.replace("/(onboarding)/welcome");
+  }, [router]);
 
-  }, [account, accountStore, router]);
+  const BigButtons = [
+    {
+      icon: <Papicons name={"Palette"} />,
+      title: "Apparence",
+      description: "Thèmes & couleurs",
+      color: "#17C300",
+      onPress: () => router.navigate("/(settings)/personalization"),
+    },
+    {
+      icon: <Papicons name={"Calendar"} />,
+      title: "Matières",
+      description: "Couleurs des cours",
+      color: "#8500dd",
+      onPress: () => router.navigate("/(settings)/subject_personalization"),
+    },
+    {
+      icon: <Papicons name={"User"} />,
+      title: "Comptes",
+      description: "Gestion des profils",
+      color: "#0059DD",
+      onPress: () => router.navigate("/(settings)/accounts"),
+    },
+    {
+      icon: <MaterialIcon name="auto-awesome" size={30} />,
+      title: "OpenCode Zen",
+      description: "Assistant local",
+      color: "#DD007D",
+      onPress: () => router.navigate("/(settings)/zen"),
+    },
+  ];
 
   const MoreSettingsList = [
     {
-      title: t("Settings_Preferences"),
+      title: "Configuration",
       content: [
-        /*{
-          title: t('Settings_Accessibility_Title'),
-          description: t('Settings_Accessibility_Description'),
-          papicon: <Papicons name={"Accessibility"} />,
-          icon: <AccessibilityIcon />,
-          color: "#0038A8",
-          onPress: () => Alert.alert("Ça arrive... ✨", "Cette fonctionnalité n'est pas encore disponible.")
-        },*/
-        /*{
-          title: t("Settings_Transport_Title"),
-          description: t("Settings_Transport_Description"),
-          papicon: <Papicons name={"Bus"} />,
-          icon: <BusIcon />,
-          color: "#000",
-          onPress: () => router.navigate("/(settings)/transport"),
-        },*/
         {
           title: t("Settings_Features_Title"),
-          description: t("Settings_Features_Description"),
-          papicon: <Papicons name={"Sparkles"} />,
-          color: "#0059DD",
+          description: "Options avancées de l'interface",
+          icon: <Sparkles size={20} color={theme.colors.primary} />,
           onPress: () => router.navigate("/(settings)/features"),
+        },
+        {
+          title: "Calendriers Android",
+          description: "Synchroniser avec les agendas de l'appareil",
+          icon: <Calendar size={20} color={theme.colors.primary} />,
+          onPress: () => router.navigate("/calendar/android-calendars"),
         },
       ],
     },
     {
-      title: t("Settings_More"),
+      title: "À propos",
       content: [
-        /*{
-          title: t('Settings_Accessibility_Title'),
-          description: t('Settings_Accessibility_Description'),
-          papicon: <Papicons name={"Accessibility"} />,
-          icon: <AccessibilityIcon />,
-          color: "#0038A8",
-          onPress: () => Alert.alert("Ça arrive... ✨", "Cette fonctionnalité n'est pas encore disponible.")
-        },*/
+        {
+          title: "À propos d'Aether",
+          description: `Version ${currentVersion} · FOSS & Transparent`,
+          icon: <ShieldCheck size={20} color="#29947A" />,
+          onPress: () => router.navigate("/(settings)/about"),
+        },
         {
           title: t("Settings_ReleaseNotes_Title"),
-          description: t("Settings_ReleaseNotes_Description"),
-          papicon: <Papicons name={"PrivatePapillonApp"} />,
-          icon: <InfoIcon />,
-          color: "#1F7AFC",
+          description: "Découvrir les nouveautés de cette version",
+          icon: <InfoIcon size={20} color={theme.colors.primary} />,
           onPress: () =>
             WebBrowser.openBrowserAsync(releaseNotesUrl, {
               presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
             }),
         },
-        {
-          title: t("Settings_About_Title"),
-          description: `${t("Settings_About_Description")} ${currentVersion}`,
-          icon: <InfoIcon />,
-          papicon: <Papicons name={"Info"} />,
-          color: "#797979",
-          onPress: () => router.navigate("/(settings)/about"),
-        },
       ],
     },
     {
-      title: t("Settings_About"),
+      title: "Session",
       content: [
         {
           title: t("Settings_Logout_Title"),
-          description: t("Settings_Logout_Description"),
-          papicon: <Papicons name={"Logout"} />,
-          color: "#a80000",
+          description: "Déconnecter tous les comptes",
+          icon: <Papicons name={"Logout"} />,
           onPress: () => {
             Alert.alert(
               t("Settings_Logout_Title"),
               t("Settings_Logout_Description"),
               [
-                {
-                  text: t("CANCEL_BTN"),
-                  style: "cancel",
-                },
-                {
-                  text: t("Settings_Logout_Title"),
-                  style: "destructive",
-                  onPress: () => {
-                    logout();
-                  },
-                },
+                { text: t("CANCEL_BTN"), style: "cancel" },
+                { text: t("Settings_Logout_Title"), style: "destructive", onPress: logout },
               ],
               { cancelable: true }
             );
@@ -160,189 +140,180 @@ export default function SettingsIndex() {
     },
     ...(settingsStore.showDevMode
       ? [
-        {
-          title: t("Settings_Dev"),
-          content: [
-            ...(settingsStore.showDevMode
-              ? [
-                {
-                  title: "Mode développeur",
-                  description: "Options avancées pour les développeurs.",
-                  papicon: <Papicons name={"Code"} />,
-                  icon: <InfoIcon />,
-                  color: "#FF6B35",
-                  onPress: () => router.navigate("/devmode"),
-                },
-              ]
-              : []),
-          ],
-        },
-      ]
+          {
+            title: "Développement",
+            content: [
+              {
+                title: "Mode développeur",
+                description: "Options avancées et débogage",
+                icon: <Papicons name={"Code"} />,
+                onPress: () => router.navigate("/devmode"),
+              },
+            ],
+          },
+        ]
       : []),
   ];
 
-  const BigButtons: Array<{
-    disabled?: boolean; icon: React.ReactNode, title: string, description: string, color: string, onPress?: () => void;
-  }> = [
-    {
-      icon: <Papicons name={"Palette"} />,
-      title: t('Settings_Personalization_Title_Card'),
-      description: t('Settings_Personalization_Subtitle_Card'),
-      color: "#17C300",
-      onPress: () => {
-        router.navigate("/(settings)/personalization")
-      }
-    },
-    {
-      icon: <Papicons name={"Calendar"} />,
-      title: t('Settings_Personalization_Subject_Title_Card'),
-      description: t('Settings_Personalization_Subject_Description'),
-      color: "#8500dd",
-      onPress: () => {
-        router.navigate("/(settings)/subject_personalization")
-      }
-    },
-    {
-      icon: <Papicons name={"User"} />,
-      title: t("Settings_Accounts_Title"),
-      description: t('Settings_Accounts_Description'),
-      color: "#0059DD",
-      onPress: () => {
-        router.navigate("/(settings)/accounts")
-      }
-    },
-    {
-      icon: <MaterialIcon name="auto-awesome" size={32} />,
-      title: "OpenCode Zen",
-      description: "Le futur assistant d'Aether",
-      color: "#DD007D",
-      onPress: () => {
-        router.navigate("/(settings)/zen")
-      }
-    }
-  ]
-
-  const RenderBigButtons = useCallback(() => {
-    return (
-      <Stack direction="vertical" gap={10}>
-        {Array.from({ length: Math.ceil(BigButtons.length / 2) }, (_, rowIndex) => (
-          <Stack key={rowIndex} direction="horizontal" gap={10}>
-            {BigButtons.slice(rowIndex * 2, rowIndex * 2 + 2).map((button, _) => {
-              const newButtonColor = adjust(button.color, theme.dark ? 0.2 : -0.2);
-
-              return (
-                <View
-                  style={{ flex: 1, borderRadius: 22, elevation: 2, overflow: Platform.OS === 'ios' ? "visible" : "hidden" }}
-                  key={button.title}
-                >
-                <ListTouchable
-                  onPress={button.onPress}
-                >
-                  <Stack
-                    flex
-                    card
-                    direction="vertical"
-                    gap={8}
-                    padding={[14, 14]}
-                    radius={23}
-                    style={[
-                      Platform.OS === 'ios' ? { borderColor: adjust(button.color, theme.dark ? 0.3 : -0.3) + "45" } : { backgroundColor: adjust(button.color, theme.dark ? -0.8 : 0.8), shadowOpacity: 0 },
-                    ]}
-                  >
-                    {Platform.OS === 'ios' && (
-                      <LinearGradient
-                        colors={[adjust(button.color, theme.dark ? 0.3 : 0.8), button.color]}
-                        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 22, opacity: 0.16 }}
-                      />
-                    )}
-                    <Icon papicon size={32} fill={button.disabled ? "#505050" : newButtonColor}>
-                      {button.icon}
-                    </Icon>
-                    <Stack direction="vertical" hAlign="start" gap={0}>
-                      <TypographyLegacy inline variant="title" weight="bold" color={button.disabled ? "#505050" : newButtonColor}>{button.title}</TypographyLegacy>
-                      <TypographyLegacy inline variant="body2" weight="medium" color={button.disabled ? "#505050" : newButtonColor}>{button.description}</TypographyLegacy>
-                    </Stack>
-                  </Stack>
-                </ListTouchable>
-                </View>
-              )
-            })}
-          </Stack>
-        ))}
-      </Stack>
-    );
-  }, [theme.dark]);
-  
-  const insets = useSafeAreaInsets();
-
-  const headerHeight = useHeaderHeight();
   const finalHeaderHeight = Platform.select({
-    android: headerHeight -16,
-    default: 0
+    android: headerHeight - 16,
+    default: 0,
   });
 
   return (
-    <>
-      <List
-        contentInsetAdjustmentBehavior="automatic"
-        gap={12}
-        ListHeaderComponent={(
-          <View
-            style={{ marginVertical: 16, gap: 4 }}
+    <List
+      contentInsetAdjustmentBehavior="automatic"
+      gap={12}
+      ListHeaderComponent={
+        <View style={{ marginVertical: 12, gap: 14 }}>
+          {/* Profile card */}
+          <Stack
+            flex
+            direction="vertical"
+            hAlign="center"
+            vAlign="center"
+            gap={6}
+            padding={[14, 0]}
+            style={{ paddingBottom: 16 }}
           >
-            <Stack
-              flex
-              direction="vertical"
-              hAlign='center'
-              vAlign='center'
-              gap={6}
-              padding={[16, 0]}
-              style={{ paddingBottom: 24 }}
-            >
-              <Avatar
-                size={72}
-                initials={getInitials(`${account?.firstName} ${account?.lastName}`)}
-                imageUrl={account && account.customisation && account.customisation.profilePicture ? `data:image/png;base64,${account.customisation.profilePicture}` : undefined}
-                style={{ marginBottom: 8 }}
-              />
-              <TypographyLegacy variant="h3" align="center">
-                {firstName || lastName ? `${firstName || ''} ${lastName || ''}`.trim() : t('Settings_NoAccount')}
-              </TypographyLegacy>
-              {establishment &&
-                <TypographyLegacy variant="body1" align="center" color="secondary">
-                  {level} {(level && establishment) && " — "} {formatSchoolName(establishment)}
-                </TypographyLegacy>
+            <Avatar
+              size={72}
+              initials={getInitials(`${account?.firstName} ${account?.lastName}`)}
+              imageUrl={
+                account?.customisation?.profilePicture
+                  ? `data:image/png;base64,${account.customisation.profilePicture}`
+                  : undefined
               }
-            </Stack>
-            <RenderBigButtons
+              style={{ marginBottom: 6 }}
             />
-          </View>
-        )}
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom, paddingTop: finalHeaderHeight }}
-      >
-        {MoreSettingsList.map(section => (
-          <List.Section key={section.title}>
-            {Platform.OS === 'android' && (
-              <List.SectionTitle>
-                <List.Label>{section.title}</List.Label>
-              </List.SectionTitle>
+            <Typography variant="h3" weight="bold" align="center">
+              {firstName || lastName
+                ? `${firstName || ""} ${lastName || ""}`.trim()
+                : t("Settings_NoAccount")}
+            </Typography>
+            {establishment && (
+              <Typography variant="body1" align="center" color="textSecondary">
+                {level} {level && establishment && " — "} {formatSchoolName(establishment)}
+              </Typography>
             )}
-            {section.content.map(item => (
-              <List.Item key={item.title} onPress={item.onPress}>
-                <List.Leading>
-                  <Icon papicon size={24} fill={theme.colors.text}>
-                    {item.papicon}
-                  </Icon>
-                </List.Leading>
-                <Typography variant="title">{item.title}</Typography>
-                <Typography variant="body1" color="textSecondary">
-                  {item.description}
-                </Typography>
-              </List.Item>
+            <View
+              style={{
+                backgroundColor: theme.dark ? "rgba(41,148,122,0.18)" : "rgba(41,148,122,0.12)",
+                paddingHorizontal: 10,
+                paddingVertical: 3,
+                borderRadius: 12,
+                marginTop: 4,
+              }}
+            >
+              <Typography variant="caption" weight="bold" style={{ color: "#29947A", fontSize: 11 }}>
+                Aether v{currentVersion} · Pronote FOSS
+              </Typography>
+            </View>
+          </Stack>
+
+          {/* Quick access grid */}
+          <View style={{ gap: 10 }}>
+            {Array.from({ length: Math.ceil(BigButtons.length / 2) }).map((_, rowIndex) => (
+              <View key={rowIndex} style={{ flexDirection: "row", gap: 10 }}>
+                {BigButtons.slice(rowIndex * 2, rowIndex * 2 + 2).map(button => {
+                  const cardBg = theme.dark
+                    ? adjust(button.color, -0.75)
+                    : adjust(button.color, 0.85);
+                  const iconColor = adjust(button.color, theme.dark ? 0.25 : -0.25);
+
+                  return (
+                    <Pressable
+                      key={button.title}
+                      onPress={button.onPress}
+                      style={({ pressed }) => [
+                        {
+                          flex: 1,
+                          backgroundColor: cardBg,
+                          borderRadius: 22,
+                          padding: 14,
+                          gap: 10,
+                          transform: [{ scale: pressed ? 0.97 : 1 }],
+                          elevation: 1,
+                          shadowColor: "#000",
+                          shadowOpacity: 0.04,
+                          shadowRadius: 6,
+                          shadowOffset: { width: 0, height: 2 },
+                        },
+                      ]}
+                    >
+                      <View
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 22,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: button.color + "25",
+                        }}
+                      >
+                        <Icon papicon size={26} fill={iconColor}>
+                          {button.icon}
+                        </Icon>
+                      </View>
+
+                      <View style={{ gap: 2 }}>
+                        <Typography variant="title" weight="bold" style={{ color: iconColor }}>
+                          {button.title}
+                        </Typography>
+                        <Typography variant="caption" weight="medium" style={{ color: iconColor, opacity: 0.85 }}>
+                          {button.description}
+                        </Typography>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             ))}
-          </List.Section>
-        ))}
-      </List>
-    </>
+          </View>
+        </View>
+      }
+      contentContainerStyle={{
+        padding: 16,
+        paddingBottom: insets.bottom + 24,
+        paddingTop: finalHeaderHeight,
+      }}
+    >
+      {MoreSettingsList.map(section => (
+        <List.Section key={section.title}>
+          <List.SectionTitle>
+            <List.Label>{section.title}</List.Label>
+          </List.SectionTitle>
+          {section.content.map(item => (
+            <List.Item key={item.title} onPress={item.onPress}>
+              <List.Leading>
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: theme.colors.card,
+                  }}
+                >
+                  <Icon papicon size={20} fill={theme.colors.text as string}>
+                    {item.icon}
+                  </Icon>
+                </View>
+              </List.Leading>
+              <Typography variant="title" weight="bold">
+                {item.title}
+              </Typography>
+              <Typography variant="body1" color="textSecondary">
+                {item.description}
+              </Typography>
+              <List.Trailing>
+                <Papicons name="ChevronRight" opacity={0.5} size={20} />
+              </List.Trailing>
+            </List.Item>
+          ))}
+        </List.Section>
+      ))}
+    </List>
   );
 }

@@ -1,58 +1,48 @@
-import {
-  Food as PawnoteFood,
-  Meal as PawnoteMeal,
-  Menu,
-  menus,
-  SessionHandle,
-} from "@blockshub/pawnote-lts";
-
-import { CanteenMenu, Food, Meal } from "@/services/shared/canteen";
+import { PronoteApiClient } from "@/services/pronote/api-client";
+import { CanteenMenu } from "@/services/shared/canteen";
 import { error } from "@/utils/logger/logger";
 
 export async function fetchPronoteCanteenMenu(
-  session: SessionHandle,
+  authToken: string,
   accountId: string,
-  date: Date
+  date: Date,
+  childName?: string
 ): Promise<CanteenMenu[]> {
-  if (!session) {
-    error("Session is undefined", "fetchPronoteAttendance");
-  }
+  try {
+    const fromStr = date.toISOString().split("T")[0];
+    const data = await PronoteApiClient.getCanteen(authToken, fromStr, undefined, childName);
 
-  const weeklyMenu = await menus(session, date);
-  if (!weeklyMenu.days?.length) {
+    return (data.menus || []).map((m: any) => {
+      const lunchMeal = m.meals?.[0];
+      const dinnerMeal = m.meals?.[1];
+
+      return {
+        date: new Date(m.date),
+        createdByAccount: accountId,
+        lunch: lunchMeal
+          ? {
+              entry: (lunchMeal.items || []).slice(0, 2).map((name: string) => ({ name })),
+              main: (lunchMeal.items || []).slice(2, 4).map((name: string) => ({ name })),
+              side: [],
+              cheese: [],
+              dessert: (lunchMeal.items || []).slice(4).map((name: string) => ({ name })),
+              drink: [],
+            }
+          : undefined,
+        dinner: dinnerMeal
+          ? {
+              entry: (dinnerMeal.items || []).slice(0, 2).map((name: string) => ({ name })),
+              main: (dinnerMeal.items || []).slice(2, 4).map((name: string) => ({ name })),
+              side: [],
+              cheese: [],
+              dessert: (dinnerMeal.items || []).slice(4).map((name: string) => ({ name })),
+              drink: [],
+            }
+          : undefined,
+      };
+    });
+  } catch (err) {
+    error(`Failed to fetch canteen menu: ${err}`, "fetchPronoteCanteenMenu");
     return [];
   }
-
-  return weeklyMenu.days.map(day => ({
-    date: day.date,
-    createdByAccount: accountId,
-    ...mapCanteenMenu(day),
-  })).sort((a, b) => a.date.getTime() - b.date.getTime());
-}
-
-function mapCanteenMenu(menu: Menu): { lunch: Meal; dinner: Meal } {
-  return {
-    lunch: mapMeal(menu.lunch),
-    dinner: mapMeal(menu.dinner),
-  };
-}
-
-function mapMeal(meal: PawnoteMeal | undefined): Meal {
-  return {
-    entry: mapFood([...meal?.entry ?? []]),
-    main: mapFood([...meal?.main ?? []]),
-    side: mapFood([...meal?.side ?? []]),
-    cheese: mapFood([...meal?.fromage ?? []]),
-    dessert: mapFood([...meal?.dessert ?? []]),
-    drink: mapFood([...meal?.drink ?? []]),
-  };
-}
-
-function mapFood(meal: PawnoteFood[]): Food[] {
-  return meal.map(food => ({
-    name: food.name,
-    allergens: food.allergens?.length
-      ? food.allergens.map(allergen => allergen.name)
-      : undefined,
-  }));
 }

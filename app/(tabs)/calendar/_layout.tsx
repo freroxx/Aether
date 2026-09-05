@@ -26,11 +26,20 @@ export default function Layout() {
         }}
       />
       <Stack.Screen
+        name="android-calendars"
+        options={{
+          presentation: "modal",
+          headerLargeTitle: false,
+          headerTitle: "Calendriers Android",
+          headerBackground: AndroidHeaderBackground
+        }}
+      />
+      <Stack.Screen
         name="icals"
         options={{
           presentation: "modal",
           headerLargeTitle: false,
-          headerTitle: t("Tab_Calendar_Icals"),
+          headerTitle: "Calendriers Android",
           headerBackground: AndroidHeaderBackground
         }}
       />

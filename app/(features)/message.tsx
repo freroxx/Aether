@@ -1,29 +1,38 @@
 import { useLocalSearchParams } from "expo-router";
 import { useTheme } from "expo-router/react-navigation";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { Send, Sparkles } from "lucide-react-native";
 
 import { Chat, Message } from "@/services/shared/chat";
 import { getManager } from "@/services/shared";
+import { generateMockChatMessages, generateMockChats } from "@/services/mock/data";
 import { useAccountStore } from "@/stores/account";
+import { useSettingsStore } from "@/stores/settings";
 import { error } from "@/utils/logger/logger";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
+import Avatar from "@/ui/components/Avatar";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
-import List from "@/ui/new/List";
-import AetherTextInput from "@/ui/new/TextInput";
 import Typography from "@/ui/new/Typography";
+import { getInitials } from "@/utils/chats/initials";
 
 export default function MessageThreadView() {
   const theme = useTheme();
+  const isDark = theme.dark;
   const insets = useSafeAreaInsets();
   const search = useLocalSearchParams();
   const chatId = Array.isArray(search.id) ? search.id[0] : search.id;
@@ -31,6 +40,10 @@ export default function MessageThreadView() {
   const account = useAccountStore(state =>
     state.accounts.find(a => a.id === state.lastUsedAccount)
   );
+  const mockDataEnabled = useSettingsStore(
+    state => state.personalization.mockDataEnabled ?? false
+  );
+
   const myName = useMemo(
     () =>
       [account?.firstName, account?.lastName]
@@ -47,27 +60,91 @@ export default function MessageThreadView() {
   const [refreshing, setRefreshing] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [isUsingMock, setIsUsingMock] = useState(false);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => {
+        setKeyboardVisible(true);
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const load = useCallback(async () => {
     try {
       const manager = getManager();
-      if (!manager || !chatId) {
+      if (!manager || !account) {
+        const mockChats = generateMockChats("guest");
+        const found = mockChats.find(c => c.id === chatId) || mockChats[0];
+        setChat(found);
+        if (found) {
+          const mockMsgs = generateMockChatMessages("guest", found.id);
+          setMessages([...mockMsgs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        }
+        setIsUsingMock(true);
         return;
       }
+
+      if (mockDataEnabled) {
+        const mockChats = generateMockChats(account.id);
+        const found = mockChats.find(c => c.id === chatId) || mockChats[0];
+        setChat(found);
+        if (found) {
+          const mockMsgs = generateMockChatMessages(account.id, found.id);
+          setMessages([...mockMsgs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        }
+        setIsUsingMock(true);
+        return;
+      }
+
       const chats = await manager.getChats();
       const found = chats.find(c => c.id === chatId);
       if (!found) {
+        setChat(undefined);
+        setMessages([]);
+        setIsUsingMock(false);
         return;
       }
+
       setChat(found);
       const data = await manager.getChatMessages(found);
-      setMessages(
-        [...data].sort((a, b) => a.date.getTime() - b.date.getTime())
-      );
+      setMessages([...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+      setIsUsingMock(false);
     } catch (e) {
       error(String(e));
+      if (mockDataEnabled || !account) {
+        const mockChats = generateMockChats(account?.id || "guest");
+        const found = mockChats.find(c => c.id === chatId) || mockChats[0];
+        setChat(found);
+        if (found) {
+          const mockMsgs = generateMockChatMessages(account?.id || "guest", found.id);
+          setMessages([...mockMsgs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        }
+        setIsUsingMock(true);
+      } else {
+        setChat(undefined);
+        setMessages([]);
+        setIsUsingMock(false);
+      }
     }
-  }, [chatId]);
+  }, [chatId, account, mockDataEnabled]);
 
   useEffect(() => {
     setLoading(true);
@@ -85,23 +162,48 @@ export default function MessageThreadView() {
     if (!content || !chat || sending) {
       return;
     }
+
     setSending(true);
     try {
       const manager = getManager();
-      await manager?.sendMessageInChat(chat, content);
+      if (!manager || isUsingMock) {
+        // Mock send
+        const newMsg: Message = {
+          id: `mock-msg-${Date.now()}`,
+          subject: "",
+          content,
+          author: account ? `${account.firstName} ${account.lastName}` : "Moi",
+          date: new Date(),
+          attachments: [],
+        };
+        setMessages(prev => [...prev, newMsg]);
+        setDraft("");
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+        return;
+      }
+
+      await manager.sendMessageInChat(chat, content);
       setDraft("");
       await load();
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (e) {
       error(String(e));
     } finally {
       setSending(false);
     }
-  }, [draft, chat, sending, load]);
+  }, [draft, chat, sending, isUsingMock, load, account]);
+
+  const correspondent = chat?.recipient || chat?.creator || "Discussion";
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
     >
       <TabHeader
         showAndroidBackButton
@@ -109,116 +211,292 @@ export default function MessageThreadView() {
         onHeightChanged={setHeaderHeight}
         title={
           <TabHeaderTitle
-            leading={chat?.subject || "Discussion"}
-            subtitle={chat?.recipient}
+            leading={chat?.subject || correspondent}
+            subtitle={chat?.subject ? correspondent : undefined}
             loading={loading}
           />
         }
       />
+
       {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <View style={styles.centerContainer}>
           <ActivityIndicator />
         </View>
       ) : (
         <>
-          <List
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             contentContainerStyle={{
-              padding: 16,
-              paddingTop: headerHeight + 8,
-              paddingBottom: 8,
+              paddingTop: headerHeight + 12,
+              paddingBottom: 16,
+              paddingHorizontal: 16,
+              gap: 12,
             }}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
+              />
             }
+            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: false })}
           >
-            {messages.length === 0 && (
-              <List.Section id="thread-empty">
-                <List.View>
-                  <Typography variant="body1" color="secondary">
-                    Aucun message dans cette discussion.
-                  </Typography>
-                </List.View>
-              </List.Section>
+            {isUsingMock && (
+              <View
+                style={[
+                  styles.mockNotice,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(41, 148, 122, 0.15)"
+                      : "rgba(41, 148, 122, 0.1)",
+                  },
+                ]}
+              >
+                <Sparkles size={14} color="#29947A" />
+                <Typography
+                  variant="caption"
+                  weight="bold"
+                  style={{ color: "#29947A", flex: 1 }}
+                >
+                  Mode démonstration actif
+                </Typography>
+              </View>
             )}
-            <List.Section id="thread">
-              {messages.map(message => {
+
+            {messages.length === 0 ? (
+              <View style={[styles.emptyCard, { backgroundColor: theme.colors.card }]}>
+                <Typography variant="body1" color="textSecondary" align="center">
+                  Aucun message dans cette discussion.
+                </Typography>
+              </View>
+            ) : (
+              messages.map(message => {
+                const authorLower = message.author.toLowerCase();
                 const mine =
-                  myName.length > 0 &&
-                  message.author.toLowerCase().includes(myName.split(" ")[0]);
+                  myName.length > 0
+                    ? authorLower.includes(myName.split(" ")[0]) ||
+                      authorLower.includes("moi")
+                    : false;
+
+                const initials = getInitials(message.author);
+
                 return (
-                  <List.View key={message.id}>
+                  <View
+                    key={message.id}
+                    style={[
+                      styles.messageRow,
+                      mine ? styles.myMessageRow : styles.theirMessageRow,
+                    ]}
+                  >
+                    {!mine && (
+                      <Avatar
+                        size={32}
+                        initials={initials}
+                        shape="circle"
+                        style={styles.senderAvatar}
+                      />
+                    )}
+
                     <View
-                      style={{
-                        alignSelf: mine ? "flex-end" : "flex-start",
-                        maxWidth: "85%",
-                        backgroundColor: mine
-                          ? theme.colors.primary
-                          : theme.colors.card,
-                        borderRadius: 16,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        gap: 2,
-                      }}
+                      style={[
+                        styles.bubble,
+                        mine
+                          ? [styles.myBubble, { backgroundColor: theme.colors.primary }]
+                          : [styles.theirBubble, { backgroundColor: theme.colors.card }],
+                      ]}
                     >
                       {!mine && (
                         <Typography
                           variant="caption"
-                          weight="semibold"
-                          color={mine ? undefined : "primary"}
+                          weight="bold"
+                          style={{ color: theme.colors.primary, marginBottom: 2 }}
                         >
                           {message.author}
                         </Typography>
                       )}
+
                       <Typography
                         variant="body1"
-                        color={mine ? "#FFFFFF" : undefined}
+                        style={{
+                          color: mine ? "#FFFFFF" : theme.colors.text,
+                          lineHeight: 20,
+                        }}
                       >
                         {message.content}
                       </Typography>
+
                       <Typography
                         variant="caption"
-                        color={mine ? "#FFFFFF" : "textSecondary"}
+                        style={{
+                          alignSelf: "flex-end",
+                          fontSize: 10,
+                          marginTop: 4,
+                          color: mine ? "rgba(255,255,255,0.75)" : String(theme.colors.text) + "80",
+                        }}
                       >
-                        {format(message.date, "d MMM · HH:mm", { locale: fr })}
+                        {format(new Date(message.date), "d MMM · HH:mm", { locale: fr })}
                       </Typography>
                     </View>
-                  </List.View>
+                  </View>
                 );
-              })}
-            </List.Section>
-          </List>
+              })
+            )}
+          </ScrollView>
+
+          {/* Bottom input bar */}
           <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              paddingHorizontal: 16,
-              paddingBottom: insets.bottom + 12,
-              paddingTop: 4,
-            }}
+            style={[
+              styles.inputBarContainer,
+              {
+                paddingBottom: isKeyboardVisible
+                  ? 10
+                  : insets.bottom + (Platform.OS === "android" ? 10 : 8),
+                backgroundColor: theme.colors.background,
+                borderTopColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+              },
+            ]}
           >
-            <View style={{ flex: 1 }}>
-              <AetherTextInput
+            <View
+              style={[
+                styles.textInputWrapper,
+                {
+                  backgroundColor: theme.colors.card,
+                },
+              ]}
+            >
+              <TextInput
                 value={draft}
                 onChangeText={setDraft}
                 placeholder="Écrire un message…"
+                placeholderTextColor={String(theme.colors.text) + "60"}
                 multiline
-                height={48}
-                color={theme.colors.primary}
                 editable={!sending}
-                onSubmitEditing={send}
+                style={[
+                  styles.textInput,
+                  {
+                    color: theme.colors.text,
+                  },
+                ]}
               />
             </View>
-            <Typography
-              variant="title"
-              color="primary"
+
+            <Pressable
               onPress={send}
+              disabled={sending || draft.trim().length === 0}
+              style={({ pressed }) => [
+                styles.sendButton,
+                {
+                  backgroundColor: theme.colors.primary,
+                  opacity: sending || draft.trim().length === 0 ? 0.4 : pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                },
+              ]}
+              hitSlop={8}
             >
-              {sending ? "…" : "Envoyer"}
-            </Typography>
+              <Send size={18} color="#FFFFFF" />
+            </Pressable>
           </View>
         </>
       )}
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  mockNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    marginBottom: 6,
+  },
+  emptyCard: {
+    padding: 24,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+  },
+  messageRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  myMessageRow: {
+    justifyContent: "flex-end",
+  },
+  theirMessageRow: {
+    justifyContent: "flex-start",
+  },
+  senderAvatar: {
+    marginBottom: 2,
+  },
+  bubble: {
+    maxWidth: "80%",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  myBubble: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 4,
+  },
+  theirBubble: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 4,
+  },
+  inputBarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  textInputWrapper: {
+    flex: 1,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === "ios" ? 10 : 6,
+    minHeight: 46,
+    maxHeight: 120,
+    justifyContent: "center",
+  },
+  textInput: {
+    fontSize: 15,
+    padding: 0,
+    margin: 0,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

@@ -1,15 +1,8 @@
 import { useRoute, useTheme } from "expo-router/react-navigation";
 import { router, useNavigation } from "expo-router";
-import {
-  AccountKind,
-  createSessionHandle,
-  loginToken,
-  SecurityError,
-  SessionHandle,
-} from "@blockshub/pawnote-lts";
 import React, { createRef, RefObject, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, KeyboardAvoidingView, Modal } from "react-native";
+import { Alert, KeyboardAvoidingView } from "react-native";
 import Reanimated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { formatSchoolName } from '@/utils/format/formatSchoolName';
 import WebView from "react-native-webview";
@@ -17,26 +10,25 @@ import { WebViewErrorEvent, WebViewMessage, WebViewNavigationEvent } from "react
 
 import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
+import { PronoteApiClient } from "@/services/pronote/api-client";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import Stack from "@/ui/components/Stack";
 import Divider from "@/ui/new/Divider";
 import Typography from "@/ui/new/Typography";
 import { URLToBase64 } from "@/utils/attachments/helper";
-import { customFetcher } from "@/utils/pronote/fetcher";
 import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
 import uuid from "@/utils/uuid/uuid";
 
 import OnboardingWebView from "../../components/OnboardingWebView";
-import { Pronote2FAModal } from "./2fa";
 import Button from "@/ui/new/Button";
 
 export default function PronoteENTLogin() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const navigation = useNavigation();
-  const { params } = useRoute();
-  const { url, school } = params;
-  const baseURL = url.split("/pronote")[0];
+  const { params } = useRoute<any>();
+  const { url = "", school } = (params as any) || {};
+  const baseURL = url.split("/pronote")[0] || "";
 
   // UI Logic
   const [browserVisible, setBrowserVisible] = React.useState(false);
@@ -70,10 +62,6 @@ export default function PronoteENTLogin() {
   const [received, setReceived] = useState<boolean>(false);
   console.log("WebViewScreen initialized with URL:", url);
 
-  const [challengeModalVisible, setChallengeModalVisible] = useState<boolean>(false);
-  const [doubleAuthError, setDoubleAuthError] = useState<SecurityError | null>(null);
-  const [doubleAuthSession, setDoubleAuthSession] = useState<SessionHandle | null>(null);
-  const [deviceId, setDeviceId] = useState<string>("");
   const [hasShownConnectionErrorAlert, setHasShownConnectionErrorAlert] = useState(false);
 
   const PRONOTE_COOKIE_EXPIRED = new Date(0).toUTCString();
@@ -229,33 +217,28 @@ export default function PronoteENTLogin() {
       setReceived(true);
 
       console.log(message.data.login, message.data.mdp);
-      console.log("Creating session handle...");
-      const session = createSessionHandle(customFetcher);
+      console.log("Connecting via PronoteApiClient.tokenLogin...");
       try {
-        const refresh = await loginToken(
-          session,
-          {
-            url: url,
-            kind: AccountKind.STUDENT,
-            username: message.data.login,
-            token: message.data.mdp,
-            deviceUUID,
-          },
+        const res = await PronoteApiClient.tokenLogin(
+          url,
+          message.data.login,
+          message.data.mdp,
+          deviceUUID,
+          "eleve"
         );
 
-        if (!refresh) {
+        if (!res.success) {
           throw new Error("Erreur lors de la connexion");
         }
 
         console.log("Login successful, adding account to store...");
-        const schoolName = session.user.resources[0].establishmentName;
-        const className = session.user.resources[0].className;
-        const { firstName, lastName } = GetIdentityFromPronoteUsername(session.user.name)
-
-        let pp = "";
-        if (session.user.resources[0].profilePicture?.url) {
-          pp = await URLToBase64(session.user.resources[0].profilePicture?.url)
-        }
+        const schoolName = res.user?.establishment || (school && school.name ? school.name : "Pronote");
+        const className = res.user?.class_name || "";
+        const { firstName, lastName } = GetIdentityFromPronoteUsername(res.user?.name || message.data.login);
+        const isParent = res.user?.account_type === "parent" || (res.children && res.children.length > 0);
+        const accountType = isParent ? "parent" : "eleve";
+        const children = res.children || [];
+        const selectedChild = children.length > 0 ? children[0].name : undefined;
 
         useAccountStore.getState().addAccount({
           id: deviceUUID,
@@ -263,18 +246,24 @@ export default function PronoteENTLogin() {
           lastName,
           schoolName,
           className,
+          accountType,
+          children,
+          selectedChild,
           customisation: {
-            profilePicture: pp,
+            profilePicture: "",
             subjects: {}
           },
           services: [{
             id: deviceUUID,
             auth: {
-              accessToken: refresh.token,
-              refreshToken: refresh.token,
+              accessToken: res.auth_token,
+              refreshToken: res.auth_token,
               additionals: {
-                ...refresh,
+                instanceURL: url,
+                username: message.data.login,
                 deviceUUID,
+                authToken: res.auth_token,
+                accountType,
               },
             },
             serviceId: Services.PRONOTE,
@@ -299,17 +288,9 @@ export default function PronoteENTLogin() {
         router.back();
         router.dismissAll();
         return router.push("/(tabs)/index");
-      } catch (error) {
-        if (error instanceof SecurityError && !error.handle.shouldCustomPassword && !error.handle.shouldCustomDoubleAuth) {
-          setDoubleAuthError(error)
-          setDoubleAuthSession(session)
-          setDeviceId(deviceUUID)
-          setChallengeModalVisible(true)
-        } else {
-          console.error("Error during login:", error);
-          Alert.alert("Erreur", "Une erreur est survenue lors de la connexion à Pronote. Veuillez réessayer.");
-          throw error;
-        }
+      } catch (error: any) {
+        console.error("Error during login:", error);
+        Alert.alert("Erreur", error?.message || "Une erreur est survenue lors de la connexion à Pronote. Veuillez réessayer.");
       }
     }
   };
@@ -397,15 +378,6 @@ export default function PronoteENTLogin() {
         document.getElementsByTagName('head')[0].appendChild(meta);
         `}
       />
-
-      <Modal
-        visible={challengeModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setChallengeModalVisible(false)}
-      >
-        <Pronote2FAModal doubleAuthSession={doubleAuthSession} doubleAuthError={doubleAuthError} setChallengeModalVisible={setChallengeModalVisible} deviceId={deviceId} />
-      </Modal>
     </KeyboardAvoidingView>
   )
 }

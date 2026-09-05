@@ -250,7 +250,7 @@ export default function GradesModal() {
                         ? String(grade.studentScore?.value.toFixed(2))
                         : undefined
                   }
-                  outOf={grade.outOf?.value}
+                  outOf={grade.outOf?.value ?? 20}
                 />
               }
               subjectVariant={grade.studentScore ? undefined : "h2"}
@@ -337,7 +337,7 @@ export default function GradesModal() {
                         ? theme.colors.tint
                         : adjust(subjectInfo.color, theme.dark ? 0.3 : -0.3)
                     }
-                    denominator={"/" + grade.outOf?.value}
+                    denominator={"/" + (grade.outOf?.value ?? 20)}
                   >
                     {grade.averageScore?.value.toFixed(2)}
                   </ContainedNumber>
@@ -427,7 +427,7 @@ export default function GradesModal() {
                       ? theme.colors.tint
                       : adjust(subjectInfo.color, theme.dark ? 0.3 : -0.3)
                   }
-                  denominator={"/" + grade.outOf?.value}
+                  denominator={"/" + (grade.outOf?.value ?? 20)}
                 >
                   {grade.maxScore?.value.toFixed(2)}
                 </ContainedNumber>
@@ -453,7 +453,7 @@ export default function GradesModal() {
                       ? theme.colors.tint
                       : adjust(subjectInfo.color, theme.dark ? 0.3 : -0.3)
                   }
-                  denominator={"/" + grade.outOf?.value}
+                  denominator={"/" + (grade.outOf?.value ?? 20)}
                 >
                   {grade.minScore?.value.toFixed(2)}
                 </ContainedNumber>

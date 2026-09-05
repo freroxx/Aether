@@ -1,0 +1,301 @@
+import { useSettingsStore } from "@/stores/settings";
+
+export const DEFAULT_PRONOTE_API_URL =
+  process.env.EXPO_PUBLIC_PRONOTE_API_URL || "https://aether-pronote-api.vercel.app";
+
+export function getPronoteApiBaseUrl(): string {
+  const customUrl = useSettingsStore.getState().personalization.pronoteApiUrl;
+  if (customUrl && customUrl.trim().length > 0) {
+    return customUrl.trim().replace(/\/+$/, "");
+  }
+  return DEFAULT_PRONOTE_API_URL.replace(/\/+$/, "");
+}
+
+async function request<T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: any;
+    authToken?: string;
+    params?: Record<string, string | undefined>;
+  } = {}
+): Promise<T> {
+  const baseUrl = getPronoteApiBaseUrl();
+  let url = `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+
+  if (options.params) {
+    const searchParams = new URLSearchParams();
+    for (const [k, v] of Object.entries(options.params)) {
+      if (v !== undefined && v !== null) {
+        searchParams.append(k, v);
+      }
+    }
+    const qs = searchParams.toString();
+    if (qs) url += `?${qs}`;
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+
+  if (options.authToken) {
+    headers["X-Pronote-Auth"] = options.authToken;
+  }
+
+  const response = await fetch(url, {
+    method: options.method || "GET",
+    headers,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (!response.ok) {
+    let errDetail = `HTTP ${response.status} ${response.statusText}`;
+    try {
+      const errJson = await response.json();
+      if (errJson.detail) errDetail = errJson.detail;
+    } catch {}
+    throw new Error(errDetail);
+  }
+
+  return response.json();
+}
+
+export interface PronoteLoginResult {
+  success: boolean;
+  user: {
+    name: string;
+    class_name?: string;
+    establishment?: string;
+    account_type: "eleve" | "parent";
+  };
+  children: Array<{ name: string; grade?: string }>;
+  auth_token: string;
+  credentials?: Record<string, any>;
+}
+
+export const PronoteApiClient = {
+  async directLogin(
+    url: string,
+    username: string,
+    password: string,
+    ent?: string,
+    accountType: "eleve" | "parent" = "eleve"
+  ): Promise<PronoteLoginResult> {
+    return request<PronoteLoginResult>("/auth/login", {
+      method: "POST",
+      body: {
+        url,
+        username,
+        password,
+        ent,
+        account_type: accountType,
+      },
+    });
+  },
+
+  async qrCodeLogin(
+    qrData: any,
+    pin: string,
+    uuid: string,
+    accountType: "eleve" | "parent" = "eleve"
+  ): Promise<PronoteLoginResult> {
+    return request<PronoteLoginResult>("/auth/qrcode", {
+      method: "POST",
+      body: {
+        qr_data: qrData,
+        pin,
+        uuid,
+        account_type: accountType,
+      },
+    });
+  },
+
+  async tokenLogin(
+    url: string,
+    username: string,
+    token: string,
+    uuid: string,
+    accountType: "eleve" | "parent" = "eleve"
+  ): Promise<PronoteLoginResult> {
+    return request<PronoteLoginResult>("/auth/token", {
+      method: "POST",
+      body: {
+        url,
+        username,
+        token,
+        uuid,
+        account_type: accountType,
+      },
+    });
+  },
+
+  async getParentChildren(authToken: string): Promise<{ children: Array<{ name: string; grade?: string }> }> {
+    return request("/parent/children", { authToken });
+  },
+
+  async getTimetable(
+    authToken: string,
+    fromDate: string,
+    toDate: string,
+    child?: string
+  ): Promise<{ lessons: any[] }> {
+    return request("/timetable", {
+      authToken,
+      params: { from_date: fromDate, to_date: toDate, child },
+    });
+  },
+
+  async getGrades(
+    authToken: string,
+    period?: string,
+    child?: string
+  ): Promise<{ period: string; grades: any[]; averages: any }> {
+    return request("/grades", {
+      authToken,
+      params: { period, child },
+    });
+  },
+
+  async getGradePeriods(authToken: string, child?: string): Promise<{ periods: any[] }> {
+    return request("/grades/periods", {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async getHomework(
+    authToken: string,
+    fromDate: string,
+    toDate: string,
+    child?: string
+  ): Promise<{ homework: any[] }> {
+    return request("/homework", {
+      authToken,
+      params: { from_date: fromDate, to_date: toDate, child },
+    });
+  },
+
+  async setHomeworkDone(
+    authToken: string,
+    homeworkId: string,
+    done: boolean,
+    child?: string
+  ): Promise<{ success: boolean; done: boolean }> {
+    return request("/homework/done", {
+      method: "POST",
+      authToken,
+      body: {
+        homework_id: homeworkId,
+        done,
+        child_name: child,
+      },
+    });
+  },
+
+  async getAttendance(authToken: string, child?: string): Promise<{ absences: any[]; delays: any[]; punishments: any[] }> {
+    return request("/attendance", {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async getNews(authToken: string, child?: string): Promise<{ news: any[] }> {
+    return request("/news", {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async getCanteen(
+    authToken: string,
+    fromDate: string,
+    toDate?: string,
+    child?: string
+  ): Promise<{ menus: any[] }> {
+    return request("/canteen", {
+      authToken,
+      params: { from_date: fromDate, to_date: toDate, child },
+    });
+  },
+
+  async getChats(authToken: string, child?: string): Promise<{ chats: any[] }> {
+    return request("/chats", {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async getChatMessages(authToken: string, chatId: string, child?: string): Promise<{ messages: any[] }> {
+    return request(`/chats/${chatId}/messages`, {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async sendChatMessage(
+    authToken: string,
+    chatId: string,
+    content: string,
+    child?: string
+  ): Promise<{ success: boolean }> {
+    return request("/chats/send", {
+      method: "POST",
+      authToken,
+      body: {
+        chat_id: chatId,
+        content,
+        child_name: child,
+      },
+    });
+  },
+
+  async geolocation(coords: { latitude: number; longitude: number }): Promise<Array<{ name: string; url: string; distance: number; postalCode?: string }>> {
+    return pronoteGeolocation(coords);
+  }
+};
+
+export async function pronoteGeolocation(coords: { latitude: number; longitude: number }): Promise<Array<{ name: string; url: string; distance: number; postalCode?: string }>> {
+  try {
+    const body = new URLSearchParams();
+    body.append("data", JSON.stringify({
+      nomFonction: "geoLoc",
+      lat: coords.latitude.toString(),
+      long: coords.longitude.toString()
+    }));
+    const res = await fetch("https://www.index-education.com/swie/geoloc.php", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: body.toString()
+    });
+    const data = await res.json();
+    return (data || []).map((item: any) => {
+      const lat1 = coords.latitude;
+      const lon1 = coords.longitude;
+      const lat2 = parseFloat(item.lat || "0");
+      const lon2 = parseFloat(item.long || "0");
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = 6371000 * c;
+      return {
+        name: item.nomEtab || "",
+        url: item.url || "",
+        distance,
+        postalCode: item.cp || ""
+      };
+    });
+  } catch (e) {
+    console.error("Pronote geolocation error:", e);
+    return [];
+  }
+}
+

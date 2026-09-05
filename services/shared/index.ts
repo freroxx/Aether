@@ -43,6 +43,7 @@ import {
   Booking,
   BookingDay,
   CanteenHistoryItem,
+  CanteenKind,
   CanteenMenu,
   QRCode,
 } from "@/services/shared/canteen";
@@ -60,25 +61,23 @@ import { useAccountStore } from "@/stores/account";
 import { Account, ServiceAccount, Services } from "@/stores/account/types";
 import { error, log, warn } from "@/utils/logger/logger";
 
-import {
-  AccessDeniedError,
-  AccountDisabledError,
-  AuthenticateError,
-  BadCredentialsError,
-  SecurityError,
-  SessionExpiredError,
-} from "@blockshub/pawnote-lts";
-
 import { AuthenticationError } from "../errors/AuthenticationError";
 import { ServiceUnavailableError } from "../errors/ServiceUnavailableError";
 
-const isPermanentAuthError = (e: unknown): boolean =>
-  e instanceof BadCredentialsError ||
-  e instanceof AuthenticateError ||
-  e instanceof SessionExpiredError ||
-  e instanceof AccessDeniedError ||
-  e instanceof AccountDisabledError ||
-  e instanceof SecurityError;
+const isPermanentAuthError = (e: unknown): boolean => {
+  if (!e) return false;
+  const msg = String((e as any)?.message || e).toLowerCase();
+  return (
+    msg.includes("401") ||
+    msg.includes("badcredentials") ||
+    msg.includes("identifiants incorrects") ||
+    msg.includes("authenticate") ||
+    msg.includes("sessionexpired") ||
+    msg.includes("accessdenied") ||
+    msg.includes("accountdisabled") ||
+    msg.includes("security")
+  );
+};
 import { Balance } from "./balance";
 import { Kid } from "./kid";
 

@@ -27,11 +27,26 @@ const UserProfile = ({ subtitle, onPress }: { subtitle?: string, onPress?: () =>
   const lastUsedAccount = useAccountStore((state) => state.lastUsedAccount);
   const theme = useTheme();
 
+  const currentAccount = accounts.find((a) => a.id === lastUsedAccount);
+  const isParent = currentAccount?.accountType === "parent";
+  const currentChildName = currentAccount?.selectedChild || currentAccount?.children?.[0]?.name;
+
+  const ChildrenMenuItems = (isParent && currentAccount?.children && currentAccount.children.length > 0)
+    ? currentAccount.children.map((c) => ({
+        id: `child:${c.name}`,
+        title: `Enfant: ${c.name}`,
+        subtitle: c.grade || "Élève",
+        state: (c.name === currentChildName ? 'on' : 'off') as 'on' | 'off',
+      }))
+    : [];
+
+  const effectiveSubtitle = subtitle || (isParent && currentChildName ? `Enfant : ${currentChildName}` : undefined);
+
   const AccountsMenuItems = (accounts && accounts.length > 0) && accounts.map((account) => ({
     id: account.id,
     title: account.firstName + ' ' + account.lastName,
     subtitle: formatSchoolName(account.schoolName ?? ""),
-    state: account.id === lastUsedAccount ? 'on' : 'off',
+    state: (account.id === lastUsedAccount ? 'on' : 'off') as 'on' | 'off',
   })) || [];
 
   return (
@@ -77,6 +92,16 @@ const UserProfile = ({ subtitle, onPress }: { subtitle?: string, onPress?: () =>
                 return;
               }
 
+              if (nativeEvent.event.startsWith("child:")) {
+                const childName = nativeEvent.event.replace("child:", "");
+                const store = useAccountStore.getState();
+                if (currentAccount) {
+                  store.setSelectedChild(currentAccount.id, childName);
+                  await initializeAccountManager();
+                }
+                return;
+              }
+
               const store = useAccountStore.getState();
               const settingsStore = useSettingsStore.getState();
               const currentAccountId = store.lastUsedAccount;
@@ -94,6 +119,14 @@ const UserProfile = ({ subtitle, onPress }: { subtitle?: string, onPress?: () =>
               await initializeAccountManager();
             }}
             actions={[
+              ...(ChildrenMenuItems.length > 0 ? [
+                ...(Platform.OS === "ios" ? [{
+                  id: 'children_group',
+                  title: 'Mes enfants',
+                  displayInline: true,
+                  subactions: ChildrenMenuItems,
+                }] : ChildrenMenuItems)
+              ] : []),
               ...(Platform.OS === "ios" ? [{
                 id: 'workspaces',
                 title: '',
@@ -121,9 +154,9 @@ const UserProfile = ({ subtitle, onPress }: { subtitle?: string, onPress?: () =>
                 </Typography>
                 <Papicons name="chevrondown" size={20} color="white" opacity={0.5} style={{ marginRight: 0 }} />
               </Stack>
-              {subtitle &&
+              {effectiveSubtitle &&
                 <Typography nowrap color='white' variant='body1' style={{ opacity: 0.7 }}>
-                  {subtitle}
+                  {effectiveSubtitle}
                 </Typography>
               }
             </Stack>

@@ -27,6 +27,8 @@ const Wallpaper = ({ height = 400, dim = true }) => {
       }
     }, [currentWallpaper]);
 
+    const isGradient = currentWallpaper?.type === "gradient" && Boolean(currentWallpaper?.gradient?.colors);
+
     return (
       <MaskedView
         style={[styles.container, { height }]}
@@ -38,10 +40,19 @@ const Wallpaper = ({ height = 400, dim = true }) => {
           />
         }
       >
-        <Image
-          source={image ? { uri: image } : require('@/assets/images/wallpapers/clouds.jpg')}
-          style={[styles.image, { height }]}
-        />
+        {isGradient ? (
+          <LinearGradient
+            colors={currentWallpaper!.gradient!.colors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.image, { height }]}
+          />
+        ) : (
+          <Image
+            source={image ? { uri: image } : require('@/assets/images/wallpapers/clouds.jpg')}
+            style={[styles.image, { height }]}
+          />
+        )}
 
         {dim &&
           <LinearGradient

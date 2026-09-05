@@ -26,6 +26,7 @@ export interface AccountsStorage {
     subjects: Record<string, { color: string; emoji: string; name: string }>
   ) => void;
   setAccountProfilePicture: (accountId: string, profilePicture: string) => void;
+  setSelectedChild: (accountId: string, childName: string) => void;
 }
 
 /**
@@ -47,6 +48,9 @@ export interface Account {
   custom?: boolean;
   schoolName?: string;
   className?: string;
+  accountType?: "eleve" | "parent";
+  children?: Array<{ name: string; grade?: string }>;
+  selectedChild?: string;
   customisation?: CustomisationStorage;
   services: ServiceAccount[];
   createdAt: string;

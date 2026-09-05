@@ -61,10 +61,9 @@ export const CalendarHeader = React.memo(({ date, onDateChange, onHeaderHeightCh
             chevron
             actions={[
               {
-                id: 'manage_icals',
-                title: t("Tab_Calendar_Icals"),
-                papicon: "calendar",
-                subtitle: t("Tab_Calendar_Icals_Description"),
+                id: 'manage_calendars',
+                title: "Calendriers Android",
+                subtitle: "Afficher les événements de l'appareil",
                 imageColor: colors.text,
                 image: Platform.select({
                   ios: 'calendar',
@@ -73,9 +72,9 @@ export const CalendarHeader = React.memo(({ date, onDateChange, onHeaderHeightCh
               }
             ]}
             onPressAction={({ nativeEvent }) => {
-              if (nativeEvent.event === 'manage_icals') {
+              if (nativeEvent.event === 'manage_calendars' || nativeEvent.event === 'manage_icals') {
                 router.push({
-                  pathname: "./calendar/icals",
+                  pathname: "/(tabs)/calendar/android-calendars" as any,
                   params: {}
                 });
               }

@@ -1,4 +1,4 @@
-import { geolocation } from "@blockshub/pawnote-lts";
+import { pronoteGeolocation } from "@/services/pronote/api-client";
 import { t } from "i18next";
 
 import { Services } from "@/stores/account/types";
@@ -34,7 +34,7 @@ export async function fetchSchools(service: Services, alert: ReturnType<typeof u
   }
 
   if (service === Services.PRONOTE) {
-    const schools = await geolocation({ latitude: pos?.latitude ?? 0, longitude: pos?.longitude ?? 0 });
+    const schools = await pronoteGeolocation({ latitude: pos?.latitude ?? 0, longitude: pos?.longitude ?? 0 });
     return schools.map(item => ({
       name: item.name,
       distance: item.distance / 10,

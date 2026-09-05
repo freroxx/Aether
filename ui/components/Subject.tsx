@@ -68,7 +68,7 @@ const Subject: React.FC<SubjectProps> = ({
                 {disabled ? status : (average ?? 0).toFixed(2)}
               </Typography>
               <Typography variant="caption" weight="semibold" color={color + "DF"} style={{ fontSize: 13, opacity: 0.8 }}>
-                {`/${outOf}`}
+                {`/${outOf ?? 20}`}
               </Typography>
             </>
           )}

@@ -1,5 +1,3 @@
-import { SessionHandle, TabLocation } from "@blockshub/pawnote-lts";
-
 import { fetchPronoteAttendance, fetchPronoteAttendancePeriods } from "@/services/pronote/attendance";
 import { fetchPronoteCanteenMenu } from "@/services/pronote/canteen";
 import {
@@ -7,7 +5,8 @@ import {
   fetchPronoteChatMessages,
   fetchPronoteChatRecipients,
   fetchPronoteChats,
-  fetchPronoteRecipients, sendPronoteMessageInChat,
+  fetchPronoteRecipients,
+  sendPronoteMessageInChat,
 } from "@/services/pronote/chat";
 import { fetchPronoteGradePeriods, fetchPronoteGrades } from "@/services/pronote/grades";
 import { fetchPronoteHomeworks, setPronoteHomeworkAsDone } from "@/services/pronote/homework";
@@ -22,19 +21,47 @@ import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
 import { Capabilities, SchoolServicePlugin } from "@/services/shared/types";
+import { Kid } from "@/services/shared/kid";
+import { useAccountStore } from "@/stores/account";
 import { Auth, Services } from "@/stores/account/types";
 import { error } from "@/utils/logger/logger";
 
 export class Pronote implements SchoolServicePlugin {
   displayName = "PRONOTE";
   service = Services.PRONOTE;
-  capabilities: Capabilities[] = [Capabilities.REFRESH];
-  session : SessionHandle | undefined = undefined;
+  capabilities: Capabilities[] = [
+    Capabilities.REFRESH,
+    Capabilities.CANTEEN_MENU,
+    Capabilities.CHAT_READ,
+    Capabilities.CHAT_REPLY,
+    Capabilities.CHAT_CREATE,
+    Capabilities.TIMETABLE,
+    Capabilities.GRADES,
+    Capabilities.HOMEWORK,
+    Capabilities.NEWS,
+    Capabilities.ATTENDANCE,
+    Capabilities.ATTENDANCE_PERIODS,
+    Capabilities.HAVE_KIDS,
+  ];
+  session: any = undefined;
   tokenExpiration = 0;
   authData: Auth = {};
   private refreshInFlight: Promise<void> | null = null;
 
   constructor(public accountId: string) {}
+
+  private getAuthToken(): string {
+    return (
+      this.authData.accessToken ||
+      (this.authData.additionals?.auth_token as string) ||
+      ""
+    );
+  }
+
+  private getSelectedChildName(): string | undefined {
+    const account = useAccountStore.getState().accounts.find(a => a.id === this.accountId);
+    return account?.selectedChild;
+  }
 
   private async checkTokenValidty(): Promise<void> {
     if (this.refreshInFlight) {
@@ -45,203 +72,194 @@ export class Pronote implements SchoolServicePlugin {
 
     this.refreshInFlight = (async () => {
       await this.refreshAccount(this.authData);
-      this.tokenExpiration = Date.now() + (5 * 60 * 1000);
-    })().finally(() => { this.refreshInFlight = null; });
+      this.tokenExpiration = Date.now() + 5 * 60 * 1000;
+    })().finally(() => {
+      this.refreshInFlight = null;
+    });
 
     await this.refreshInFlight;
   }
 
   async refreshAccount(credentials: Auth): Promise<Pronote> {
-    const refresh = (await refreshPronoteAccount(this.accountId, credentials));
+    const refresh = await refreshPronoteAccount(this.accountId, credentials);
     this.authData = refresh.auth;
     this.session = refresh.session;
 
-    const tabCapabilities: Partial<Record<TabLocation, Capabilities | Capabilities[]>> = {
-      [TabLocation.Assignments]: Capabilities.HOMEWORK,
-      [TabLocation.Discussions]: [Capabilities.CHAT_READ, Capabilities.CHAT_REPLY, Capabilities.CHAT_CREATE],
-      [TabLocation.Grades]: Capabilities.GRADES,
-      [TabLocation.Notebook]: [Capabilities.ATTENDANCE, Capabilities.ATTENDANCE_PERIODS],
-      [TabLocation.News]: Capabilities.NEWS,
-      [TabLocation.Menus]: Capabilities.CANTEEN_MENU,
-      [TabLocation.Timetable]: Capabilities.TIMETABLE,
-    };
+    const capabilitiesSet = new Set<Capabilities>([
+      Capabilities.REFRESH,
+      Capabilities.CANTEEN_MENU,
+      Capabilities.TIMETABLE,
+      Capabilities.GRADES,
+      Capabilities.HOMEWORK,
+      Capabilities.NEWS,
+      Capabilities.ATTENDANCE,
+      Capabilities.ATTENDANCE_PERIODS,
+      Capabilities.CHAT_READ,
+      Capabilities.CHAT_REPLY,
+      Capabilities.CHAT_CREATE,
+      Capabilities.HAVE_KIDS,
+    ]);
 
-    for (const tab of this.session.user?.authorizations?.tabs ?? []) {
-      const capability = tabCapabilities[tab];
-      if (capability) {
-        this.capabilities.push(...(Array.isArray(capability) ? capability : [capability]));
-      }
-    }
-		
+    this.capabilities = Array.from(capabilitiesSet);
     return this;
   }
 
+  getKids(): Kid[] {
+    const account = useAccountStore.getState().accounts.find(a => a.id === this.accountId);
+    if (!account?.children?.length) return [];
+    return account.children.map((c, idx) => ({
+      id: `kid_${idx}_${c.name}`,
+      firstName: c.name.split(" ")[0] || c.name,
+      lastName: c.name.split(" ").slice(1).join(" ") || "",
+      class: c.grade || "",
+      dateOfBirth: new Date(),
+      createdByAccount: this.accountId,
+    }));
+  }
+
   async getHomeworks(weekNumber: number): Promise<Homework[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteHomeworks(this.session, this.accountId, weekNumber);
-    }
-
-    error("Session is not valid", "Pronote.getHomeworks");
+    await this.checkTokenValidty();
+    return fetchPronoteHomeworks(
+      this.getAuthToken(),
+      this.accountId,
+      weekNumber,
+      this.getSelectedChildName()
+    );
   }
 
   async getNews(): Promise<News[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteNews(this.session, this.accountId);
-    }
-
-    error("Session is not valid", "Pronote.getNews");
+    await this.checkTokenValidty();
+    return fetchPronoteNews(
+      this.getAuthToken(),
+      this.accountId,
+      this.getSelectedChildName()
+    );
   }
 
   async getGradesForPeriod(period: Period): Promise<PeriodGrades> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteGrades(this.session, this.accountId, period);
-    }
-
-    error("Session is not valid", "Pronote.getGradesForPeriod");
+    await this.checkTokenValidty();
+    return fetchPronoteGrades(
+      this.getAuthToken(),
+      this.accountId,
+      period,
+      this.getSelectedChildName()
+    );
   }
 
   async getGradesPeriods(): Promise<Period[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteGradePeriods(this.session, this.accountId);
-    }
-
-    error("Session is not valid", "Pronote.getGradesPeriods");
+    await this.checkTokenValidty();
+    return fetchPronoteGradePeriods(
+      this.getAuthToken(),
+      this.accountId,
+      this.getSelectedChildName()
+    );
   }
 
   async getAttendanceForPeriod(period: string): Promise<Attendance> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteAttendance(this.session, this.accountId, period);
-    }
-
-    error("Session is not valid", "Pronote.getAttendanceForPeriod");
+    await this.checkTokenValidty();
+    return fetchPronoteAttendance(
+      this.getAuthToken(),
+      this.accountId,
+      period,
+      this.getSelectedChildName()
+    );
   }
 
   async getAttendancePeriods(): Promise<Period[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteAttendancePeriods(this.session, this.accountId);
-    }
-
-    error("Session is not valid", "Pronote.getAttendancePeriods");
+    await this.checkTokenValidty();
+    return fetchPronoteAttendancePeriods(
+      this.getAuthToken(),
+      this.accountId,
+      this.getSelectedChildName()
+    );
   }
 
   async getWeeklyCanteenMenu(startDate: Date): Promise<CanteenMenu[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteCanteenMenu(this.session, this.accountId, startDate);
-    }
-
-    error("Session is not valid", "Pronote.getWeeklyCanteenMenu");
+    await this.checkTokenValidty();
+    return fetchPronoteCanteenMenu(
+      this.getAuthToken(),
+      this.accountId,
+      startDate,
+      this.getSelectedChildName()
+    );
   }
 
   async getWeeklyTimetable(weekNumber: number, date: Date): Promise<CourseDay[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteWeekTimetable(this.session, this.accountId, weekNumber, date);
-    }
-
-    error("Session is not valid", "Pronote.getWeeklyTimetable");
+    await this.checkTokenValidty();
+    return fetchPronoteWeekTimetable(
+      this.getAuthToken(),
+      this.accountId,
+      weekNumber,
+      date,
+      this.getSelectedChildName()
+    );
   }
 
   async getCourseResources(course: Course): Promise<CourseResource[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteCourseResources(this.session, course);
-    }
-
-    error("Session is not valid", "Pronote.getWeeklyTimetable");
+    return [];
   }
 
   async getChats(): Promise<Chat[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteChats(this.session, this.accountId);
-    }
-
-    error("Session is not valid", "Pronote.getChats");
+    await this.checkTokenValidty();
+    return fetchPronoteChats(
+      this.getAuthToken(),
+      this.accountId,
+      this.getSelectedChildName()
+    );
   }
 
   async getChatRecipients(chat: Chat): Promise<Recipient[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteChatRecipients(this.session, chat);
-    }
-
-    error("Session is not valid", "Pronote.getChatRecipients");
+    return [];
   }
 
   async getChatMessages(chat: Chat): Promise<Message[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteChatMessages(this.session, this.accountId, chat);
-    }
-
-    error("Session is not valid", "Pronote.getChatMessages");
+    await this.checkTokenValidty();
+    return fetchPronoteChatMessages(
+      this.getAuthToken(),
+      this.accountId,
+      chat,
+      this.getSelectedChildName()
+    );
   }
 
   async getRecipientsAvailableForNewChat(): Promise<Recipient[]> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return fetchPronoteRecipients(this.session);
-    }
-
-    error("Session is not valid", "Pronote.getRecipientsAvailableForNewChat");
+    return [];
   }
 
   async sendMessageInChat(chat: Chat, content: string): Promise<void> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      await sendPronoteMessageInChat(this.session, chat, content);
-    }
-
-    error("Session is not valid", "Pronote.sendMessageInChat");
+    await this.checkTokenValidty();
+    await sendPronoteMessageInChat(
+      this.getAuthToken(),
+      chat,
+      content,
+      this.getSelectedChildName()
+    );
   }
 
   async setNewsAsAcknowledged(news: News): Promise<News> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return setPronoteNewsAsAcknowledged(this.session, news);
-    }
-
-    error("Session is not valid", "Pronote.setNewsAsAcknowledged");
+    await this.checkTokenValidty();
+    return setPronoteNewsAsAcknowledged(this.getAuthToken(), news);
   }
 
   async setHomeworkCompletion(homework: Homework, state?: boolean): Promise<Homework> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return setPronoteHomeworkAsDone(this.session, homework, state)
-    }
-    error("Session is not valid", "Pronote.setHomeworkCompletion")
+    await this.checkTokenValidty();
+    return setPronoteHomeworkAsDone(
+      this.getAuthToken(),
+      homework,
+      state,
+      this.getSelectedChildName()
+    );
   }
 
   async createMail(subject: string, content: string, recipients: Recipient[]): Promise<Chat> {
-    await this.checkTokenValidty()
-
-    if (this.session) {
-      return createPronoteMail(this.session, this.accountId, subject, content, recipients)
-    }
-
-    error("Session is not valid", "Skolengo.createMail")
+    await this.checkTokenValidty();
+    return createPronoteMail(
+      this.getAuthToken(),
+      this.accountId,
+      subject,
+      content,
+      recipients,
+      this.getSelectedChildName()
+    );
   }
 }
