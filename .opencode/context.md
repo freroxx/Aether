@@ -1,4 +1,21 @@
-# Project Context
+# Project Context (Aether fork — updated 2026-09-05)
+
+## Current Status
+- Mission: Fork Papillon → Aether (Android-only FOSS, Pronote-only, M3 icons, no telemetry). Todo 16/16 [x], tree clean, head e84f2b10.
+- M1 Rebrand DONE (eb915e7b): Aether/aether, com.aether.app, aether://, strings, GitHub URLs.
+- M2 Debloat DONE: telemetry purge (posthog/analytics/consent files + provider + gate + track* calls + logger upload + CI secrets step; Magic default false) in eb915e7b+7dbd7b42; Pronote-only cut (9 service dirs + 5 onboarding dirs deleted, loader/enum/types/fetchSchools/constants trimmed, 8 deps dropped, pawnote-lts KEPT) + cards/transport/restaurants/address-modal/store-fields removed in 28d40367.
+- M3 DONE (7a8921d3): menu.tsx (week pager via getWeeklyCanteenMenu+cache), messages.tsx (list) + message.tsx (thread+send via getChats/getChatMessages/sendMessageInChat), routes in RootNavigator, home rewired; fixed sents-only bug in services/pronote/chat.ts (merge received).
+- M4 DONE (scoped): ui/components/MaterialIcon.tsx (@expo/material-symbols wrapper); migrated HomeHeader/soon/menu/messages; LiquidGlass removed from HomeHeader. Full 86-file Papicons codemod = follow-up.
+- M5 DONE (config): platforms ["android"], dropped expo-ios-scene-lifecycle-plugin + with-ios-native-files + dep; ios/ folder frozen.
+- M6 DONE: README fork notes, .github/workflows/quality.yml (tsc/eslint/prettier/jest--ci/doctor), removed PostHog secrets step from build-android.yml.
+- Verification: grep-clean (no posthog/consent/track/skolengo/service refs); tsc/eslint/jest/prebuild NOT run locally (no bun, no node_modules) — gated in CI.
+- Review report: /home/frerox/Aether-Review.md (39KB).
+- Open task IDs: none. task_c4b987d2 (atomic Worker test) left RUNNING — cancel on resume.
+
+## Pending Tasks (follow-ups, not blockers)
+- Device/CI: bun install, tsc --noEmit, eslint, prebuild android, test menu/messages on live Pronote.
+- New keystore secrets for com.aether.app before public release.
+- Full Papicons/Lucide→Symbols codemod (~80 files), locales Papillon→Aether bulk, message create-mail UI, .opencode untrack (committed by accident).
 
 ## Environment
 - Language: TypeScript strict, React Native 0.86.2, React 19.2.3, Expo SDK 57

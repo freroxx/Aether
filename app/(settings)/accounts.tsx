@@ -207,7 +207,7 @@ export default function AccountsView() {
         <List.Item
           onPress={() =>
             router.navigate({
-              pathname: "/(onboarding)/restaurants/method",
+              pathname: "/(onboarding)/serviceSelection",
             })
           }
         >

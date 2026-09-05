@@ -11,18 +11,19 @@ import {
 } from "@blockshub/pawnote-lts";
 import React, { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FlatList, View } from "react-native";
+import { FlatList, Platform, Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import Reanimated from "react-native-reanimated"
 
 import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
 import { useAlert } from "@/ui/components/AlertProvider";
+import AnimatedPressable from "@/ui/components/AnimatedPressable";
 import Icon from "@/ui/components/Icon";
 import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
 
-import { PlatformPressable } from "../ed/credentials";
+const PlatformPressable = Platform.OS === 'android' ? Pressable : AnimatedPressable;
 
 export function Pronote2FAModal({ doubleAuthSession, doubleAuthError, setChallengeModalVisible, deviceId }: { doubleAuthSession: SessionHandle | null, doubleAuthError: SecurityError | null, setChallengeModalVisible: (visible: boolean) => void, deviceId: string }) {
   const { t } = useTranslation();
