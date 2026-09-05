@@ -27,7 +27,9 @@ export default function PronoteENTLogin() {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const { params } = useRoute<any>();
-  const { url = "", school } = (params as any) || {};
+  const { url = "", school, accountType = "eleve" } = (params as any) || {};
+  const isParent = accountType === "parent";
+  const targetHtml = isParent ? "mobile.parent.html" : "mobile.eleve.html";
   const baseURL = url.split("/pronote")[0] || "";
 
   // UI Logic
@@ -60,7 +62,7 @@ export default function PronoteENTLogin() {
 
   const [deviceUUID] = useState(uuid());
   const [received, setReceived] = useState<boolean>(false);
-  console.log("WebViewScreen initialized with URL:", url);
+  console.log("WebViewScreen initialized with URL:", url, "as", accountType);
 
   const [hasShownConnectionErrorAlert, setHasShownConnectionErrorAlert] = useState(false);
 
@@ -106,7 +108,7 @@ export default function PronoteENTLogin() {
             document.cookie = "ielang=1036; expires=${PRONOTE_COOKIE_LANGUAGE_EXPIRES}";
           }
 
-          window.location.assign("${url}/mobile.eleve.html?fd=1");
+          window.location.assign("${url}/${targetHtml}?fd=1");
         }
         catch (error) {
 
@@ -224,7 +226,7 @@ export default function PronoteENTLogin() {
           message.data.login,
           message.data.mdp,
           deviceUUID,
-          "eleve"
+          isParent ? "parent" : "eleve"
         );
 
         if (!res.success) {
@@ -235,8 +237,8 @@ export default function PronoteENTLogin() {
         const schoolName = res.user?.establishment || (school && school.name ? school.name : "Pronote");
         const className = res.user?.class_name || "";
         const { firstName, lastName } = GetIdentityFromPronoteUsername(res.user?.name || message.data.login);
-        const isParent = res.user?.account_type === "parent" || (res.children && res.children.length > 0);
-        const accountType = isParent ? "parent" : "eleve";
+        const finalIsParent = res.user?.account_type === "parent" || (res.children && res.children.length > 0);
+        const finalAccountType = finalIsParent ? "parent" : "eleve";
         const children = res.children || [];
         const selectedChild = children.length > 0 ? children[0].name : undefined;
 
@@ -246,7 +248,7 @@ export default function PronoteENTLogin() {
           lastName,
           schoolName,
           className,
-          accountType,
+          accountType: finalAccountType,
           children,
           selectedChild,
           customisation: {
@@ -263,7 +265,7 @@ export default function PronoteENTLogin() {
                 username: message.data.login,
                 deviceUUID,
                 authToken: res.auth_token,
-                accountType,
+                accountType: finalAccountType,
               },
             },
             serviceId: Services.PRONOTE,

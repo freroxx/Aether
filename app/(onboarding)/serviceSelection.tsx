@@ -46,6 +46,8 @@ export default function ServiceSelection() {
     switch (type) {
     case "univ":
       return t("ONBOARDING_SERVICE_SELECTION_TITLE_UNIV");
+    case "parents":
+      return "Sélectionne ton service (Espace Parents)";
     default:
       return t("ONBOARDING_SERVICE_SELECTION_TITLE_SCHOOL");
     }
@@ -61,10 +63,16 @@ export default function ServiceSelection() {
       return;
     }
     const newRoute = './services/' + serviceRoute;
-    router.push(newRoute);
+    router.push({
+      pathname: newRoute as any,
+      params: {
+        accountType: type === "parents" ? "parent" : "eleve",
+        type: type,
+      } as any,
+    });
   };
 
-  if (!["school", "univ"].includes(type)) {
+  if (!["school", "univ", "parents"].includes(type)) {
     return (
       <ScrollView
         contentContainerStyle={{

@@ -13,7 +13,9 @@ import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
 
 const PronoteSearchHeader = memo(({
+  accountType,
 }: {
+  accountType?: string;
 }) => {
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -21,7 +23,7 @@ const PronoteSearchHeader = memo(({
 
   const submitURL = () => {
     if (url.trim().length === 0) {return;}
-    navigation.navigate("browser", { url });
+    navigation.navigate("browser", { url, accountType });
   };
 
   const urlValid = url.trim().length > 0 && (url.startsWith("http://") || url.startsWith("https://"));
@@ -44,11 +46,13 @@ const PronoteSearchHeader = memo(({
 export default function PronoteLoginURL() {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
+  const route = useRoute<any>();
+  const accountType = route.params?.accountType || "eleve";
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={20}>
       <List
-        ListHeaderComponent={<PronoteSearchHeader />}
+        ListHeaderComponent={<PronoteSearchHeader accountType={accountType} />}
         contentContainerStyle={{
           padding: 16,
           flexGrow: 1,

@@ -114,8 +114,11 @@ export default function PronoteLoginMethod() {
     }
   }, [debouncedCity]);
 
+  const route = useRoute<any>();
+  const accountType = route.params?.accountType || (route.params?.type === "parents" ? "parent" : "eleve");
+
   const selectCity = (city: School) => {
-    navigation.navigate(`select`, { city: city });
+    navigation.navigate(`select`, { city: city, accountType });
   }
 
   return (
@@ -133,7 +136,7 @@ export default function PronoteLoginMethod() {
         animated
       >
         {cities.length === 0 && !loading && (
-          <List.Item animated onPress={() => navigation.navigate("qrcode")}>
+          <List.Item animated onPress={() => navigation.navigate("qrcode", { accountType })}>
             <List.Leading>
               <Icon><Papicons name="qrcode" /></Icon>
             </List.Leading>
@@ -145,7 +148,7 @@ export default function PronoteLoginMethod() {
         )}
 
         {cities.length === 0 && !loading && (
-          <List.Item animated onPress={() => navigation.navigate("url")}>
+          <List.Item animated onPress={() => navigation.navigate("url", { accountType })}>
             <List.Leading>
               <Icon><Papicons name="link" /></Icon>
             </List.Leading>

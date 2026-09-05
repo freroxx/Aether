@@ -141,10 +141,12 @@ def read_root():
 
 @app.post("/auth/login")
 def login_direct(req: DirectLoginRequest):
-    is_parent = req.account_type.lower() == "parent"
+    req_url = req.url.lower()
+    is_parent = ("parent" in req_url) or (req.account_type.lower() == "parent")
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
 
     ent = getattr(pronotepy.ent, req.ent) if req.ent and hasattr(pronotepy.ent, req.ent) else None
+    client = None
     try:
         client = ClientClass(
             req.url,
@@ -153,16 +155,27 @@ def login_direct(req: DirectLoginRequest):
             ent=ent
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erreur de connexion Pronote: {str(e)}")
+        AltClass = pronotepy.Client if is_parent else pronotepy.ParentClient
+        try:
+            client = AltClass(
+                req.url,
+                username=req.username,
+                password=req.password,
+                ent=ent
+            )
+            is_parent = not is_parent
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Erreur de connexion Pronote: {str(e)}")
 
-    if not client.logged_in:
+    if not client or not client.logged_in:
         raise HTTPException(status_code=401, detail="Identifiants incorrects ou établissement injoignable")
 
+    final_account_type = "parent" if is_parent else "eleve"
     user_info = {
         "name": getattr(client.info, "name", req.username),
         "class_name": getattr(client.info, "class_name", ""),
         "establishment": getattr(client.info, "establishment", ""),
-        "account_type": req.account_type,
+        "account_type": final_account_type,
     }
 
     children = []
@@ -174,7 +187,7 @@ def login_direct(req: DirectLoginRequest):
         "username": req.username,
         "password": req.password,
         "ent": req.ent,
-        "account_type": req.account_type,
+        "account_type": final_account_type,
     }
     encoded_token = base64.b64encode(json.dumps(auth_payload).encode("utf-8")).decode("utf-8")
 
@@ -187,23 +200,35 @@ def login_direct(req: DirectLoginRequest):
 
 @app.post("/auth/qrcode")
 def login_qrcode(req: QrCodeLoginRequest):
-    is_parent = req.account_type.lower() == "parent"
-    ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
-
     try:
         qr_dict = req.qr_data if isinstance(req.qr_data, dict) else json.loads(req.qr_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Données QR Code invalides: {str(e)}")
+
+    qr_url = str(qr_dict.get("url", "")).lower()
+    is_parent = ("parent" in qr_url) or (req.account_type.lower() == "parent")
+    ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
+
+    client = None
+    try:
         client = ClientClass.qrcode_login(qr_dict, req.pin, req.uuid)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erreur QR Code / PIN: {str(e)}")
+        AltClass = pronotepy.Client if is_parent else pronotepy.ParentClient
+        try:
+            client = AltClass.qrcode_login(qr_dict, req.pin, req.uuid)
+            is_parent = not is_parent
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Erreur QR Code / PIN: {str(e)}")
 
-    if not client.logged_in:
+    if not client or not client.logged_in:
         raise HTTPException(status_code=401, detail="Code PIN ou QR Code expiré")
 
+    final_account_type = "parent" if is_parent else "eleve"
     user_info = {
         "name": getattr(client.info, "name", ""),
         "class_name": getattr(client.info, "class_name", ""),
         "establishment": getattr(client.info, "establishment", ""),
-        "account_type": req.account_type,
+        "account_type": final_account_type,
     }
 
     children = []
@@ -213,9 +238,9 @@ def login_qrcode(req: QrCodeLoginRequest):
     auth_payload = {
         "url": getattr(client, "pronote_url", ""),
         "username": getattr(client, "username", ""),
-        "token": getattr(client, "password", ""), # in pronotepy token_login, password field holds the token
+        "token": getattr(client, "password", ""),
         "uuid": req.uuid,
-        "account_type": req.account_type,
+        "account_type": final_account_type,
     }
     encoded_token = base64.b64encode(json.dumps(auth_payload).encode("utf-8")).decode("utf-8")
 
@@ -229,22 +254,30 @@ def login_qrcode(req: QrCodeLoginRequest):
 
 @app.post("/auth/token")
 def login_token(req: TokenLoginRequest):
-    is_parent = req.account_type.lower() == "parent"
+    req_url = req.url.lower()
+    is_parent = ("parent" in req_url) or (req.account_type.lower() == "parent")
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
 
+    client = None
     try:
         client = ClientClass.token_login(req.url, req.username, req.token, req.uuid)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erreur token login: {str(e)}")
+        AltClass = pronotepy.Client if is_parent else pronotepy.ParentClient
+        try:
+            client = AltClass.token_login(req.url, req.username, req.token, req.uuid)
+            is_parent = not is_parent
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Erreur token login: {str(e)}")
 
-    if not client.logged_in:
+    if not client or not client.logged_in:
         raise HTTPException(status_code=401, detail="Token expiré ou révoqué")
 
+    final_account_type = "parent" if is_parent else "eleve"
     user_info = {
         "name": getattr(client.info, "name", ""),
         "class_name": getattr(client.info, "class_name", ""),
         "establishment": getattr(client.info, "establishment", ""),
-        "account_type": req.account_type,
+        "account_type": final_account_type,
     }
 
     children = []
@@ -256,7 +289,7 @@ def login_token(req: TokenLoginRequest):
         "username": req.username,
         "token": req.token,
         "uuid": req.uuid,
-        "account_type": req.account_type,
+        "account_type": final_account_type,
     }
     encoded_token = base64.b64encode(json.dumps(auth_payload).encode("utf-8")).decode("utf-8")
 

@@ -44,7 +44,7 @@ export function GetSupportedServices(redirect: (path: { pathname: string, option
       name: "pronote",
       route: "pronote",
       title: t("ONBOARDING_SERVICE_PRONOTE"),
-      type: ["school", "univ"],
+      type: ["school", "univ", "parents"],
       image: require("@/assets/images/service_pronote.png"),
       onPress: () => {
         redirect({ pathname: './school/method', options: { service: Services.PRONOTE } });

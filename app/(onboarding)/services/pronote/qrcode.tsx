@@ -1,6 +1,6 @@
 import { Papicons } from "@getpapillon/papicons";
 import MaskedView from "@react-native-masked-view/masked-view";
-import { useTheme } from "expo-router/react-navigation";
+import { useTheme, useRoute } from "expo-router/react-navigation";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
@@ -23,6 +23,8 @@ import uuid from "@/utils/uuid/uuid";
 export default function PronoteLoginWithQR() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const route = useRoute<any>();
+  const initialAccountType = route.params?.accountType;
 
   const { colors } = theme;
   const [permission, requestPermission] = useCameraPermissions();
@@ -51,6 +53,7 @@ export default function PronoteLoginWithQR() {
 
     try {
       const decodedJSON = JSON.parse(QRData!);
+      const detectedAccountType = initialAccountType || (decodedJSON?.url?.includes("parent") ? "parent" : "eleve");
 
       const res = await PronoteApiClient.qrCodeLogin(
         {
@@ -59,7 +62,8 @@ export default function PronoteLoginWithQR() {
           url: decodedJSON.url,
         },
         QRValidationCode,
-        accountID
+        accountID,
+        detectedAccountType
       );
 
       if (!res.success) {

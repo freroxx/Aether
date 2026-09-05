@@ -62,7 +62,7 @@ export default function PronoteLoginSelectEtab() {
   const { t } = useTranslation();
 
   const { params } = useRoute<any>();
-  const { city } = (params as any) || {};
+  const { city, accountType = "eleve" } = (params as any) || {};
 
   const [search, setSearch] = useState<string>("");
   const [schools, setSchools] = useState<Array<School>>([]);
@@ -80,7 +80,7 @@ export default function PronoteLoginSelectEtab() {
   const filteredSchools = schools.filter(school => school.name.toLowerCase().includes(search.toLowerCase()));
 
   const selectSchool = (school: School) => {
-    navigation.navigate("browser", { url: school.url, school });
+    navigation.navigate("browser", { url: school.url, school, accountType });
   }
 
   return (
