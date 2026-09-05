@@ -14,7 +14,6 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=flat-square" alt="License GPL-3.0" /></a>
   <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/Platform-Android-green.svg?style=flat-square" alt="Platform Android" /></a>
-  <a href="https://expo.dev"><img src="https://img.shields.io/badge/Expo-SDK%2057-black.svg?style=flat-square" alt="Expo SDK 57" /></a>
   <a href="https://github.com/bain3/pronotepy"><img src="https://img.shields.io/badge/Backend-pronotepy%20FastAPI-blueviolet.svg?style=flat-square" alt="pronotepy FastAPI" /></a>
   <a href="privacy.md"><img src="https://img.shields.io/badge/Telemetry-Zero%20%2F%20No%20Tracking-success.svg?style=flat-square" alt="Zero Telemetry" /></a>
 </p>
