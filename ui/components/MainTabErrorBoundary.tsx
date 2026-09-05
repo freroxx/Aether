@@ -34,7 +34,7 @@ const MainTabErrorFallback = () => {
   );
 };
 
-export default function MainTabErrorBoundary({ children }: MainTabErrorBoundaryProps) {``
+export default function MainTabErrorBoundary({ children }: MainTabErrorBoundaryProps) {
   return (
     <ErrorBoundary fallback={<MainTabErrorFallback />}>
       {children}

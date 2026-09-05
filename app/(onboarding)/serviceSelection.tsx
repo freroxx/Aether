@@ -62,7 +62,8 @@ export default function ServiceSelection() {
       services.find(service => service.name === serviceName)?.onPress();
       return;
     }
-    const newRoute = './services/' + serviceRoute;
+    const targetRoute = serviceRoute === "pronote" ? "pronote/locate" : serviceRoute;
+    const newRoute = './services/' + targetRoute;
     router.push({
       pathname: newRoute as any,
       params: {

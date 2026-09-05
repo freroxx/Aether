@@ -1,4 +1,4 @@
-import { useHeaderHeight } from "expo-router/react-navigation";
+import { useHeaderHeight, useRoute } from "expo-router/react-navigation";
 import { useNavigation } from "expo-router";
 import React, { memo } from "react";
 import { useTranslation } from "react-i18next";
