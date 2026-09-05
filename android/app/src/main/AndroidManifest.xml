@@ -37,6 +37,5 @@
         <data android:scheme="exp+aether"/>
       </intent-filter>
     </activity>
-    <uses-native-library android:name="libOpenCL.so" android:required="false"/>
   </application>
 </manifest>

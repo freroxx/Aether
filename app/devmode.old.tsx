@@ -19,7 +19,6 @@ import SectionHeader from "@/ui/components/SectionHeader";
 import Typography from "@/ui/components/Typography";
 import NativeSwitch from "@/ui/native/NativeSwitch";
 import { scheduleNotificationAtDate } from "@/utils/notification/reminder/helper";
-import NativeSwitch from "@/ui/native/NativeSwitch";
 
 export default function Devmode() {
   const accountStore = useAccountStore();
