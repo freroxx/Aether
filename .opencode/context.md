@@ -1,6 +1,10 @@
 # Project Context (Aether fork — updated 2026-09-05)
 
-## Current Status (updated 2026-09-05, head b0ce8f56)
+## Current Status (updated 2026-09-05, head 9ec03055)
+- M7 identity wave 2 DONE (9ec03055, 171 files): per-ABI splits plugin; M3 indigo graduation-cap icon set (icon/adaptive/mono/favicon/logotype/splash/about_aether.png, splash bg #4338CA); Papillon→Aether sweep incl 39 locales + transition/component renames (Papicons glyph names + @getpapillon pkg + upstream PapillonApp URLs intentionally kept); demo login via 3s long-press on welcome "Se connecter avec" (Ripple/Button long-press, createMockProfile Camille Martin); dead assets deleted.
+- User release build in progress: add M7 fixes on top — prior fixes committed (2fa PlatformPressable b0ce8f56, MaterialIcon vector-icons 70019b2c, orientation default 0092ac25). Next user prebuild picks up splits plugin + new icons; expect 4 APKs (~60MB each) in app/build/outputs/apk/release/.
+- Known follow-ups: full Papicons codemod, message create-mail UI, new CI keystore secrets, strip edgeToEdgeEnabled (done in app.config), org links use github.com/aether-app placeholder.
+- task_c4b987d2 (stuck Worker test) — cancel on resume.
 - Aether fork todo 16/16 [x]; follow-up fix b0ce8f56 committed, tree clean.
 - BUILD IN PROGRESS by user: bun install OK, prebuild OK, keystore ~/aether-release.keystore created, assembleRelease failed twice: (1) Skia prebuilts missing → fixed via `bunx install-skia`; (2) JS bundle error `../ed/credentials` from pronote/2fa.tsx → fixed by inlining PlatformPressable (Pressable on Android, AnimatedPressable else); accounts.tsx add-service rerouted to /(onboarding)/serviceSelection. User re-running assembleRelease.
 - Prebuild warning (non-blocking): EDGE_TO_EDGE_PLUGIN edgeToEdgeEnabled obsolete on Android 16; strip from app.config.ts in cleanup.

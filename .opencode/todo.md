@@ -35,3 +35,10 @@
 
 ## M6: Quality + FOSS docs | agent:Reviewer
 - [x] S6.1.1: README fork notes, quality CI, dropped PostHog secrets step (toolchain absent locally: no bun/node_modules, CI runs gates) | size:M
+
+## M7: Aether identity wave 2 | status: completed
+- [x] S7.1: Per-ABI APK splits plugin (plugins/with-apk-splits.js, registered) | size:S
+- [x] S7.2: M3 expressive school icon set (icon/adaptive/mono/favicon/logotype/splash/about_aether) + splash bg indigo | size:M
+- [x] S7.3: Papillon→Aether sweep incl. 39 locales (keys renamed, refs fixed), transitions/components renamed, upstream URLs preserved | size:L
+- [x] S7.4: Demo login via 3s long-press on welcome login button (Ripple/Button long-press support, createMockProfile) | size:M
+- [x] S7.5: Dead assets deleted (services/univ/cards/transport/restaurant images, old logos) | size:S
