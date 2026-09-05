@@ -83,8 +83,6 @@ export function useAppInitialization() {
     };
   }, []);
 
-  // Magic/ModelManager Initialization
-
   // Error Handling for Fonts
   const handleError = useCallback(() => {
     if (fontsError) { throw fontsError; }

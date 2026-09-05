@@ -1,4 +1,3 @@
-import * as Localization from "expo-localization";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
@@ -88,8 +87,8 @@ const languageDetector = {
   type: "languageDetector",
   async: true,
   detect: (cb: (lang: string) => void) => {
-    const detectedLang = Localization.getLocales()[0].languageTag.split("-")[0];
-    cb(Object.keys(resources).includes(detectedLang) ? detectedLang : "en");
+    // Aether defaults to French; the user can switch in Settings → Language.
+    cb("fr");
   },
 };
 
@@ -98,7 +97,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: ["en", "fr"],
+    fallbackLng: ["fr", "en"],
     interpolation: { escapeValue: false },
     detection: {
       order: ["languageDetector"],
