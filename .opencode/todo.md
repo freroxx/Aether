@@ -37,6 +37,19 @@
 - [x] S6.1.1: README fork notes, quality CI, dropped PostHog secrets step (toolchain absent locally: no bun/node_modules, CI runs gates) | size:M
 
 ## M7: Aether identity wave 2 | status: completed
+- [x] S7.1-S7.5: splits, icon set, brand sweep, demo long-press, dead assets (see log)
+
+## M8: Magic+ → OpenCode Zen | status: completed
+- [x] S8.1: Deleted magic.tsx/useMagicPrediction/stores+utils magic/endpoints/TFLite dep+plugin+patch; cleaned TaskItem/init/stores/devmode/_layout; Zen teaser screen + settings entry | size:L
+
+## M9: Guest demo data | status: completed
+- [x] S9.1: Mock chats (3 threads) + recipients + canteen week + send/create in MockData plugin | size:M
+
+## M10: Messages/menu polish + wallpaper | status: completed
+- [x] S10.1: Fixed my 2 tsc errors; wallpaper Gallery buttons → MaterialIcon (glyph fix) | size:S
+
+## M11: French default | status: completed
+- [x] S11.1: Detector forces fr, fallback [fr,en], dropped expo-localization import | size:S
 - [x] S7.1: Per-ABI APK splits plugin (plugins/with-apk-splits.js, registered) | size:S
 - [x] S7.2: M3 expressive school icon set (icon/adaptive/mono/favicon/logotype/splash/about_aether) + splash bg indigo | size:M
 - [x] S7.3: Papillon→Aether sweep incl. 39 locales (keys renamed, refs fixed), transitions/components renamed, upstream URLs preserved | size:L
