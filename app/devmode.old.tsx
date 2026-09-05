@@ -10,7 +10,6 @@ import LogIcon from "@/components/Log/LogIcon";
 import { database } from "@/database";
 import { useAccountStore } from '@/stores/account';
 import { useLogStore, useNetworkStore } from '@/stores/logs';
-import { useMagicStore } from "@/stores/magic";
 import { useSettingsStore } from "@/stores/settings";
 import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
@@ -18,9 +17,7 @@ import Item, { Leading, Trailing } from '@/ui/components/Item';
 import List from '@/ui/components/List';
 import SectionHeader from "@/ui/components/SectionHeader";
 import Typography from "@/ui/components/Typography";
-import { MAGIC_URL } from "@/utils/endpoints";
-import { log } from "@/utils/logger/logger";
-import ModelManager from "@/utils/magic/ModelManager";
+import NativeSwitch from "@/ui/native/NativeSwitch";
 import { scheduleNotificationAtDate } from "@/utils/notification/reminder/helper";
 import NativeSwitch from "@/ui/native/NativeSwitch";
 
@@ -29,9 +26,6 @@ export default function Devmode() {
   const logsStore = useLogStore();
   const settingStore = useSettingsStore(state => state.personalization)
   const mutateProperty = useSettingsStore(state => state.mutateProperty)
-  const magicStore = useMagicStore()
-
-  const magicStoreHomework = useMagicStore(state => state.processHomeworks)
 
   const { colors } = useTheme();
   const alert = useAlert();
@@ -117,174 +111,21 @@ export default function Devmode() {
       </List>
 
       <SectionHeader
-        title="Magic+"
+        title="Notifications"
         leading={
           <Icon>
-            <Papicons name="Sparkles" size={18} />
+            <Papicons name="Clock" size={18} />
           </Icon>
         }
       />
 
       <List>
-        <Item>
-          <Typography>
-            {settingStore.magicEnabled
-              ? "Aether Magic+ est Activé"
-              : "Aether Magic+ est Désactivé"}
-          </Typography>
-        </Item>
-        <Item onPress={() => ModelManager.refresh()}>
-          <Typography variant="title">Rafraîchir le modèle</Typography>
-        </Item>
-        <Item
-          onPress={async () => {
-            try {
-              const result = await ModelManager.reset();
-              if (result.success) {
-                Alert.alert(
-                  "Succès",
-                  "Le modèle a été réinitialisé avec succès. Il sera retéléchargé au prochain démarrage."
-                );
-              } else {
-                Alert.alert("Erreur", `Échec du reset: ${result.error}`);
-              }
-            } catch (error) {
-              Alert.alert("Erreur", `Erreur lors du reset: ${String(error)}`);
-            }
-          }}
-        >
-          <Typography variant="title">Reset complet du modèle</Typography>
-        </Item>
         <Item
           onPress={() => {
-            const status = ModelManager.getStatus();
-            Alert.alert(
-              "Statut du modèle",
-              `Modèle chargé: ${status.hasModel ? "Oui" : "Non"}\n` +
-                `Max Length: ${status.maxLen}\n` +
-                `Nombre de labels: ${status.labelsCount}\n` +
-                `Taille du vocabulaire: ${status.wordIndexSize}\n` +
-                `Index OOV: ${status.oovIndex}`
-            );
+            requestPermissionsAsync();
           }}
         >
-          <Typography variant="title">Afficher le statut du modèle</Typography>
-        </Item>
-        <Item
-          onPress={async () => {
-            try {
-              const result = await ModelManager.predict(
-                "ds analyse de doc",
-                true
-              );
-              if ("error" in result) {
-                Alert.alert("Erreur de prédiction", result.error);
-              } else {
-                Alert.alert(
-                  "Test de prédiction réussi",
-                  `Prédiction: ${result.predicted}\nScores: ${result.scores
-                    .slice(0, 3)
-                    .map(s => s.toFixed(3))
-                    .join(", ")}...`
-                );
-              }
-            } catch (error) {
-              Alert.alert("Erreur", `Erreur lors du test: ${String(error)}`);
-            }
-          }}
-        >
-          <Typography variant="title">Tester une prédiction</Typography>
-        </Item>
-        <Item
-          onPress={() => {
-            try {
-              magicStore.clear();
-              Alert.alert(
-                "Cache vidé",
-                "Le cache des prédictions Magic a été vidé avec succès !"
-              );
-            } catch (error) {
-              Alert.alert(
-                "Erreur",
-                `Erreur lors du vidage du cache: ${String(error)}`
-              );
-            }
-          }}
-        >
-          <Typography variant="title">Vider le cache Magic</Typography>
-          <Trailing>
-            <Typography variant="caption">
-              {magicStoreHomework.length} devoirs
-            </Typography>
-          </Trailing>
-        </Item>
-        <Item
-          onPress={() => {
-            const currentURL = settingStore.magicModelURL || MAGIC_URL;
-
-            Alert.prompt(
-              "URL Custom Magic Model",
-              `URL actuelle: ${currentURL}\n\nEntrez une nouvelle URL:`,
-              [
-                {
-                  text: "Annuler",
-                  style: "cancel",
-                },
-                {
-                  text: "Valider",
-                  onPress: (newURL?: string) => {
-                    if (newURL && newURL.trim()) {
-                      mutateProperty("personalization", {
-                        magicModelURL: newURL.trim(),
-                      });
-                      Alert.alert("Succès", "URL du modèle Magic mise à jour!");
-                    }
-                  },
-                },
-              ],
-              "plain-text",
-              currentURL
-            );
-          }}
-        >
-          <Typography variant="title">
-            Changer l&apos;URL Custom Magic
-          </Typography>
-        </Item>
-        <Item
-          onPress={() => {
-            Alert.alert(
-              "Reset URL Magic Model",
-              "Voulez-vous remettre l'URL du modèle Magic par défaut?",
-              [
-                {
-                  text: "Annuler",
-                  style: "cancel",
-                },
-                {
-                  text: "Reset",
-                  style: "destructive",
-                  onPress: () => {
-                    mutateProperty("personalization", {
-                      magicModelURL: MAGIC_URL,
-                    });
-                    Alert.alert(
-                      "Succès",
-                      "URL du modèle Magic remise par défaut!"
-                    );
-                  },
-                },
-              ]
-            );
-          }}
-        >
-          <Typography variant="title">Reset URL Magic Model</Typography>
-        </Item>
-        <Item onPress={() => magicStore.clear()}>
-          <Typography variant="title">Clear Magic Store</Typography>
-        </Item>
-        <Item onPress={() => log(JSON.stringify(magicStoreHomework))}>
-          <Typography variant="title">ConsoleLog Magic Store</Typography>
+          <Typography variant="title">Demander la permission</Typography>
         </Item>
       </List>
 

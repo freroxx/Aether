@@ -89,7 +89,6 @@
     "react-native-device-info": "^15.0.2",
     "react-native-dynamic-theme": "^0.3.4",
     "react-native-edge-to-edge": "1.6.0",
-    "react-native-fast-tflite": "^1.6.1",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-graph": "^1.2.0",
     "react-native-htmlview": "^0.17.0",
@@ -132,8 +131,7 @@
       "reactNativeDirectoryCheck": {
         "listUnknownPackages": false,
         "exclude": [
-          "@nozbe/watermelondb",
-          "react-native-fast-tflite"
+          "@nozbe/watermelondb"
         ]
       }
     }

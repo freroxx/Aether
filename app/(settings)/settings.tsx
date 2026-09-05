@@ -14,6 +14,7 @@ import { useSettingsStore } from "@/stores/settings";
 import AnimatedPressable from "@/ui/components/AnimatedPressable";
 import Avatar from "@/ui/components/Avatar";
 import Icon from "@/ui/components/Icon";
+import MaterialIcon from "@/ui/components/MaterialIcon";
 import { NativeHeaderSide } from "@/ui/components/NativeHeader";
 import Stack from "@/ui/components/Stack";
 import TableFlatList from "@/ui/components/TableFlatList";
@@ -211,12 +212,12 @@ export default function SettingsIndex() {
       }
     },
     {
-      icon: <Papicons name={"Sparkles"} />,
-      title: "Magic+",
-      description: t('Settings_MagicPlus_Description_Card'),
+      icon: <MaterialIcon name="auto-awesome" size={32} />,
+      title: "OpenCode Zen",
+      description: "Le futur assistant d'Aether",
       color: "#DD007D",
       onPress: () => {
-        router.navigate("/(settings)/magic")
+        router.navigate("/(settings)/zen")
       }
     }
   ]

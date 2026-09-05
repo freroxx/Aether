@@ -76,9 +76,9 @@ export default function Layout() {
           }}
         />
         <Stack.Screen
-          name="magic"
+          name="zen"
           options={{
-            headerTitle: t("Settings_MagicPlus_Title"),
+            headerTitle: "OpenCode Zen",
             headerBackButtonDisplayMode: "minimal",
             headerTransparent: false,
             headerLargeTitle: false,

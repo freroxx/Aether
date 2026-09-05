@@ -3,7 +3,6 @@ import { persist } from "zustand/middleware";
 import { Platform } from "react-native";
 
 import { Colors } from "@/utils/colors";
-import { MAGIC_URL } from "@/utils/endpoints";
 
 import { createMMKVStorage } from "../global";
 import { Personalization,SettingsState, SettingsStorage } from "./types";
@@ -18,12 +17,10 @@ const defaultPersonalization: Personalization = {
   useMaterialYou: DEFAULT_MATERIAL_YOU_ENABLED,
   iOSBottomAccessoryEnabled: true,
   showTabBarLabels: true,
-  magicEnabled: false,
   hideNameOnHomeScreen: false,
   showAlertAtLogin: false,
   showDevMode: false,
   mockDataEnabled: false,
-  magicModelURL: MAGIC_URL,
   gradesDisplayScale: "20",
   welcomeModalSeen: false,
 };

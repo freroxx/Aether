@@ -8,7 +8,6 @@ import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 import { getSubjectName } from "@/utils/subjects/name";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectColor } from "@/utils/subjects/colors";
-import { useMagicPrediction } from '../hooks/useMagicPrediction';
 import { Link } from 'expo-router';
 import { getHomeworkRouteId } from '@/database/useHomework';
 
@@ -25,9 +24,6 @@ const TaskItem = memo(
     fromCache = false,
     setAsDone
   }: TaskItemProps) => {
-    const cleanContent = useMemo(() => item.content.replace(/<[^>]*>/g, ""), [item.content]);
-    const magic = useMagicPrediction(cleanContent);
-
     return (
       <Reanimated.View
         style={{ marginBottom: 10 }}
@@ -50,7 +46,6 @@ const TaskItem = memo(
             date={new Date(item.dueDate)}
             completed={item.isDone}
             hasAttachments={item.attachments.length > 0}
-            magic={magic}
             onToggle={() => setAsDone(item, !item.isDone)}
           />
         </Link>

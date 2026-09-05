@@ -130,13 +130,6 @@ export default {
         },
       ],
       "expo-web-browser",
-      [
-        "react-native-fast-tflite",
-        {
-          enableCoreMLDelegate: true,
-          enableAndroidGpuLibraries: true,
-        },
-      ],
       "react-native-bottom-tabs",
       "expo-secure-store",
       "./plugins/with-apk-splits",

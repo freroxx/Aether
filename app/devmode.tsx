@@ -16,9 +16,6 @@ import { ClearDatabaseForAccount } from "@/database/DatabaseProvider";
 import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
 import { useSettingsStore } from "@/stores/settings";
-import { useMagicStore } from "@/stores/magic";
-import ModelManager from "@/utils/magic/ModelManager";
-import { MAGIC_URL } from "@/utils/endpoints";
 import LogIcon from "@/components/Log/LogIcon";
 import { getManager, initializeAccountManager } from "@/services/shared";
 import { warn } from "@/utils/logger/logger";
@@ -107,9 +104,6 @@ export default function DevMode() {
   async function ClearAccounts() {
     useAccountStore.getState().reset();
   }
-  async function ClearMagicCache() {
-    useMagicStore.getState().clear();
-  }
 
   const handleDangerousAction = (action: () => void) => {
     Alert.alert(
@@ -128,22 +122,6 @@ export default function DevMode() {
       ]
     );
   };
-
-  const resetModel = async () => {
-    try {
-      const result = await ModelManager.reset();
-      if (result.success) {
-        Alert.alert(
-          "Succès",
-          "Le modèle a été réinitialisé avec succès. Il sera retéléchargé au prochain démarrage."
-        );
-      } else {
-        Alert.alert("Erreur", `Échec du reset: ${result.error}`);
-      }
-    } catch (error) {
-      Alert.alert("Erreur", `Erreur lors du reset: ${String(error)}`);
-    }
-  }
 
   const handlePress = async (action: () => void) => {
     await action();
@@ -286,97 +264,6 @@ export default function DevMode() {
             </List.Leading>
             <Typography variant="action">Ouvrir le modal de bienvenue</Typography>
           </List.Item>
-        </List.Section>
-        <List.Section>
-          <List.SectionTitle>
-            <Papicons name="Sparkles" color={colors.text + 88} />
-            <List.Label>Aether Magic+</List.Label>
-          </List.SectionTitle>
-            <List.Item onPress={() => handlePress(ClearMagicCache)}>
-              <Typography variant="action">Supprimer le cache de Magic</Typography>
-              <List.Trailing>
-                <Typography color="textSecondary" variant="action">
-                  {useMagicStore.getState().processHomeworks.length} devoirs
-                </Typography>
-              </List.Trailing>
-            </List.Item>
-            <List.Item onPress={() => ModelManager.refresh}>
-              <Typography variant="action">Rafraîchir le modèle</Typography>
-            </List.Item>
-            <List.Item onPress={() => handlePress(resetModel)}>
-              <Typography variant="action">Réinitialiser le modèle</Typography>
-            </List.Item>
-            <List.Item onPress={() => {
-              const status = ModelManager.getStatus();
-              Alert.alert(
-                "Statut du modèle",
-                `Modèle chargé: ${status.hasModel ? "Oui" : "Non"}\n` +
-                  `Max Length: ${status.maxLen}\n` +
-                  `Nombre de labels: ${status.labelsCount}\n` +
-                  `Taille du vocabulaire: ${status.wordIndexSize}\n` +
-                  `Index OOV: ${status.oovIndex}`
-              );
-            }}>
-              <Typography variant="action">Afficher les informations du modèle</Typography>
-            </List.Item>
-            <List.Item onPress={async () => {
-                try {
-                  const result = await ModelManager.predict(
-                    "ds analyse de doc",
-                    true
-                  );
-                  if ("error" in result) {
-                    Alert.alert("Erreur de prédiction", result.error);
-                  } else {
-                    Alert.alert(
-                      "Test de prédiction réussi",
-                      `Prédiction: ${result.predicted}\nScores: ${result.scores
-                        .slice(0, 3)
-                        .map(s => s.toFixed(3))
-                        .join(", ")}...`
-                    );
-                  }
-                } catch (error) {
-                  Alert.alert("Erreur", `Erreur lors du test: ${String(error)}`);
-                }
-              }}>
-              <Typography variant="action">Tester les prédictions</Typography>
-            </List.Item>
-            <List.Item onPress={() => {
-              const currentURL = useSettingsStore.getState().personalization.magicModelURL || MAGIC_URL;
-  
-              Alert.prompt(
-                "Mise à jour de la source", undefined,
-                [
-                  {
-                    text: "Annuler",
-                    style: "cancel",
-                  },
-                  {
-                    text: "Valider",
-                    onPress: (newURL?: string) => {
-                      if (newURL && newURL.trim()) {
-                        useSettingsStore.getState().mutateProperty("personalization", {
-                          magicModelURL: newURL.trim(),
-                        });
-                        Alert.alert("Succès", "URL du modèle Magic mise à jour!");
-                      }
-                    },
-                  },
-                ],
-                "plain-text",
-                currentURL
-              );
-            }}>
-              <Typography variant="action">Changer la source de Magic</Typography>
-            </List.Item>
-            <List.Item onPress={() => handlePress(() => {
-              useSettingsStore.getState().mutateProperty("personalization", {
-                magicModelURL: MAGIC_URL
-              })
-            })}>
-              <Typography variant="action">Réinitialiser la source de Magic</Typography>
-            </List.Item>
         </List.Section>
         <List.Section>
           <List.SectionTitle>

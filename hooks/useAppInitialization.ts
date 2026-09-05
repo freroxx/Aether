@@ -8,7 +8,6 @@ import { initializeAccountManager } from '@/services/shared';
 import { useSettingsStore } from '@/stores/settings';
 import i18n from '@/utils/i18n';
 import { warn } from '@/utils/logger/logger';
-import ModelManager from '@/utils/magic/ModelManager';
 import { FONT_CONFIG } from '@/constants/LayoutScreenOptions';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -20,7 +19,6 @@ export function useAppInitialization() {
   
   // Settings
   const customLanguage = useSettingsStore(state => state.personalization.language);
-  const magicEnabled = useSettingsStore(state => state.personalization.magicEnabled);
   const selectedTheme = useSettingsStore(state => state.personalization.theme);
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
 
@@ -86,11 +84,6 @@ export function useAppInitialization() {
   }, []);
 
   // Magic/ModelManager Initialization
-  useEffect(() => {
-    if (magicEnabled) {
-      ModelManager.safeInit();
-    }
-  }, [magicEnabled]);
 
   // Error Handling for Fonts
   const handleError = useCallback(() => {
