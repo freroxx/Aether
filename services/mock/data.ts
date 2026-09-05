@@ -497,7 +497,7 @@ export function generateMockChatMessages(
   });
 }
 
-const MOCK_MENUS: Array<[string, string[], string[], string[], string[], string[]]> = [
+const MOCK_MENUS: Array<[string, string[], string[], string[], string[], string[], string[]]> = [
   ["Lundi", ["Salade verte", "Tomates mozzarella"], ["Poulet rôti", "Steak végétal"], ["Riz pilaf"], ["Yaourt"], ["Fruit de saison"], []],
   ["Mardi", ["Soupe de légumes"], ["Poisson pané"], ["Purée"], [], ["Compote"], []],
   ["Mercredi", [], [], [], [], [], []],
