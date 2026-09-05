@@ -9,12 +9,12 @@
 - [x] S1.1.3: package.json name (aether), permission strings Aether | size:S
 - [x] S1.1.4: settings URLs + soon.tsx rebrand (locales bulk deferred) | size:M
 
-## M2: Debloat (Pronote-only, no cards/transport/telemetry) | status: pending
+## M2: Debloat (Pronote-only, no cards/transport/telemetry) | status: completed
 ### T2.1: Pronote-only services | agent:Worker | depends:M1
-- [ ] S2.1.1: Delete non-Pronote services (keep pronote/shared/local/mock, keep pawnote-lts) + trim Services enum + onboarding constants | size:L
-- [ ] S2.1.2: Drop unused deps (skolengojs, alise, turboself, esup-multi, blockscho/directe/rd) keep pawnote | size:S
+- [x] S2.1.1: Delete non-Pronote services (keep pronote/shared/local/mock, keep pawnote-lts) + trim Services enum + onboarding constants | size:L
+- [x] S2.1.2: Drop unused deps (skolengojs, alise, turboself, esup-multi, blockscho/directe/rd) keep pawnote | size:S
 ### T2.2: Remove cards+transport | agent:Worker | depends:T2.1
-- [ ] S2.2.1: Delete cards routes, settings cards/transport, Transit, restaurant/transport utils, store transport fields, calendar transportInfo | size:M
+- [x] S2.2.1: Delete cards routes, settings cards/transport, Transit, restaurant/transport utils, store transport fields, calendar transportInfo | size:M
 ### T2.3: Telemetry purge (keep Magic off-by-default) | agent:Worker
 - [x] S2.3.1: Remove posthog/analytics/consent/app-consent + Provider + screen() + track* calls + secrets CI | size:M
 - [x] S2.3.2: Magic disabled by default (defaultPersonalization + verify init gate) | size:S
