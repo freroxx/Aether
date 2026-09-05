@@ -8,7 +8,7 @@ export default {
     name: "Aether",
     slug: "aether",
     version: PackageJSON.version,
-    orientation: "both",
+    orientation: "default",
     icon: "./assets/images/icon.png",
     scheme: ["aether"],
     platforms: ["android"],
