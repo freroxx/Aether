@@ -101,7 +101,7 @@ export default function MessagesView() {
                       width: 44,
                       height: 44,
                       borderRadius: 22,
-                      backgroundColor: theme.colors.primary + "22",
+                      backgroundColor: theme.colors.card,
                       alignItems: "center",
                       justifyContent: "center",
                     }}

@@ -11,6 +11,7 @@ import { File, Directory, Paths } from 'expo-file-system';
 import ActivityIndicator from "@/components/ActivityIndicator"
 import { NativeHeaderPressable, NativeHeaderSide } from "@/ui/components/NativeHeader"
 import Icon from "@/ui/components/Icon"
+import MaterialIcon from "@/ui/components/MaterialIcon"
 import { router } from "expo-router";
 import { Papicons } from "@getpapillon/papicons"
 import { t } from "i18next";
@@ -223,9 +224,7 @@ const WallpaperModal = () => {
           </NativeHeaderPressable>
         ) : (
           <NativeHeaderPressable onPress={() => uploadCustomWallpaper()}>
-            <Icon size={28} fill={hasCustomWallpaper ? colors.primary : undefined}>
-              <Papicons name="Gallery" />
-            </Icon>
+            <MaterialIcon name="add-photo-alternate" size={28} color={hasCustomWallpaper ? colors.primary : undefined} />
           </NativeHeaderPressable>
         )}
       </NativeHeaderSide>
@@ -233,9 +232,7 @@ const WallpaperModal = () => {
       <NativeHeaderSide side="Right" key={currentWallpaper?.id + ":" + wallpaperDirectory.exists}>
         {Platform.OS === 'android' && (
           <NativeHeaderPressable onPress={() => uploadCustomWallpaper()}>
-            <Icon size={28} fill={hasCustomWallpaper ? colors.primary : undefined}>
-              <Papicons name="Gallery" />
-            </Icon>
+            <MaterialIcon name="add-photo-alternate" size={28} color={hasCustomWallpaper ? colors.primary : undefined} />
           </NativeHeaderPressable>
         )}
         <ActionMenu

@@ -9,7 +9,8 @@ export type MaterialIconName = React.ComponentProps<
 interface MaterialIconProps {
   name: MaterialIconName;
   size?: number;
-  color?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  color?: any;
   style?: StyleProp<TextStyle>;
 }
 

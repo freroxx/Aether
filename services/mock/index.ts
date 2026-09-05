@@ -1,4 +1,6 @@
 import { Attendance } from "@/services/shared/attendance";
+import { CanteenMenu } from "@/services/shared/canteen";
+import { Chat, Message, Recipient } from "@/services/shared/chat";
 import { Period, PeriodGrades } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
@@ -8,6 +10,10 @@ import { Auth, Services } from "@/stores/account/types";
 
 import {
   generateMockAttendance,
+  generateMockCanteenMenu,
+  generateMockChatMessages,
+  generateMockChatRecipients,
+  generateMockChats,
   generateMockGrades,
   generateMockHomeworks,
   generateMockNews,
@@ -26,12 +32,17 @@ export class MockData implements SchoolServicePlugin {
     Capabilities.ATTENDANCE,
     Capabilities.ATTENDANCE_PERIODS,
     Capabilities.TIMETABLE,
+    Capabilities.CANTEEN_MENU,
+    Capabilities.CHAT_READ,
+    Capabilities.CHAT_REPLY,
+    Capabilities.CHAT_CREATE,
   ];
   authData: Auth = {};
   session = undefined;
 
   private homeworkState = new Map<string, boolean>();
   private newsState = new Map<string, boolean>();
+  private sentMessages = new Map<string, Message[]>();
 
   constructor(public accountId: string) {}
 
@@ -88,5 +99,57 @@ export class MockData implements SchoolServicePlugin {
 
   async getAttendanceForPeriod(_period: string): Promise<Attendance> {
     return generateMockAttendance(this.accountId);
+  }
+
+  async getWeeklyCanteenMenu(startDate: Date): Promise<CanteenMenu[]> {
+    return generateMockCanteenMenu(this.accountId, startDate);
+  }
+
+  async getChats(): Promise<Chat[]> {
+    return generateMockChats(this.accountId);
+  }
+
+  async getChatRecipients(): Promise<Recipient[]> {
+    return generateMockChatRecipients(this.accountId);
+  }
+
+  async getChatMessages(chat: Chat): Promise<Message[]> {
+    return [
+      ...generateMockChatMessages(this.accountId, chat.id),
+      ...(this.sentMessages.get(chat.id) ?? []),
+    ];
+  }
+
+  async getRecipientsAvailableForNewChat(): Promise<Recipient[]> {
+    return generateMockChatRecipients(this.accountId);
+  }
+
+  async sendMessageInChat(chat: Chat, content: string): Promise<void> {
+    const existing = this.sentMessages.get(chat.id) ?? [];
+    existing.push({
+      id: `mock-message-${chat.id}-sent-${existing.length}`,
+      subject: "",
+      content,
+      author: "Camille Martin",
+      date: new Date(),
+      attachments: [],
+    });
+    this.sentMessages.set(chat.id, existing);
+  }
+
+  async createMail(
+    subject: string,
+    content: string,
+    recipients: Recipient[]
+  ): Promise<Chat> {
+    void content;
+    return {
+      id: `mock-chat-${Date.now()}`,
+      subject,
+      recipient: recipients.map(r => r.name).join(", "),
+      creator: "Camille Martin",
+      date: new Date(),
+      createdByAccount: this.accountId,
+    };
   }
 }

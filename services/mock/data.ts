@@ -1,4 +1,6 @@
 import { Attendance, ObservationType } from "@/services/shared/attendance";
+import { CanteenMenu } from "@/services/shared/canteen";
+import { Chat, Message, Recipient } from "@/services/shared/chat";
 import { Period, PeriodGrades, Subject } from "@/services/shared/grade";
 import { Homework, ReturnFormat } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
@@ -414,4 +416,116 @@ export function generateMockAttendance(
       },
     ],
   };
+}
+
+export function generateMockChats(accountId: string): Chat[] {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  return [
+    {
+      id: "mock-chat-vie-scolaire",
+      subject: "Sortie scolaire au musée",
+      recipient: "Mme Leroy (Vie scolaire)",
+      creator: "Mme Leroy",
+      date: new Date(now - 2 * day),
+      createdByAccount: accountId,
+    },
+    {
+      id: "mock-chat-maths",
+      subject: "Devoir de mathématiques",
+      recipient: "Mme Lefèvre",
+      creator: "Mme Lefèvre",
+      date: new Date(now - 5 * day),
+      createdByAccount: accountId,
+    },
+    {
+      id: "mock-chat-eps",
+      subject: "Certificat médical EPS",
+      recipient: "M. Fontaine",
+      creator: "Camille Martin",
+      date: new Date(now - 9 * day),
+      createdByAccount: accountId,
+    },
+  ];
+}
+
+export function generateMockChatRecipients(accountId: string): Recipient[] {
+  void accountId;
+  return [
+    { id: "mock-recipient-lefevre", name: "Mme Lefèvre", class: "Mathématiques" },
+    { id: "mock-recipient-dubois", name: "M. Dubois", class: "Français" },
+    { id: "mock-recipient-leroy", name: "Mme Leroy", class: "Vie scolaire" },
+    { id: "mock-recipient-fontaine", name: "M. Fontaine", class: "EPS" },
+  ];
+}
+
+const MOCK_THREADS: Record<string, Array<[string, string, number, string]>> = {
+  "mock-chat-vie-scolaire": [
+    ["Mme Leroy", "Bonjour, la sortie au musée d'Orsay aura lieu vendredi. Pensez à l'autorisation signée !", 2, "09:12"],
+    ["Camille Martin", "Bonjour, c'est noté, je la rapporte demain matin.", 2, "18:40"],
+    ["Mme Leroy", "Parfait, merci !", 1, "08:05"],
+  ],
+  "mock-chat-maths": [
+    ["Mme Lefèvre", "Le devoir sur les fonctions est reporté à jeudi.", 5, "17:20"],
+    ["Camille Martin", "Merci pour l'info, on reverra le chapitre 4 d'ici là ?", 4, "19:02"],
+  ],
+  "mock-chat-eps": [
+    ["Camille Martin", "Bonjour, voici mon certificat médical pour la dispense d'EPS.", 9, "10:15"],
+  ],
+};
+
+export function generateMockChatMessages(
+  accountId: string,
+  chatId: string
+): Message[] {
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  void accountId;
+  const thread = MOCK_THREADS[chatId] ?? [];
+  return thread.map(([author, content, daysAgo, time], index) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    const date = new Date(now - daysAgo * day);
+    date.setHours(hours, minutes, 0, 0);
+    return {
+      id: `mock-message-${chatId}-${index}`,
+      subject: "",
+      content,
+      author,
+      date,
+      attachments: [],
+    };
+  });
+}
+
+const MOCK_MENUS: Array<[string, string[], string[], string[], string[], string[]]> = [
+  ["Lundi", ["Salade verte", "Tomates mozzarella"], ["Poulet rôti", "Steak végétal"], ["Riz pilaf"], ["Yaourt"], ["Fruit de saison"], []],
+  ["Mardi", ["Soupe de légumes"], ["Poisson pané"], ["Purée"], [], ["Compote"], []],
+  ["Mercredi", [], [], [], [], [], []],
+  ["Jeudi", ["Carottes râpées"], ["Bœuf bourguignon", "Omelette"], ["Coquillettes"], ["Fromage"], ["Tarte aux pommes"], []],
+  ["Vendredi", ["Concombre"], ["Pizza"], ["Salade"], [], ["Glace"], []],
+];
+
+export function generateMockCanteenMenu(accountId: string, startDate: Date): CanteenMenu[] {
+  const monday = new Date(startDate);
+  monday.setHours(0, 0, 0, 0);
+  const weekday = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - weekday);
+  return MOCK_MENUS.map(([dayName, entry, main, side, dessert, drink], index) => {
+    void dayName;
+    const date = new Date(monday);
+    date.setDate(date.getDate() + index);
+    const foods = (names: string[]) => names.map(name => ({ name }));
+    return {
+      date,
+      createdByAccount: accountId,
+      lunch: {
+        entry: foods(entry),
+        main: foods(main),
+        side: foods(side),
+        dessert: foods(dessert),
+        drink: foods(drink),
+      },
+      dinner: undefined,
+    };
+  });
 }

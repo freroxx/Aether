@@ -204,6 +204,7 @@ export default function MessageThreadView() {
                 placeholder="Écrire un message…"
                 multiline
                 height={48}
+                color={theme.colors.primary}
                 editable={!sending}
                 onSubmitEditing={send}
               />
