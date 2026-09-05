@@ -212,10 +212,10 @@ export default function AndroidCalendarsScreen() {
                     <Switch
                       value={isEnabled}
                       onValueChange={() => toggleCalendar(cal.id, isEnabled)}
-                      thumbColor={isEnabled ? String(colors.primary) : dark ? "#73777f" : "#e0e2ec"}
+                      thumbColor={isEnabled ? (dark ? "#29947A" : "#20725E") : dark ? "#73777f" : "#e0e2ec"}
                       trackColor={{
                         false: dark ? "#3b4858" : "#d9e2ec",
-                        true: String(colors.primary) + "66",
+                        true: dark ? "rgba(41, 148, 122, 0.45)" : "rgba(41, 148, 122, 0.35)",
                       }}
                     />
                   </View>

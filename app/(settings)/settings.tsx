@@ -93,7 +93,7 @@ export default function SettingsIndex() {
           title: "Calendriers Android",
           description: "Synchroniser avec les agendas de l'appareil",
           icon: <Calendar size={20} color={theme.colors.primary} />,
-          onPress: () => router.navigate("/calendar/android-calendars"),
+          onPress: () => router.push("/(settings)/android-calendars"),
         },
       ],
     },

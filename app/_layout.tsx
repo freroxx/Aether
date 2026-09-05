@@ -69,7 +69,7 @@ export default function RootLayout() {
 
   return (
     <AppProviders>
-      <FakeSplash isAppReady={isAppReady} instant={true} />
+      <FakeSplash isAppReady={isAppReady} instant={false} />
       <RootNavigator />
     </AppProviders>
   );
