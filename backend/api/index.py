@@ -114,11 +114,15 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
         else:
             raise HTTPException(status_code=400, detail="Données d'authentification incomplètes")
 
-        if not client.logged_in:
-            raise HTTPException(status_code=401, detail="Échec de connexion à Pronote")
-
-        if is_parent and child_name:
-            client.set_child(child_name)
+        if is_parent and child_name and hasattr(client, "set_child"):
+            if hasattr(client, "children") and client.children:
+                target_child = next((c for c in client.children if getattr(c, "name", "").lower() == child_name.lower()), None)
+                if target_child:
+                    client.set_child(target_child)
+                else:
+                    client.set_child(child_name)
+            else:
+                client.set_child(child_name)
 
         return client
     except Exception as e:
@@ -292,16 +296,27 @@ def get_timetable(
         elif getattr(l, "status", None):
             status_str = str(l.status)
 
+        teacher = getattr(l, "teacher_name", "")
+        if not teacher and hasattr(l, "teachers") and l.teachers:
+            teacher = ", ".join(getattr(t, "name", str(t)) for t in l.teachers)
+
+        room = getattr(l, "classroom", "")
+        if not room and hasattr(l, "classrooms") and l.classrooms:
+            room = ", ".join(getattr(c, "name", str(c)) for c in l.classrooms)
+
+        end_time = getattr(l, "end", None)
+        end_iso = end_time.isoformat() if end_time else (l.start + timedelta(hours=1)).isoformat()
+
         result.append({
             "id": getattr(l, "id", f"{l.start}_{getattr(l.subject, 'name', '')}"),
-            "subject": getattr(l.subject, "name", "Matière"),
-            "teacher": getattr(l, "teacher_name", ""),
-            "room": getattr(l, "classroom", ""),
+            "subject": getattr(l.subject, "name", "Matière") if hasattr(l, "subject") and l.subject else "Matière",
+            "teacher": teacher,
+            "room": room,
             "start": l.start.isoformat(),
-            "end": l.end.isoformat(),
+            "end": end_iso,
             "canceled": getattr(l, "canceled", False),
             "status": status_str,
-            "color": getattr(l.subject, "color", None) if hasattr(l, "subject") else None,
+            "color": getattr(l.subject, "color", None) if hasattr(l, "subject") and l.subject else None,
             "memo": getattr(l, "memo", None),
             "is_outing": getattr(l, "outing", False),
         })
