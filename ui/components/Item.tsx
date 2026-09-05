@@ -4,7 +4,7 @@ import { Pressable, PressableProps, View } from "react-native";
 import Reanimated, { Easing, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 
 import { Animation } from "../utils/Animation";
-import { PapillonAppearIn, PapillonAppearOut } from "../utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "../utils/Transition";
 
 const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable);
 const LAYOUT_ANIMATION = Animation(LinearTransition, "list");
@@ -221,8 +221,8 @@ const ItemComponent = React.forwardRef<typeof Pressable, ListProps>(function Ite
       <Reanimated.View
         layout={LAYOUT_ANIMATION}
         style={borderStyle}
-        entering={animate ? PapillonAppearIn : undefined}
-        exiting={animate ? PapillonAppearOut : undefined}
+        entering={animate ? AetherAppearIn : undefined}
+        exiting={animate ? AetherAppearOut : undefined}
       >
         <AnimatedPressable
           {...rest}
@@ -241,8 +241,8 @@ const ItemComponent = React.forwardRef<typeof Pressable, ListProps>(function Ite
       <Reanimated.View
         layout={LAYOUT_ANIMATION}
         style={borderStyle}
-        entering={animate ? PapillonAppearIn : undefined}
-        exiting={animate ? PapillonAppearOut : undefined}
+        entering={animate ? AetherAppearIn : undefined}
+        exiting={animate ? AetherAppearOut : undefined}
       >
         <AnimatedPressable
           {...rest}

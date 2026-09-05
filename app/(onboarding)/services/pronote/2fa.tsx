@@ -39,11 +39,11 @@ export function Pronote2FAModal({ doubleAuthSession, doubleAuthError, setChallen
       const error = doubleAuthError
       const session = doubleAuthSession
       const deviceName = Device.deviceName
-      const source = "Papillon sur " + deviceName
-      await securitySource(session, source.length > 30 ? "Papillon" : "Papillon sur " + deviceName)
+      const source = "Aether sur " + deviceName
+      await securitySource(session, source.length > 30 ? "Aether" : "Aether sur " + deviceName)
       await securitySave(session, error.handle, {
         pin: pinCode,
-        deviceName: source.length > 30 ? "Papillon" : "Papillon sur " + deviceName || "Papillon"
+        deviceName: source.length > 30 ? "Aether" : "Aether sur " + deviceName || "Aether"
       })
 
       const context = error.handle.context;

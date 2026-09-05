@@ -74,7 +74,7 @@ export const getSubjectAverageByProperty = (
   return -1;
 };
 
-export const PapillonSubjectAvgByProperty = (
+export const AetherSubjectAvgByProperty = (
   grades: Grade[],
   property: ScoreProperty = "studentScore"
 ): number => {

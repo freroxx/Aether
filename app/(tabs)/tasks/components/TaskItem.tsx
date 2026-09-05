@@ -4,7 +4,7 @@ import Reanimated from 'react-native-reanimated';
 
 import { Homework } from "@/services/shared/homework";
 import Task from "@/ui/components/Task";
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 import { getSubjectName } from "@/utils/subjects/name";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectColor } from "@/utils/subjects/colors";
@@ -31,8 +31,8 @@ const TaskItem = memo(
     return (
       <Reanimated.View
         style={{ marginBottom: 10 }}
-        entering={PapillonAppearIn}
-        exiting={PapillonAppearOut}
+        entering={AetherAppearIn}
+        exiting={AetherAppearOut}
       >
         <Link
           href={{

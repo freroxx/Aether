@@ -25,12 +25,12 @@ import { Dynamic } from "@/ui/components/Dynamic";
 import Icon from "@/ui/components/Icon";
 import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/new/Typography";
-import { PapillonAppearIn, PapillonAppearOut } from "@/ui/utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import adjust from "@/utils/adjustColor";
-import PapillonMedian from "@/utils/grades/algorithms/median";
-import PapillonSubjectAvg from "@/utils/grades/algorithms/subject";
-import PapillonGradesAveragesOverTime from "@/utils/grades/algorithms/time";
-import PapillonWeightedAvg from "@/utils/grades/algorithms/weighted";
+import AetherMedian from "@/utils/grades/algorithms/median";
+import AetherSubjectAvg from "@/utils/grades/algorithms/subject";
+import AetherGradesAveragesOverTime from "@/utils/grades/algorithms/time";
+import AetherWeightedAvg from "@/utils/grades/algorithms/weighted";
 import {
   GradeDisplayScale,
   getDisplayDenominator,
@@ -54,7 +54,7 @@ const algorithms = [
     key: "subjects",
     label: t("Grades_Avg_Subject_Title"),
     description: t("Grades_Avg_Subject_Description"),
-    algorithm: PapillonSubjectAvg,
+    algorithm: AetherSubjectAvg,
     canInjectRealAverage: true,
     sfsymbol: "square.stack.3d.up.fill",
   },
@@ -62,14 +62,14 @@ const algorithms = [
     key: "weighted",
     label: t("Grades_Avg_All_Pond"),
     description: t("Grades_Avg_All_Pond_Description"),
-    algorithm: PapillonWeightedAvg,
+    algorithm: AetherWeightedAvg,
     sfsymbol: "plus.forwardslash.minus",
   },
   {
     key: "median",
     label: t("Grades_Avg_Median_Title"),
     description: t("Grades_Avg_Median_Description"),
-    algorithm: PapillonMedian,
+    algorithm: AetherMedian,
     sfsymbol: "chart.bar.xaxis.ascending",
   },
 ];
@@ -106,7 +106,7 @@ const Averages = ({
         return [];
       }
       try {
-        const history = PapillonGradesAveragesOverTime(
+        const history = AetherGradesAveragesOverTime(
           algorithm.algorithm,
           grades,
           "studentScore"
@@ -271,8 +271,8 @@ const Averages = ({
           overflow: inline ? "hidden" : "visible",
           height: inline ? undefined : isLargeLayout ? 420 : 220,
         }}
-        entering={!inline ? PapillonAppearIn : undefined}
-        exiting={!inline ? PapillonAppearOut : undefined}
+        entering={!inline ? AetherAppearIn : undefined}
+        exiting={!inline ? AetherAppearOut : undefined}
       >
         <LayoutAnimationConfig skipEntering={true} skipExiting={true}>
           <Stack

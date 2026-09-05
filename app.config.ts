@@ -92,7 +92,6 @@ export default {
         backgroundColor: "#ffffff",
         monochromeImage: "./assets/images/monochrome-icon.png",
       },
-      edgeToEdgeEnabled: true,
       supportsTablet: true,
       predictiveBackGestureEnabled: true,
     },
@@ -118,7 +117,7 @@ export default {
       [
         "expo-splash-screen",
         {
-          backgroundColor: "#29947A",
+          backgroundColor: "#4338CA",
           image: "./assets/images/logotype.png",
           imageWidth: 240,
         },
@@ -140,6 +139,7 @@ export default {
       ],
       "react-native-bottom-tabs",
       "expo-secure-store",
+      "./plugins/with-apk-splits",
       [
         "expo-location",
         {

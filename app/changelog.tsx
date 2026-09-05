@@ -24,7 +24,7 @@ export default function ChangelogScreen() {
         style={{ width: 72, height: 72, alignSelf: "center", borderRadius: 20, marginBottom: 8 }}
       />
       <Typography variant="h3" align="center">
-        Bienvenue sur Papillon v8
+        Bienvenue sur Aether v8
       </Typography>
       <Typography variant="body1" color="secondary" align="center">
         Cette mise à jour a été repensée de fond en comble pour améliorer votre expérience. Mais cela prend du temps, nous faisons de notre mieux pour faire de cette version la meilleure possible.
@@ -37,7 +37,7 @@ export default function ChangelogScreen() {
         Pourquoi tout changer ?
       </Typography>
       <Typography variant="body1" color="secondary" align="center">
-        Vous évoluez, nous aussi ! Papillon n'a jamais cessé de grandir depuis des années, et nous nous devons d'utiliser une application modernisée afin d'offrir la meilleure expérience et de garantir le futur de l'application.
+        Vous évoluez, nous aussi ! Aether n'a jamais cessé de grandir depuis des années, et nous nous devons d'utiliser une application modernisée afin d'offrir la meilleure expérience et de garantir le futur de l'application.
       </Typography>
       <Typography variant="body1" color="primary" align="center">
         Ce processus prend énormément de temps, et en tant qu'étudiants et lycéens, on doit aussi aller en cours, donc on fait ce qu'on peut avec ce qu'on à !
@@ -53,7 +53,7 @@ export default function ChangelogScreen() {
         Il manque (telle ou telle) fonctionnalité ?
       </Typography>
       <Typography variant="body1" color="secondary" align="center">
-        Pour vous permettre d'utiliser Papillon dès la rentrée, l'application est sortie plus lègere en fonctionnalités que prévu. Nous travaillons d'arrache-pied pour réintégrer les fonctionnalités manquantes au plus vite.
+        Pour vous permettre d'utiliser Aether dès la rentrée, l'application est sortie plus lègere en fonctionnalités que prévu. Nous travaillons d'arrache-pied pour réintégrer les fonctionnalités manquantes au plus vite.
       </Typography>
 
       <View style={{ height: 16 }} />

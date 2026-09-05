@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, PressableProps } from "react-native";
 import Reanimated, { Easing, FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 
 import { Animation } from "../utils/Animation";
-import { PapillonZoomIn, PapillonZoomOut } from "../utils/Transition";
+import { AetherZoomIn, AetherZoomOut } from "../utils/Transition";
 import Typography from "./Typography";
 import * as ExpoHaptics from "expo-haptics";
 import { runsIOS26 } from "../utils/IsLiquidGlass";
@@ -190,12 +190,12 @@ const Button: React.FC<ButtonProps> = React.memo(({
     (rest.children && !title) ? rest.children : (
       <>
         {loading && (
-          <Reanimated.View layout={Animation(LinearTransition)} entering={PapillonZoomIn} exiting={PapillonZoomOut}>
+          <Reanimated.View layout={Animation(LinearTransition)} entering={AetherZoomIn} exiting={AetherZoomOut}>
             <ActivityIndicator color={textColor} />
           </Reanimated.View>
         )}
         {buttonIcon && (
-          <Reanimated.View layout={Animation(LinearTransition)} entering={PapillonZoomIn} exiting={PapillonZoomOut}>
+          <Reanimated.View layout={Animation(LinearTransition)} entering={AetherZoomIn} exiting={AetherZoomOut}>
             {buttonIcon}
           </Reanimated.View>
         )}
@@ -205,7 +205,7 @@ const Button: React.FC<ButtonProps> = React.memo(({
           </Typography>
         </Reanimated.View>
         {rest.children && typeof rest.children !== "function" && (
-          <Reanimated.View layout={Animation(LinearTransition)} entering={PapillonZoomIn} exiting={PapillonZoomOut}>
+          <Reanimated.View layout={Animation(LinearTransition)} entering={AetherZoomIn} exiting={AetherZoomOut}>
             {rest.children}
           </Reanimated.View>
         )}

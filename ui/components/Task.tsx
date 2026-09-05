@@ -15,7 +15,7 @@ import Icon from './Icon';
 import { Dynamic } from './Dynamic';
 import { Animation } from '../utils/Animation';
 import { LinearTransition } from 'react-native-reanimated';
-import { PapillonAppearIn, PapillonAppearOut } from '../utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '../utils/Transition';
 import { t } from 'i18next';
 import { Platform } from 'react-native';
 import { ListTouchable } from '../new/List';

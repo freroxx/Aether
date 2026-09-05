@@ -129,8 +129,8 @@ export default function Devmode() {
         <Item>
           <Typography>
             {settingStore.magicEnabled
-              ? "Papillon Magic+ est Activé"
-              : "Papillon Magic+ est Désactivé"}
+              ? "Aether Magic+ est Activé"
+              : "Aether Magic+ est Désactivé"}
           </Typography>
         </Item>
         <Item onPress={() => ModelManager.refresh()}>
@@ -454,8 +454,8 @@ export default function Devmode() {
             const date = new Date(Date.now() + 5000);
 
             const id = await scheduleNotificationAtDate(
-              "Papillon",
-              "Une notification programmée via Papillon arrive à l'instant!",
+              "Aether",
+              "Une notification programmée via Aether arrive à l'instant!",
               date
             );
 

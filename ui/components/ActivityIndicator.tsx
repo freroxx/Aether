@@ -10,7 +10,7 @@ import Animated, {
   cancelAnimation,
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
-import { PapillonAppearIn, PapillonAppearOut } from '../utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '../utils/Transition';
 
 interface ActivityIndicatorProps {
   size?: number;
@@ -55,8 +55,8 @@ const ActivityIndicator: React.FC<ActivityIndicatorProps> = ({
 
   return (
     <Animated.View
-      entering={PapillonAppearIn}
-      exiting={PapillonAppearOut}
+      entering={AetherAppearIn}
+      exiting={AetherAppearOut}
     >
       <Animated.View
         style={[

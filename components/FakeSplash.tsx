@@ -10,7 +10,7 @@ const videoSource: VideoSource = {
   assetId
 };
 
-export const PapillonSplashOut = () => {
+export const AetherSplashOut = () => {
   "worklet";
   return {
     initialValues: {
@@ -46,7 +46,7 @@ const FakeSplash = ({ isAppReady, instant }: { isAppReady: boolean, instant?: bo
         justifyContent: "center",
         alignItems: "center",
       }}
-      exiting={PapillonSplashOut}
+      exiting={AetherSplashOut}
     >
       <Image
         source={require('@/assets/images/splash.png')}

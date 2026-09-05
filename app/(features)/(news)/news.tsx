@@ -11,7 +11,7 @@ import TabHeaderTitle from '@/ui/components/TabHeaderTitle'
 import { useKeyboardHeight } from '@/ui/hooks/useKeyboardHeight'
 import List from '@/ui/new/List'
 import Typography from '@/ui/new/Typography'
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition'
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition'
 import { getProfileColorByName } from '@/utils/chats/colors'
 import { getInitials } from '@/utils/chats/initials'
 import { warn } from '@/utils/logger/logger'
@@ -125,7 +125,7 @@ const NewsView = () => {
           ListFooterComponent={<Reanimated.View style={footerStyle} />}
           scrollIndicatorInsets={{ top: headerHeight - insets.top }}
           ListEmptyComponent={
-            <Dynamic animated key='empty-list:warn' entering={PapillonAppearIn} exiting={PapillonAppearOut}>
+            <Dynamic animated key='empty-list:warn' entering={AetherAppearIn} exiting={AetherAppearOut}>
               <Stack
                 hAlign='center'
                 vAlign='center'

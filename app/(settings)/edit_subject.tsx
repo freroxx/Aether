@@ -25,7 +25,7 @@ import Button from "@/ui/new/Button";
 import { UnicodeEmojis } from "@/constants/UnicodeEmojis";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { PapillonZoomIn, PapillonZoomOut } from "@/ui/utils/Transition";
+import { AetherZoomIn, AetherZoomOut } from "@/ui/utils/Transition";
 import { ListTouchable } from "@/ui/new/List";
 import { LegendList, LegendListRef } from "@legendapp/list";
 import { FlashList } from "@shopify/flash-list";
@@ -157,8 +157,8 @@ function EmojiPicker({
       <Animated.View
         style={[emojiContainerStyle]}
         key={selectedEmoji + "_preview"}
-        entering={PapillonZoomIn}
-        exiting={PapillonZoomOut}
+        entering={AetherZoomIn}
+        exiting={AetherZoomOut}
       >
         <Typography
           style={{

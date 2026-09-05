@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import { Easing, withSpring, withTiming } from "react-native-reanimated";
 
-export const PapillonZoomIn = () => {
+export const AetherZoomIn = () => {
   "worklet";
   return {
     initialValues: {
@@ -25,7 +25,7 @@ export const PapillonZoomIn = () => {
   };
 };
 
-export const PapillonZoomOut = () => {
+export const AetherZoomOut = () => {
   "worklet";
   return {
     initialValues: {
@@ -49,7 +49,7 @@ export const PapillonZoomOut = () => {
   };
 };
 
-export const PapillonAppearIn = () => {
+export const AetherAppearIn = () => {
   "worklet";
   return {
     initialValues: {
@@ -73,7 +73,7 @@ export const PapillonAppearIn = () => {
   };
 };
 
-export const PapillonAppearOut = () => {
+export const AetherAppearOut = () => {
   "worklet";
   return {
     initialValues: {
@@ -97,7 +97,7 @@ export const PapillonAppearOut = () => {
   };
 };
 
-export const PapillonSpringIn = () => {
+export const AetherSpringIn = () => {
   "worklet";
   return {
     initialValues: {
@@ -120,7 +120,7 @@ export const PapillonSpringIn = () => {
   };
 };
 
-export const PapillonSpringOut = () => {
+export const AetherSpringOut = () => {
   "worklet";
   return {
     initialValues: {
@@ -142,7 +142,7 @@ export const PapillonSpringOut = () => {
   };
 };
 
-export const PapillonAndroidMenuIn = () => {
+export const AetherAndroidMenuIn = () => {
   "worklet";
   return {
     initialValues: {

@@ -123,14 +123,14 @@ export default function SettingsAbout() {
       title: t("Settings_About_Discord"),
       description: t("Settings_About_Discord_Description"),
       leading: <Papicons name="TextBubble" />,
-      onPress: () => Linking.openURL("https://go.papillon.bzh/discord"),
+      onPress: () => Linking.openURL("https://github.com/aether-app/Aether/discussions"),
     },
     {
       title: t("Settings_About_Issue"),
       description: t("Settings_About_Issue_Description"),
       leading: <Papicons name="Info" />,
       onPress: () =>
-        Linking.openURL("https://github.com/PapillonApp/Papillon/issues"),
+        Linking.openURL("https://github.com/aether-app/Aether/issues"),
     },
   ];
 
@@ -145,7 +145,7 @@ export default function SettingsAbout() {
       title: t("Settings_About_Github"),
       description: t("Settings_About_Github_Description"),
       leading: <Github />,
-      onPress: () => Linking.openURL("https://github.com/PapillonApp/Papillon"),
+      onPress: () => Linking.openURL("https://github.com/aether-app/Aether"),
     },
     {
       title: t("Settings_About_Contributors"),
@@ -199,9 +199,9 @@ export default function SettingsAbout() {
       <List.View style={{ marginBottom: 10 }}>
         <SettingsHeader
           color={theme.dark ? "#121e2a" : "#dfebf7"}
-          title={t("Settings_About_Papillion_Behind")}
-          description={t("Settings_About_Papillion_Behind_Description")}
-          imageSource={require("@/assets/images/about_papillon.png")}
+          title={t("Settings_About_Aether_Behind")}
+          description={t("Settings_About_Aether_Behind_Description")}
+          imageSource={require("@/assets/images/about_aether.png")}
           disableMargin
           height={270}
         />

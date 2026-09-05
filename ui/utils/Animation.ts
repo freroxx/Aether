@@ -4,16 +4,16 @@ const SPRING_CONFIG = { mass: 1, damping: 20, stiffness: 300 };
 
 type AnimationStyle = "default" | "spring" | "list" | "smooth" | "fade";
 
-const PapillonSpring = (a: any) =>
+const AetherSpring = (a: any) =>
   a?.springify().mass(SPRING_CONFIG.mass).damping(SPRING_CONFIG.damping).stiffness(SPRING_CONFIG.stiffness);
 
-const PapillonList = (a: any) =>
+const AetherList = (a: any) =>
   a?.duration(300).easing(Easing.out(Easing.exp));
 
-const PapillonReanimatedSpring = (a: any) =>
+const AetherReanimatedSpring = (a: any) =>
   a?.springify({ duration: 300 });
 
-const PapillonFade = {
+const AetherFade = {
   in: FadeInUp.duration(200).easing(Easing.out(Easing.ease)).withInitialValues({
     opacity: 0,
   }),
@@ -23,15 +23,15 @@ const PapillonFade = {
 export const Animation = (animation?: any, style?: AnimationStyle) => {
   switch (style) {
   case "spring":
-    return PapillonSpring(animation);
+    return AetherSpring(animation);
   case "list":
-    return PapillonList(animation);
+    return AetherList(animation);
   case "smooth":
-    return PapillonReanimatedSpring(animation);
+    return AetherReanimatedSpring(animation);
   default:
-    return PapillonSpring(animation);
+    return AetherSpring(animation);
   }
 };
 
-export const PapillonFadeIn = PapillonFade.in;
-export const PapillonFadeOut = PapillonFade.out;
+export const AetherFadeIn = AetherFade.in;
+export const AetherFadeOut = AetherFade.out;

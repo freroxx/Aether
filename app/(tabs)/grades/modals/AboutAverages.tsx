@@ -27,7 +27,7 @@ export default function AboutAverages() {
         </Typography>
 
         <Typography variant="h4" style={{ marginTop: 20 }}>
-          Comment Papillon calcule-t-il les moyennes générales ?
+          Comment Aether calcule-t-il les moyennes générales ?
         </Typography>
 
         <Typography variant="body1" color="secondary">
@@ -35,7 +35,7 @@ export default function AboutAverages() {
         </Typography>
 
         <Typography variant="body1" color="secondary">
-          Papillon regroupe automatiquement tes notes en fonction de leur matière présumée et en calcule la moyenne en tenant compte des coefficients et autres paramètres. Ensuite, il peut ou non calculer la moyennes des matières entre-elles.
+          Aether regroupe automatiquement tes notes en fonction de leur matière présumée et en calcule la moyenne en tenant compte des coefficients et autres paramètres. Ensuite, il peut ou non calculer la moyennes des matières entre-elles.
         </Typography>
 
         <Typography variant="h4" style={{ marginTop: 20 }}>
@@ -51,7 +51,7 @@ export default function AboutAverages() {
         </Typography>
 
         <Typography variant="body1" color="secondary">
-          Lorsque Papillon affiche qu'une moyenne est fournie par l'établissement, c'est qu'il n'y a aucune différence entre ta moyenne réelle et celle affichée. Cependant, si la mention "estimée" ou une date apparaît, il peut exister une différence de l'ordre de quelques demi-points.
+          Lorsque Aether affiche qu'une moyenne est fournie par l'établissement, c'est qu'il n'y a aucune différence entre ta moyenne réelle et celle affichée. Cependant, si la mention "estimée" ou une date apparaît, il peut exister une différence de l'ordre de quelques demi-points.
         </Typography>
       </Stack>
     </ScrollView>

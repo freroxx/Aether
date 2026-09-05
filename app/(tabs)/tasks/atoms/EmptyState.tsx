@@ -2,7 +2,7 @@ import { Dynamic } from "@/ui/components/Dynamic";
 import Icon from "@/ui/components/Icon";
 import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
-import { PapillonAppearIn, PapillonAppearOut } from "@/ui/utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import { Papicons } from "@getpapillon/papicons";
 import { t } from "i18next";
 import React, { memo } from "react";
@@ -15,8 +15,8 @@ const EmptyState = memo(({ isSearching }: EmptyStateProps) => (
   <Dynamic
     animated
     key="empty-list:warn"
-    entering={PapillonAppearIn}
-    exiting={PapillonAppearOut}
+    entering={AetherAppearIn}
+    exiting={AetherAppearOut}
   >
     <Stack hAlign="center" vAlign="center" flex style={{ width: "100%" }}>
       <Icon papicon opacity={0.5} size={32} style={{ marginBottom: 3 }}>

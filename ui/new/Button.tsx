@@ -5,7 +5,7 @@ import { ViewStyle } from "react-native";
 import Ripple from "./RippleEffect";
 import Typography from "./Typography";
 
-export default function Button({ label, onPress, disabled = false, variant = "primary", fullWidth = false, leading, trailing, gap = 10, height = 50, maxWidth = 600,  color, style }: { label: string; onPress: () => void; disabled?: boolean; variant?: "primary" | "secondary" | "outlined" | "ghost" | "text"; fullWidth?: boolean; leading?: React.ReactNode; trailing?: React.ReactNode, gap?: number, height?: number, maxWidth?: number, color?: string, style?: ViewStyle }) {
+export default function Button({ label, onPress, onLongPress, longPressDuration, disabled = false, variant = "primary", fullWidth = false, leading, trailing, gap = 10, height = 50, maxWidth = 600,  color, style }: { label: string; onPress: () => void; onLongPress?: () => void; longPressDuration?: number; disabled?: boolean; variant?: "primary" | "secondary" | "outlined" | "ghost" | "text"; fullWidth?: boolean; leading?: React.ReactNode; trailing?: React.ReactNode, gap?: number, height?: number, maxWidth?: number, color?: string, style?: ViewStyle }) {
   const theme = useTheme();
   const { colors } = theme;
 
@@ -94,6 +94,8 @@ export default function Button({ label, onPress, disabled = false, variant = "pr
           onPress();
         });
       }}
+      onLongPress={onLongPress}
+      longPressDuration={longPressDuration}
     >
       {leading}
       <Typography {...TextVariants[variant]}>{label}</Typography>

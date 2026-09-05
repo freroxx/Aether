@@ -8,10 +8,10 @@ import Animated, {
 import Svg, { Circle } from 'react-native-svg';
 
 import {
-  PapillonAppearIn,
-  PapillonAppearOut,
-  PapillonZoomIn,
-  PapillonZoomOut,
+  AetherAppearIn,
+  AetherAppearOut,
+  AetherZoomIn,
+  AetherZoomOut,
 } from "../utils/Transition";
 import { SpringConfig } from "react-native-reanimated/src/animation/spring";
 import { Papicons } from "@getpapillon/papicons";
@@ -77,8 +77,8 @@ const CircularProgress: FC<CircularProgressProps> = ({
 
   return (
     <Animated.View
-      entering={PapillonAppearIn}
-      exiting={PapillonAppearOut}
+      entering={AetherAppearIn}
+      exiting={AetherAppearOut}
       style={[styles.container, { width: radius * 2, height: radius * 2 }]}
       key={`circular-progress-${radius}`}
     >
@@ -105,8 +105,8 @@ const CircularProgress: FC<CircularProgressProps> = ({
       </Svg>
       {percentageCompleteScaled >= 100 && showCheckmark && (
         <Animated.View
-          entering={PapillonZoomIn}
-          exiting={PapillonZoomOut}
+          entering={AetherZoomIn}
+          exiting={AetherZoomOut}
           style={{
             position: "absolute",
             top: 0,

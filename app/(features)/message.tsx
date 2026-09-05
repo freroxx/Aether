@@ -19,7 +19,7 @@ import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
 import List from "@/ui/new/List";
-import PapillonTextInput from "@/ui/new/TextInput";
+import AetherTextInput from "@/ui/new/TextInput";
 import Typography from "@/ui/new/Typography";
 
 export default function MessageThreadView() {
@@ -198,7 +198,7 @@ export default function MessageThreadView() {
             }}
           >
             <View style={{ flex: 1 }}>
-              <PapillonTextInput
+              <AetherTextInput
                 value={draft}
                 onChangeText={setDraft}
                 placeholder="Écrire un message…"

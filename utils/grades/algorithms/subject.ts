@@ -73,7 +73,7 @@ export const getSubjectAverage = (
   return -1;
 };
 
-const PapillonSubjectAvg = (grades: Grade[], key: ScoreProperty = "studentScore"): number => {
+const AetherSubjectAvg = (grades: Grade[], key: ScoreProperty = "studentScore"): number => {
   if (!grades?.length) {
     return 0;
   }
@@ -106,4 +106,4 @@ const PapillonSubjectAvg = (grades: Grade[], key: ScoreProperty = "studentScore"
   return countedSubjects > 0 ? totalAverage / countedSubjects : 0;
 };
 
-export default PapillonSubjectAvg;
+export default AetherSubjectAvg;

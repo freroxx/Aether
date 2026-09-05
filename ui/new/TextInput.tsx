@@ -3,7 +3,7 @@ import React from 'react';
 import { TextInput,View } from 'react-native';
 import { useFont } from '@/utils/theme/fonts';
 
-const PapillonTextInput = ({ height = 54, color, ...props }) => {
+const AetherTextInput = ({ height = 54, color, ...props }) => {
   const { colors } = useTheme();
   const font = useFont();
 
@@ -38,4 +38,4 @@ const PapillonTextInput = ({ height = 54, color, ...props }) => {
   );
 }
 
-export default PapillonTextInput;
+export default AetherTextInput;

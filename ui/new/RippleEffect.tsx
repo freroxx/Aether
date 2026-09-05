@@ -13,6 +13,8 @@ import Animated, {
 interface RippleProps {
   style?: ViewStyle;
   onTap?: () => void;
+  onLongPress?: () => void;
+  longPressDuration?: number;
   rippleColor?: string;
   pressScale?: number; // Target scale (e.g., 0.9)
   scaleDuration?: number; // How fast the view shrinks/grows
@@ -22,6 +24,8 @@ interface RippleProps {
 const Ripple: React.FC<RippleProps> = ({
   style,
   onTap,
+  onLongPress,
+  longPressDuration = 500,
   rippleColor = 'rgba(0,0,0,0.1)',
   pressScale = 0.96,
   scaleDuration = 100,
@@ -45,7 +49,13 @@ const Ripple: React.FC<RippleProps> = ({
     });
   };
 
-  const gesture = Gesture.Tap()
+  const handleLongPress = () => {
+    InteractionManager.runAfterInteractions(() => {
+      onLongPress?.();
+    });
+  };
+
+  const tapGesture = Gesture.Tap()
     .onBegin((event) => {
       // 1. Position and Start Ripple
       centerX.value = event.x;
@@ -69,6 +79,17 @@ const Ripple: React.FC<RippleProps> = ({
       rippleOpacity.value = withTiming(0, { duration: 700 });
       containerScale.value = withSpring(1, { duration: scaleDuration * 5, dampingRatio: 0.4 });
     });
+
+  const gesture = onLongPress
+    ? Gesture.Exclusive(
+      Gesture.LongPress()
+        .minDuration(longPressDuration)
+        .onEnd(() => {
+          runOnJS(handleLongPress)();
+        }),
+      tapGesture
+    )
+    : tapGesture;
 
   const rStyle = useAnimatedStyle(() => {
     const circleRadius = Math.sqrt(width.value ** 2 + height.value ** 2);

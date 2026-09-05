@@ -13,7 +13,7 @@ import Button from "@/ui/new/Button";
 import Divider from "@/ui/new/Divider";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
-import { PapillonZoomIn, PapillonZoomOut } from "@/ui/utils/Transition";
+import { AetherZoomIn, AetherZoomOut } from "@/ui/utils/Transition";
 import adjust from "@/utils/adjustColor";
 
 import { GetSupportedServices } from './utils/constants';
@@ -152,8 +152,8 @@ export default function ServiceSelection() {
               {selectedService === app.name && (
                 <Dynamic
                   animated
-                  entering={PapillonZoomIn}
-                  exiting={PapillonZoomOut}
+                  entering={AetherZoomIn}
+                  exiting={AetherZoomOut}
                 >
                   <Icon fill={colors.primary}>
                     <Papicons name="check" />

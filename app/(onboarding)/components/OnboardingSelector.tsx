@@ -10,7 +10,7 @@ import Stack from "@/ui/components/Stack";
 import Divider from "@/ui/new/Divider";
 import Ripple from "@/ui/new/RippleEffect";
 import Typography from "@/ui/new/Typography";
-import { PapillonZoomIn, PapillonZoomOut } from "@/ui/utils/Transition";
+import { AetherZoomIn, AetherZoomOut } from "@/ui/utils/Transition";
 import adjust from "@/utils/adjustColor";
 import { LayoutAnimationConfig } from "react-native-reanimated";
 
@@ -55,7 +55,7 @@ export default function OnboardingSelector({ item, selected, setSelected }) {
 
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
           {selected == item.key && (
-            <Dynamic animated entering={PapillonZoomIn} exiting={PapillonZoomOut}>
+            <Dynamic animated entering={AetherZoomIn} exiting={AetherZoomOut}>
               <Icon fill={dark}>
                 <Papicons name="check" />
               </Icon>

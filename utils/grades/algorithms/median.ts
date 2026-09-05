@@ -1,6 +1,6 @@
 import { Grade } from "@/services/shared/grade";
 
-const PapillonMedian = (grades: Grade[]): number => {
+const AetherMedian = (grades: Grade[]): number => {
   const validGrades = grades
     .filter((grade) => 
       grade.studentScore?.value !== null && 
@@ -42,4 +42,4 @@ const PapillonMedian = (grades: Grade[]): number => {
   return validGrades[middle];
 };
 
-export default PapillonMedian;
+export default AetherMedian;

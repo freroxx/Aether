@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getDateRangeOfWeek, getWeekNumberFromDate } from '@/database/useHomework';
 import { runsIOS26 } from '@/ui/utils/IsLiquidGlass';
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 import { useFont } from '@/utils/theme/fonts';
 
 interface WeekPickerProps {
@@ -59,8 +59,8 @@ const WeekPicker: React.FC<WeekPickerProps> = ({ selectedWeek, onSelectWeek, onC
         zIndex: 1000000,
         transformOrigin: "center top",
       }}
-      entering={PapillonAppearIn}
-      exiting={PapillonAppearOut}
+      entering={AetherAppearIn}
+      exiting={AetherAppearOut}
     >
       <BlurView
         style={{

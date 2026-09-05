@@ -1,4 +1,4 @@
-import { PapillonAppearIn, PapillonAppearOut } from "@/ui/utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import Stack from "@/ui/components/Stack";
 import Icon from "@/ui/components/Icon";
 import { Papicons } from "@getpapillon/papicons";
@@ -79,7 +79,7 @@ export function CompactGradeList({
   ), [grades]);
 
   return (
-    <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut}>
+    <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut}>
       <Stack gap={8} width={"100%"} style={{ marginBottom: large ? 0 : 16 }}>
         {!large && (
           <Stack

@@ -11,7 +11,7 @@ import { Papicons } from '@getpapillon/papicons';
 import { Dynamic } from '@/ui/components/Dynamic';
 import Stack from '@/ui/components/Stack';
 import Typography from '@/ui/components/Typography';
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 
 interface DateHeaderProps {
   title: string;
@@ -33,7 +33,7 @@ const DateHeader = memo(
     });
 
     return (
-      <Dynamic animated key={`header:${title}`} entering={PapillonAppearIn} exiting={PapillonAppearOut}>
+      <Dynamic animated key={`header:${title}`} entering={AetherAppearIn} exiting={AetherAppearOut}>
         <TouchableOpacity onPress={onToggle} activeOpacity={0.6}>
           <Stack
             direction='horizontal'

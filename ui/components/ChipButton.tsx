@@ -6,7 +6,7 @@ import React from "react";
 import { Platform, Pressable, TouchableNativeFeedback, TouchableOpacity, View } from "react-native";
 
 import { runsIOS26 } from "../utils/IsLiquidGlass";
-import { PapillonAppearIn, PapillonAppearOut } from "../utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "../utils/Transition";
 import { Dynamic } from "./Dynamic";
 import Icon from "./Icon";
 import Stack from "./Stack";
@@ -55,7 +55,7 @@ const ChipButton: React.FC<React.PropsWithChildren<{
               }
 
               {children &&
-                <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut} key={"chip-text:" + children?.toString()}>
+                <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut} key={"chip-text:" + children?.toString()}>
                   <Typography>
                     {children}
                   </Typography>
@@ -111,7 +111,7 @@ const ChipButton: React.FC<React.PropsWithChildren<{
           }
 
           {children &&
-            <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut} key={"chip-text:" + children?.toString()}>
+            <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut} key={"chip-text:" + children?.toString()}>
               <Typography>
                 {children}
               </Typography>

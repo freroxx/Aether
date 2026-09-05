@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import Reanimated, { EntryExitAnimationFunction, LayoutAnimation, LinearTransition } from "react-native-reanimated";
 
 import { Animation } from "../utils/Animation";
-import { PapillonAppearIn, PapillonAppearOut } from "../utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "../utils/Transition";
 
 type DynamicProps = {
   children?: React.ReactNode;
@@ -16,8 +16,8 @@ type DynamicProps = {
 };
 
 // Pre-compute animations to avoid function calls on every render
-const APPEAR_IN = PapillonAppearIn;
-const APPEAR_OUT = PapillonAppearOut;
+const APPEAR_IN = AetherAppearIn;
+const APPEAR_OUT = AetherAppearOut;
 
 // Pre-compute animated layout to avoid conditional computation
 const ANIMATED_LAYOUT = Animation(LinearTransition, "smooth");

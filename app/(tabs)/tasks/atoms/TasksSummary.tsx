@@ -5,7 +5,7 @@ import { useTheme } from "expo-router/react-navigation";
 import { CircularProgress } from '@/ui/components/CircularProgress';
 import Stack from '@/ui/components/Stack';
 import Typography from '@/ui/components/Typography';
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 import { Homework } from "@/services/shared/homework";
 import { Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -31,8 +31,8 @@ const TasksSummary: React.FC<TasksSummaryProps> = ({
 
   return (
     <Reanimated.View
-      entering={PapillonAppearIn}
-      exiting={PapillonAppearOut}
+      entering={AetherAppearIn}
+      exiting={AetherAppearOut}
       layout={LinearTransition}
       style={{
         marginTop:

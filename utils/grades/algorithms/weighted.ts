@@ -1,7 +1,7 @@
 import { Grade } from "@/services/shared/grade";
 import { ScoreProperty } from "./helpers";
 
-const PapillonWeightedAvg = (grades: Grade[], key: ScoreProperty = "studentScore"): number => {
+const AetherWeightedAvg = (grades: Grade[], key: ScoreProperty = "studentScore"): number => {
   let calcGradesSum = 0;
   let calcOutOfSum = 0;
 
@@ -54,4 +54,4 @@ const PapillonWeightedAvg = (grades: Grade[], key: ScoreProperty = "studentScore
   return 0;
 };
 
-export default PapillonWeightedAvg;
+export default AetherWeightedAvg;

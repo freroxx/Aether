@@ -7,7 +7,7 @@ import { Platform, Pressable } from "react-native";
 import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PapillonSpringIn, PapillonSpringOut } from "../utils/Transition";
+import { AetherSpringIn, AetherSpringOut } from "../utils/Transition";
 
 
 export interface CalendarProps {
@@ -93,8 +93,8 @@ const Calendar = React.forwardRef<CalendarRef, CalendarProps>(({
             left: 12,
             zIndex: 10,
           }]}
-          entering={PapillonSpringIn}
-          exiting={PapillonSpringOut}
+          entering={AetherSpringIn}
+          exiting={AetherSpringOut}
         >
           <LiquidGlassView
             glassType="regular"

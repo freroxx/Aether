@@ -1,8 +1,8 @@
 {
   "name": "papillon-ui",
   "version": "0.1.0",
-  "description": "The official Papillon UI library",
+  "description": "The official Aether UI library",
   "main": "./index.js",
-  "author": "PapillonApp",
+  "author": "AetherApp",
   "license": "GPL-3.0-or-later"
 }

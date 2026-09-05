@@ -5,7 +5,7 @@ import { LiquidGlassView } from '@sbaiahmed1/react-native-blur';
 import React, { useEffect, useState } from "react";
 import { Dimensions, Platform, TextInput, TouchableOpacity, useWindowDimensions, View } from "react-native";
 
-import { PapillonAppearIn, PapillonAppearOut } from "../utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "../utils/Transition";
 import { Dynamic } from "./Dynamic";
 import Icon from "./Icon";
 import Stack from "./Stack";
@@ -129,7 +129,7 @@ const Search: React.FC<SearchProps> = ({
         />
 
         {input.length > 0 && (
-          <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut}>
+          <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut}>
             <TouchableOpacity
               onPress={() => setInput("")}
             >

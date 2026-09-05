@@ -290,7 +290,7 @@ export default function DevMode() {
         <List.Section>
           <List.SectionTitle>
             <Papicons name="Sparkles" color={colors.text + 88} />
-            <List.Label>Papillon Magic+</List.Label>
+            <List.Label>Aether Magic+</List.Label>
           </List.SectionTitle>
             <List.Item onPress={() => handlePress(ClearMagicCache)}>
               <Typography variant="action">Supprimer le cache de Magic</Typography>
@@ -423,7 +423,7 @@ export default function DevMode() {
                 <Papicons name="Trash" />
               </Icon>
             </List.Leading>
-            <Typography variant="title" color="white">Réinitialiser Papillon</Typography>
+            <Typography variant="title" color="white">Réinitialiser Aether</Typography>
             <Typography variant="subtitle" color="white">Efface définitivement vos comptes, paramètres et données locales.</Typography>
           </List.Item>
         </List.Section>

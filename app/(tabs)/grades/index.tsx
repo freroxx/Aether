@@ -19,7 +19,7 @@ import TabHeader from '@/ui/components/TabHeader';
 import TabHeaderTitle from '@/ui/components/TabHeaderTitle';
 import LegacyTypography from '@/ui/components/Typography';
 import { useKeyboardHeight } from '@/ui/hooks/useKeyboardHeight';
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 import { getCurrentPeriod } from '@/utils/grades/helper/period';
 import i18n from '@/utils/i18n';
 import { getPeriodName, getPeriodNumber, isPeriodWithNumber } from "@/utils/services/periods";
@@ -536,7 +536,7 @@ const GradesView: React.FC = () => {
         ListFooterComponent={<Reanimated.View style={footerStyle} />}
 
         ListEmptyComponent={loading ? undefined :
-          <Dynamic animated key={'empty-list:warn'} entering={PapillonAppearIn} exiting={PapillonAppearOut}>
+          <Dynamic animated key={'empty-list:warn'} entering={AetherAppearIn} exiting={AetherAppearOut}>
             <Stack
               hAlign="center"
               vAlign="center"

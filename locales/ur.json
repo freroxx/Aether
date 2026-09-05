@@ -18,7 +18,7 @@
   "Tab_News": "خبریں",
 
   "ONBOARDING_MAIN_TITLE": "آپ کی اسکولی زندگی کو سنبھالنے والی ایپ",
-  "ONBOARDING_MAIN_DESCRIPTION": "اپنے گریڈز، کورسز، ہوم ورک اور بہت کچھ دیکھنے کے لیے اپنی اسکولی ایپس کو پیپیلون (Papillon) سے جوڑیں!",
+  "ONBOARDING_MAIN_DESCRIPTION": "اپنے گریڈز، کورسز، ہوم ورک اور بہت کچھ دیکھنے کے لیے اپنی اسکولی ایپس کو پیپیلون (Aether) سے جوڑیں!",
   "ONBOARDING_START_BTN": "شروع کریں",
   "ONBOARDING_HELP_BTN": "مدد چاہیے؟",
   "ONBOARDING_UNIVERSITY": "یونیورسٹی سروس",
@@ -296,8 +296,8 @@
   "News_Search_NoResults": "کوئی خبر نہیں ملی",
   "News_Search_NoResults_Description": "آپ کی تلاش کے مطابق کوئی خبر نہیں ملی۔",
 
-  "News_Theme_Papillon_Title": "پیپیلون",
-  "News_Theme_Papillon_Description": "ایک نرم اور خوبصورت تھیم",
+  "News_Theme_Aether_Title": "پیپیلون",
+  "News_Theme_Aether_Description": "ایک نرم اور خوبصورت تھیم",
 
   "News_Theme_Reading_Title": "مطالعہ",
   "News_Theme_Reading_Description": "مطالعہ کے لیے ڈیزائن کی گئی تھیم",
@@ -354,8 +354,8 @@
   "Settings_Personalization_Subject_Title": "مضامین کو حسبِ ضرورت بنائیں",
   "Settings_Personalization_Subject_Title_Card": "مضامین",
   "Settings_Personalization_Subject_Description": "آئیکنز، رنگ",
-  "Settings_About_Papillion_Behind": "پیپیلون کے پیچھے",
-  "Settings_About_Papillion_Behind_Description": "پیپیلون 100% رضاکار طلباء کے ذریعے چلایا جاتا ہے",
+  "Settings_About_Aether_Behind": "پیپیلون کے پیچھے",
+  "Settings_About_Aether_Behind_Description": "پیپیلون 100% رضاکار طلباء کے ذریعے چلایا جاتا ہے",
   "Settings_About_Discord": "ڈسکارڈ سرور",
   "Settings_About_Discord_Description": "ڈسکارڈ سرور میں شامل ہوں",
   "Settings_About_Crowdin": "کراؤڈن پروجیکٹ",

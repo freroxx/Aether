@@ -9,8 +9,9 @@ import Reanimated, { FadeIn, FadeOut } from "react-native-reanimated";
 import Stack from "@/ui/components/Stack";
 import Button from "@/ui/new/Button";
 import Divider from "@/ui/new/Divider";
-import PapillonLogo from "@/ui/new/symbols/PapillonLogo";
+import AetherLogo from "@/ui/new/symbols/AetherLogo";
 import Typography from "@/ui/new/Typography";
+import { createMockProfile } from "@/services/mock/account";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTranslation } from "react-i18next";
@@ -22,13 +23,13 @@ export default function Welcome() {
   const { t } = useTranslation();
 
   const openHelpWebPage = () => {
-    WebBrowser.openBrowserAsync("https://docs.papillon.bzh/support", {
+    WebBrowser.openBrowserAsync("https://github.com/aether-app/Aether/issues", {
       presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET
     });
   }
 
   const openLegalWebPage = () => {
-    WebBrowser.openBrowserAsync("https://docs.papillon.bzh/terms", {
+    WebBrowser.openBrowserAsync("https://github.com/aether-app/Aether", {
       presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET
     });
   }
@@ -131,7 +132,7 @@ export default function Welcome() {
             maxWidth: 600,
           }}
         >
-          <PapillonLogo fill={"#FFFFFF"} />
+          <AetherLogo fill={"#FFFFFF"} />
 
           <Typography
             color="#FFFFFF"
@@ -161,35 +162,15 @@ export default function Welcome() {
                     zIndex: 3,
                   }}
                 />
-                <Image
-                  source={require("@/assets/images/service_ed.png")}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 32,
-                    borderWidth: 3,
-                    borderColor: colors.primary,
-                    marginLeft: -16,
-                    zIndex: 2,
-                  }}
-                />
-                <Image
-                  source={require("@/assets/images/service_skolengo.png")}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 32,
-                    borderWidth: 3,
-                    borderColor: colors.primary,
-                    marginLeft: -16,
-                    zIndex: 1,
-                  }}
-                />
               </Stack>
             }
             onPress={() => {
               router.push("./ageSelection");
             }}
+            onLongPress={() => {
+              createMockProfile();
+            }}
+            longPressDuration={3000}
             fullWidth
           />
           <Button

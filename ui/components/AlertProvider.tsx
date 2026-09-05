@@ -27,7 +27,7 @@ const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable);
 import { useTheme } from "expo-router/react-navigation";
 import { useRouter } from "expo-router";
 
-import { PapillonAppearIn, PapillonAppearOut } from "../utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "../utils/Transition";
 import Typography from "../new/Typography";
 import { runsIOS26 } from "../utils/IsLiquidGlass";
 import { LiquidGlassView } from "@sbaiahmed1/react-native-blur";
@@ -228,8 +228,8 @@ const AlertComponent = React.memo(({ alert, onPress }: { alert: Alert, onPress?:
     return (
       <Reanimated.View
         layout={Animation(LinearTransition)}
-        entering={PapillonAppearIn}
-        exiting={PapillonAppearOut}
+        entering={AetherAppearIn}
+        exiting={AetherAppearOut}
       >
         <LiquidGlassView
           glassType="regular"
@@ -275,8 +275,8 @@ const AlertComponent = React.memo(({ alert, onPress }: { alert: Alert, onPress?:
     <AnimatedPressable
       onPress={handlePress}
       layout={Animation(LinearTransition)}
-      entering={PapillonAppearIn}
-      exiting={PapillonAppearOut}
+      entering={AetherAppearIn}
+      exiting={AetherAppearOut}
       style={containerStyle}
     >
       {IconComponent && (

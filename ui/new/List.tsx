@@ -6,7 +6,7 @@ import { Platform, StyleSheet, TouchableNativeFeedback, TouchableOpacity, View }
 import Reanimated, { LinearTransition } from 'react-native-reanimated';
 
 import { Animation } from "../utils/Animation";
-import { PapillonAppearIn, PapillonAppearOut } from "../utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "../utils/Transition";
 import Typography from "./Typography";
 
 type MarkerProps = {
@@ -115,8 +115,8 @@ const renderListRow = ({
   colors,
 }) => {
   const ItemComponent = listAnimated ? Reanimated.View : View;
-  const entering = itemProps.entering ?? (itemProps.animated ? PapillonAppearIn : undefined);
-  const exiting = itemProps.exiting ?? (itemProps.animated ? PapillonAppearOut : undefined);
+  const entering = itemProps.entering ?? (itemProps.animated ? AetherAppearIn : undefined);
+  const exiting = itemProps.exiting ?? (itemProps.animated ? AetherAppearOut : undefined);
   const row = (
     <View
       style={[

@@ -12,7 +12,7 @@ import { Alert, Image, Platform, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker"
 import { Dynamic } from "@/ui/components/Dynamic";
-import { PapillonAppearIn, PapillonAppearOut } from "@/ui/utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import { Stack as ExpoStack } from 'expo-router';
 import { AppColors } from "@/utils/colors";

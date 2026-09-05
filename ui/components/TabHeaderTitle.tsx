@@ -8,7 +8,7 @@ import { NativeHeaderHighlight } from '@/ui/components/NativeHeader';
 import Typography from '@/ui/components/Typography';
 
 import { Animation } from '../utils/Animation';
-import { PapillonAppearIn, PapillonAppearOut } from '../utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '../utils/Transition';
 import ActivityIndicator from './ActivityIndicator';
 import { Dynamic } from './Dynamic';
 import Icon from './Icon';
@@ -67,7 +67,7 @@ const TabHeaderTitle: React.FC<TabHeaderTitleProps> = ({
           >
             {leading &&
               typeof leading === 'string' ? (
-              <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut} key={"leading:" + leading.toString()}>
+              <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut} key={"leading:" + leading.toString()}>
                 <Typography variant="header" nowrap>{leading}</Typography>
               </Dynamic>
             ) : (
@@ -75,14 +75,14 @@ const TabHeaderTitle: React.FC<TabHeaderTitleProps> = ({
             )}
 
             {number && (
-              <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut}>
+              <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut}>
                 <NativeHeaderHighlight variant='navigation' color={color}>{number}</NativeHeaderHighlight>
               </Dynamic>
             )}
 
             {trailing &&
               typeof trailing === 'string' ? (
-              <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut} key={"trailing:" + trailing.toString()}>
+              <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut} key={"trailing:" + trailing.toString()}>
                 <Typography variant="header">{trailing}</Typography>
               </Dynamic>
             ) : (
@@ -90,7 +90,7 @@ const TabHeaderTitle: React.FC<TabHeaderTitleProps> = ({
             )}
 
             {chevron && (
-              <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut}>
+              <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut}>
                 <Icon size={20} opacity={0.5}>
                   <Papicons name="chevrondown" />
                 </Icon>
@@ -104,7 +104,7 @@ const TabHeaderTitle: React.FC<TabHeaderTitleProps> = ({
             )}
           </Stack>
           {subtitle && (
-            <Dynamic animated entering={PapillonAppearIn} exiting={PapillonAppearOut} key={"subtitle:" + subtitle.toString()}>
+            <Dynamic animated entering={AetherAppearIn} exiting={AetherAppearOut} key={"subtitle:" + subtitle.toString()}>
               <Typography variant="body1" color={"secondary"}>
                 {subtitle}
               </Typography>

@@ -1,7 +1,7 @@
 import { Grade } from "@/services/shared/grade";
 import { ScoreProperty } from "./helpers";
 
-const PapillonGradesAveragesOverTime = (algorithm: (grades: Grade[], key: ScoreProperty) => number, grades: Grade[], key: ScoreProperty = "studentScore") => {
+const AetherGradesAveragesOverTime = (algorithm: (grades: Grade[], key: ScoreProperty) => number, grades: Grade[], key: ScoreProperty = "studentScore") => {
   const sortedGrades = grades.sort((a, b) => new Date(a.givenAt).getTime() - new Date(b.givenAt).getTime());
 
   const averages: { date: Date; average: number }[] = [];
@@ -15,4 +15,4 @@ const PapillonGradesAveragesOverTime = (algorithm: (grades: Grade[], key: ScoreP
   return averages;
 };
 
-export default PapillonGradesAveragesOverTime;
+export default AetherGradesAveragesOverTime;

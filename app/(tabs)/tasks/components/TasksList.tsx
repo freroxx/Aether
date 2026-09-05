@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Homework } from "@/services/shared/homework";
 import List from "@/ui/new/List";
-import { PapillonAppearIn, PapillonAppearOut } from "@/ui/utils/Transition";
+import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import useResizable from "@/ui/utils/Resizable";
 import { generateId } from "@/utils/generateId";
 
@@ -67,8 +67,8 @@ const TasksList: React.FC<TasksListProps> = ({
       return (
         <Reanimated.View
           layout={LinearTransition}
-          entering={PapillonAppearIn}
-          exiting={PapillonAppearOut}
+          entering={AetherAppearIn}
+          exiting={AetherAppearOut}
         >
           <TaskItem
             item={source}

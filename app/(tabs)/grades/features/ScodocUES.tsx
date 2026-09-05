@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from "expo-router/react-navigation";
 import AnimatedPressable from '@/ui/components/AnimatedPressable';
 import { Dynamic } from '@/ui/components/Dynamic';
-import { PapillonAppearIn, PapillonAppearOut } from '@/ui/utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 import { GradeDisplayScale, formatAssumed20ForDisplay } from '@/utils/grades/scale';
 
 export interface AveragedElement {
@@ -87,8 +87,8 @@ const ScodocUES: React.FC<{ data: UEMap, displayScale: GradeDisplayScale }> = ({
           {displayUEs && (
             <Dynamic
               animated
-              entering={PapillonAppearIn}
-              exiting={PapillonAppearOut}
+              entering={AetherAppearIn}
+              exiting={AetherAppearOut}
             >
               <List style={{ width: "95%", marginLeft: "2.5%" }}>
                 <List.Section>
