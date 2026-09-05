@@ -1,5 +1,3 @@
-import { Skolengo } from "skolengojs";
-
 import { GenericInterface } from "./types";
 
 export interface Kid extends GenericInterface {
@@ -8,5 +6,5 @@ export interface Kid extends GenericInterface {
 	lastName: string,
 	class: string,
 	dateOfBirth: Date,
-	ref?: Skolengo
+	ref?: unknown
 }

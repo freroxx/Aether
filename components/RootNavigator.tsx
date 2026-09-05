@@ -200,36 +200,6 @@ function RootNavigatorContent() {
         />
 
         <Stack.Screen
-          name="(features)/(cards)/cards"
-          options={{
-            headerShown: false,
-            presentation: "modal",
-            headerTitle: t("Profile_QRCards"),
-            headerTransparent: runsIOS26,
-          }}
-        />
-
-        <Stack.Screen
-          name="(features)/(cards)/specific"
-          options={{
-            headerShown: false,
-            presentation: "modal",
-            headerTitle: t("Profile_QRCards"),
-            headerTransparent: runsIOS26,
-          }}
-        />
-
-        <Stack.Screen
-          name="(features)/(cards)/qrcode"
-          options={{
-            headerShown: false,
-            presentation: "transparentModal",
-            headerTitle: "QR-Code",
-            animation: "fade",
-          }}
-        />
-
-        <Stack.Screen
           name="(features)/attendance"
           options={{
             headerShown: false,

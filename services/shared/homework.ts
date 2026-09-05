@@ -1,5 +1,3 @@
-import { Assignment } from "skolengojs";
-
 import { Attachment } from "@/services/shared/attachment";
 import { GenericInterface } from "@/services/shared/types";
 
@@ -27,7 +25,7 @@ export interface Homework extends GenericInterface{
   evaluation: boolean;
   custom: boolean;
   progress?: number;
-	ref?: Assignment;
+	ref?: unknown;
 }
 
 export enum ReturnFormat {

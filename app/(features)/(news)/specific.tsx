@@ -1,14 +1,11 @@
 import { getManager } from "@/services/shared";
 import { News } from "@/services/shared/news";
 import { getNewsById } from "@/database/useNews";
-import { useAccountStore } from "@/stores/account";
-import { Services } from "@/stores/account/types";
 import Stack from "@/ui/components/Stack";
 import TypographyLegacy, { VARIANTS } from "@/ui/components/Typography";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
-import { Attachment, News as SkolengoNews } from "skolengojs";
 
 import HTMLView from "react-native-htmlview";
 import { HeaderBackButton, useTheme } from "expo-router/react-navigation";
@@ -59,29 +56,6 @@ const NewsPage = () => {
     const acknowledgeNews = async () => {
       if (!news.acknowledged) {
         const manager = getManager();
-
-        const store = useAccountStore.getState()
-        const account = store.accounts.find(account => account.id === store.lastUsedAccount)
-        const service = account?.services.find(service => service.id === news.createdByAccount)
-
-        if (service?.serviceId === Services.SKOLENGO) {
-          const attachment = new Attachment("", "", "")
-
-          news.ref = new SkolengoNews(
-            news.id,
-            news.createdAt,
-            news.title ?? "",
-            news.content,
-            news.content,
-            {
-              id: "",
-              name: "",
-            },
-            "",
-            attachment
-          );
-        }
-
         await manager?.setNewsAsDone(news);
       }
     };

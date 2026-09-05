@@ -1,5 +1,4 @@
 import { geolocation } from "@blockshub/pawnote-lts";
-import { School as SkolengoSkool,SearchSchools } from "skolengojs";
 import { t } from "i18next";
 
 import { Services } from "@/stores/account/types";
@@ -11,7 +10,7 @@ export interface School {
   name: string,
   distance: number,
   url: string,
-  ref?: SkolengoSkool
+  ref?: unknown
 }
 
 export async function fetchSchools(service: Services, alert: ReturnType<typeof useAlert>, city?: string): Promise<School[]> {
@@ -30,7 +29,7 @@ export async function fetchSchools(service: Services, alert: ReturnType<typeof u
     }
   }
 
-  if (city && service !== Services.SKOLENGO) {
+  if (city) {
     pos = await GeographicQuerying(city);
   }
 
@@ -42,51 +41,6 @@ export async function fetchSchools(service: Services, alert: ReturnType<typeof u
       url: item.url,
     }));
   }
-
-  if (service === Services.SKOLENGO) {
-    let cityName: string | undefined;
-
-    if (city) {
-      cityName = city;
-    }
-    else if (pos?.latitude && pos?.longitude) {
-      cityName = (await GeographicReverse(pos.latitude, pos.longitude)).city;
-    }
-    else {
-      return [];
-    }
-
-    const schools = await SearchSchools(cityName, 50);
-    const list: School[] = [];
-
-    for (const school of schools) {
-      let distance = 0;
-
-      if (pos?.latitude && pos?.longitude) {
-        if (school.location.addressLine?.trim() && school.location.city?.trim() && school.location.zipCode?.trim()) {
-          const position = await GeographicQuerying(
-            `${school.location.addressLine} ${school.location.city} ${school.location.zipCode}`
-          );
-          distance = calculateDistanceBetweenPositions(
-            pos.latitude,
-            pos.longitude,
-            position.longitude,
-            position.latitude
-          );
-        }
-      }
-
-      list.push({
-        name: school.name,
-        distance: distance / 1000,
-        url: "",
-        ref: school,
-      });
-    }
-
-    return list;
-  }
-
 
   return [];
 }

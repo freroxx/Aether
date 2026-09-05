@@ -1,9 +1,7 @@
 /* eslint-disable no-console */
-// Reporting (if consent has been given)
+// Local-only logging (no telemetry, no upload)
 import { useLogStore } from '@/stores/logs/index';
 import { LogType } from '@/stores/logs/types';
-import { checkConsent } from '@/utils/logger/consent';
-import { posthog } from '@/utils/logger/posthog';
 const format = "[%DATE%][%FROM%] %MESSAGE%";
 
 const typeList = ["LOG", "ERROR", "WARN", "INFO"];
@@ -57,11 +55,6 @@ function error(message: string, from?: string): Error {
   const functionName = obtainFunctionName(from)
   saveLog(date, message, LogType.ERROR, functionName);
   console.error(message);
-  checkConsent().then(consent => {
-    if (consent.given && consent.level !== "none") {
-      posthog.captureException(new Error(message));
-    }
-  });
   return new Error(message);
 }
 

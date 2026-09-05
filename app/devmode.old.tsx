@@ -22,7 +22,6 @@ import { MAGIC_URL } from "@/utils/endpoints";
 import { log } from "@/utils/logger/logger";
 import ModelManager from "@/utils/magic/ModelManager";
 import { scheduleNotificationAtDate } from "@/utils/notification/reminder/helper";
-import { initializeTransport } from "@/utils/transport";
 import NativeSwitch from "@/ui/native/NativeSwitch";
 
 export default function Devmode() {
@@ -430,37 +429,6 @@ export default function Devmode() {
           }}
         >
           <Typography variant="title">Faire une requête (GET)</Typography>
-        </Item>
-      </List>
-
-      <SectionHeader
-        title="Transport"
-        leading={
-          <Icon>
-            <Papicons name="Bus" size={18} />
-          </Icon>
-        }
-      />
-      <List>
-        <Item
-          onPress={() => {
-            initializeTransport(undefined).then(transport => {
-              console.log(transport);
-            });
-          }}
-        >
-          <Typography variant="title">Initialiser sans addresse</Typography>
-        </Item>
-        <Item
-          onPress={() => {
-            initializeTransport("106 Rue de la Pompe, 75016 Paris").then(
-              transport => {
-                console.log(transport);
-              }
-            );
-          }}
-        >
-          <Typography variant="title">Initialiser avec addresse</Typography>
         </Item>
       </List>
 

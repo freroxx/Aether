@@ -52,69 +52,6 @@ export function GetSupportedServices(redirect: (path: { pathname: string, option
       variant: 'service' as const,
       color: 'light' as const,
     },
-    {
-      name: "ed",
-      route: "ed",
-      title: t("ONBOARDING_SERVICE_ED"),
-      type: ["school"],
-      image: require("@/assets/images/service_ed.png"),
-      onPress: () => {
-        redirect({ pathname: './ecoledirecte/credentials', options: { service: Services.ECOLEDIRECTE } });
-      },
-      variant: 'service' as const,
-      color: 'light' as const,
-    },
-    {
-      name: "skolengo",
-      route: "skolengo",
-      title: t("ONBOARDING_SERVICE_SKOLENGO"),
-      type: ["school"],
-      image: require("@/assets/images/service_skolengo.png"),
-      onPress: () => {
-        redirect({ pathname: './school/method', options: { service: Services.SKOLENGO } });
-      },
-      variant: 'service' as const,
-      color: 'light' as const,
-    },
-    {
-      name: "univ-lorraine",
-      title: t("ONBOARDING_SERVICE_UNIV_LORRAINE"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/univ_lorraine.png"),
-      type: ["univ"],
-      onPress: () => {
-        redirect({ pathname: './services/multi/credentials', options: { color: "#000000", university: "ULorraine", url: "https://mobile-back.univ-lorraine.fr" } });
-      },
-    },
-    {
-      name: "univ-nimes",
-      title: t("ONBOARDING_SERVICE_UNIV_NIMES"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/univ_nimes.png"),
-      type: ["univ"],
-      onPress: () => {
-        redirect({ pathname: './services/multi/credentials', options: { color: "#FF341B", university: "UNîmes", url: "https://mobile-back.unimes.fr" } });
-      },
-    },
-    {
-      name: "univ-uphf",
-      title: t("ONBOARDING_SERVICE_UNIV_UPHF"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/univ_uphf.png"),
-      type: ["univ"],
-      onPress: () => {
-        redirect({ pathname: './services/multi/credentials', options: { color: "#008DB0", university: "UPHF", url: "https://appmob.uphf.fr/backend" } });
-      },
-    },
-    {
-      name: "appscho",
-      route: "appscho",
-      title: t("ONBOARDING_OTHER_UNIVERSITIES"),
-      image: require("@/assets/images/icon.png"),
-      hasLimitedSupport: false,
-      type: ["univ"],
-      onPress: () => { redirect({ pathname: './appscho/list' }) }
-    },
   ]
 }
 
@@ -128,87 +65,11 @@ export interface SupportedUniversity {
 }
 
 export function GetSupportedUniversities(redirect: (path: { pathname: string, options?: UnknownInputParams }) => void): SupportedUniversity[] {
+  void redirect;
   const { t } = useTranslation();
+  void t;
 
-  return [
-    {
-      name: "univ-lorraine",
-      title: t("ONBOARDING_SERVICE_UNIV_LORRAINE"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/univ_lorraine.png"),
-      type: "main",
-      onPress: () => {
-        redirect({ pathname: './services/multi/credentials', options: { color: "#000000", university: "ULorraine", url: "https://mobile-back.univ-lorraine.fr" } });
-      },
-    },
-    {
-      name: "univ-nimes",
-      title: t("ONBOARDING_SERVICE_UNIV_NIMES"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/univ_nimes.png"),
-      type: "main",
-      onPress: () => {
-        redirect({ pathname: './services/multi/credentials', options: { color: "#FF341B", university: "UNîmes", url: "https://mobile-back.unimes.fr" } });
-      },
-    },
-    {
-      name: "univ-uphf",
-      title: t("ONBOARDING_SERVICE_UNIV_UPHF"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/univ_uphf.png"),
-      type: "main",
-      onPress: () => {
-        redirect({ pathname: './services/multi/credentials', options: { color: "#008DB0", university: "UPHF", url: "https://appmob.uphf.fr/backend" } });
-      },
-    },
-    {
-      name: "appscho",
-      title: t("ONBOARDING_OTHER_UNIVERSITIES"),
-      hasLimitedSupport: false,
-      type: "other",
-      onPress: () => { redirect({ pathname: './appscho/list' }) }
-    },
-    /*{
-      name: "limited-functions",
-      title: t("Feature_Limited"),
-      hasLimitedSupport: true,
-      image: require("@/assets/images/icon.png"),
-      type: "separator",
-      onPress: () => { }
-    },
-    {
-      name: "univ-rennes-1",
-      title: "Université de Rennes 1",
-      hasLimitedSupport: true,
-      image: require("@/assets/images/univ_rennes1.png"),
-      type: "main",
-      onPress: () => { }
-    },
-    {
-      name: "univ-rennes-2",
-      title: "Université de Rennes 2",
-      hasLimitedSupport: true,
-      image: require("@/assets/images/univ_rennes2.png"),
-      type: "main",
-      onPress: () => { }
-    },
-    {
-      name: "univ-limoges",
-      title: "Université de Limoges",
-      type: "main",
-      hasLimitedSupport: true,
-      image: require("@/assets/images/univ_limoges.png"),
-      onPress: () => { }
-    },
-    {
-      name: "univ_paris_sorbonne",
-      title: "Université de Sorbonne Paris Nord",
-      hasLimitedSupport: true,
-      image: require("@/assets/images/univ_paris_sorbonne.png"),
-      type: "main",
-      onPress: () => { }
-    } */
-  ]
+  return [];
 }
 
 export interface LoginMethod {
@@ -225,7 +86,7 @@ export function GetLoginMethods(redirect: (path: { pathname: RelativePathString 
   return [
     {
       id: "map",
-      availableFor: [Services.PRONOTE, Services.SKOLENGO],
+      availableFor: [Services.PRONOTE],
       description: t("ONBOARDING_METHOD_POSITION"),
       icon: <Papicons name={"MapPin"} />,
       onPress: async () => {
@@ -234,7 +95,7 @@ export function GetLoginMethods(redirect: (path: { pathname: RelativePathString 
     },
     {
       id: "search",
-      availableFor: [Services.PRONOTE, Services.SKOLENGO],
+      availableFor: [Services.PRONOTE],
       description: t("ONBOARDING_METHOD_SEARCH"),
       icon: <Papicons name={"Search"} />,
       onPress: () => {
@@ -272,46 +133,5 @@ export interface SupportedRestaurant {
 }
 
 export function GetSupportedRestaurants(redirect: (path: { pathname: string }) => void): SupportedRestaurant[] {
-  return [
-    {
-      name: "turboself",
-      title: t("ONBOARDING_SERVICE_TURBOSELF"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/turboself.png"),
-      type: "main",
-      onPress: () => {
-        redirect({ pathname: '/(onboarding)/restaurants/turboself' });
-      }
-    },/*
-    {
-      name: "ard",
-      title: t("ONBOARDING_SERVICE_ARD"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/ard.png"),
-      type: "main",
-      onPress: () => {
-        redirect({ pathname: '/(onboarding)/restaurants/ard' });
-      }
-    },*/
-    {
-      name: "izly",
-      title: t("ONBOARDING_SERVICE_IZLY"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/izly.png"),
-      type: "main",
-      onPress: () => {
-        redirect({ pathname: '/(onboarding)/restaurants/izly' });
-      }
-    },
-    {
-      name: "alise",
-      title: t("ONBOARDING_SERVICE_ALISE"),
-      hasLimitedSupport: false,
-      image: require("@/assets/images/alise.jpg"),
-      type: "main",
-      onPress: () => {
-        redirect({ pathname: '/(onboarding)/restaurants/alise' });
-      }
-    }
-  ]
+  return [];
 }

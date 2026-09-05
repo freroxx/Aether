@@ -4,7 +4,6 @@ import React, { useMemo, useRef } from "react";
 import { Dimensions,FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Course as SharedCourse, CourseStatus } from "@/services/shared/timetable";
-import { TransportStorage } from "@/stores/account/types";
 import Course from "@/ui/components/Course";
 import { Colors, getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectName } from '@/utils/subjects/name';
@@ -21,7 +20,6 @@ interface CalendarDayProps {
   headerHeight: number;
   insets: any;
   tabBarHeight: number;
-  transportInfo?: TransportStorage;
 }
 
 function areCoursesEquivalent(a: SharedCourse[], b: SharedCourse[]) {
@@ -46,7 +44,7 @@ function areCoursesEquivalent(a: SharedCourse[], b: SharedCourse[]) {
   return true;
 }
 
-export const CalendarDay = React.memo(({ dayDate, courses, isRefreshing, onRefresh, colors, headerHeight, insets, tabBarHeight, transportInfo }: CalendarDayProps) => {
+export const CalendarDay = React.memo(({ dayDate, courses, isRefreshing, onRefresh, colors, headerHeight, insets, tabBarHeight }: CalendarDayProps) => {
   // Cache to preserve event object identity by id
   const eventCache = useRef<{ [id: string]: any }>({});
 

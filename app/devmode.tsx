@@ -19,7 +19,6 @@ import { useSettingsStore } from "@/stores/settings";
 import { useMagicStore } from "@/stores/magic";
 import ModelManager from "@/utils/magic/ModelManager";
 import { MAGIC_URL } from "@/utils/endpoints";
-import { initializeTransport } from "@/utils/transport";
 import LogIcon from "@/components/Log/LogIcon";
 import { getManager, initializeAccountManager } from "@/services/shared";
 import { warn } from "@/utils/logger/logger";
@@ -286,28 +285,6 @@ export default function DevMode() {
               </Icon>
             </List.Leading>
             <Typography variant="action">Ouvrir le modal de bienvenue</Typography>
-          </List.Item>
-        </List.Section>
-        <List.Section>
-          <List.SectionTitle>
-            <Papicons name="Bus" color={colors.text + 88} />
-            <List.Label>Transport</List.Label>
-          </List.SectionTitle>
-          <List.Item onPress={() => handlePress(() => {
-            initializeTransport(undefined).then(transport => {
-              console.log(transport);
-            });
-          })}>
-            <Typography variant="action">Initialiser sans adresse</Typography>
-          </List.Item>
-          <List.Item onPress={() => handlePress(() => {
-            initializeTransport("106 Rue de la Pompe, 75016 Paris").then(
-              transport => {
-                console.log(transport);
-              }
-            );
-          })}>
-            <Typography variant="action">Initialiser avec une adresse</Typography>
           </List.Item>
         </List.Section>
         <List.Section>

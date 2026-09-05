@@ -1,6 +1,3 @@
-import * as Ezly from "ezly";
-import { Skolengo } from "skolengojs";
-
 /**
  * Represents the storage structure for user accounts.
  *
@@ -29,11 +26,6 @@ export interface AccountsStorage {
     subjects: Record<string, { color: string; emoji: string; name: string }>
   ) => void;
   setAccountProfilePicture: (accountId: string, profilePicture: string) => void;
-  setTransportEnabled: (transportEnabled: boolean) => void;
-  setTransportService: (id: string) => void;
-  setTransportHomeAddress: (address: TransportAddress) => void;
-  setTransportSchoolAddress: (address: TransportAddress) => void;
-  initializeTransport: (address: string | undefined) => void;
 }
 
 /**
@@ -56,7 +48,6 @@ export interface Account {
   schoolName?: string;
   className?: string;
   customisation?: CustomisationStorage;
-  transport?: TransportStorage;
   services: ServiceAccount[];
   createdAt: string;
   updatedAt: string;
@@ -69,21 +60,6 @@ export interface CustomisableSubject {
 export interface CustomisationStorage {
   profilePicture: string;
   subjects: Record<string, CustomisableSubject>;
-}
-
-export interface TransportAddress {
-  firstTitle: string;
-  secondTitle: string;
-  address: string;
-  longitude: number;
-  latitude: number;
-}
-
-export interface TransportStorage {
-  enabled: boolean;
-  homeAddress?: TransportAddress;
-  schoolAddress?: TransportAddress;
-  defaultApp: string;
 }
 
 /**
@@ -111,25 +87,16 @@ export interface ServiceAccount {
  *
  * @property {string} [accessToken] - Optional access token used for authentication.
  * @property {string} [refreshToken] - Optional refresh token used to obtain new access tokens.
- * @property {Skolengo} [session] - Optional, used in some libraries like Skolengo.js
  * @property {string} [additionals] - Optional record containing additional authentication-related key-value pairs.
  */
 export interface Auth {
   accessToken?: string;
   refreshToken?: string;
-  session?: Skolengo | Ezly.Identification;
+  session?: unknown;
   additionals?: Record<string, string | number>;
 }
 
 export enum Services {
   PRONOTE,
-  SKOLENGO,
-  ECOLEDIRECTE,
-  TURBOSELF,
-  ARD,
-  IZLY,
-  MULTI,
-  ALISE,
-  APPSCHO,
   MOCK_DATA = 10,
 }

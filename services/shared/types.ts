@@ -1,13 +1,5 @@
-import { Client } from "@blockshub/blocksdirecte";
-import { User } from "@blockshub/blockscho";
-import { Multi as MultiClient } from "esup-multi.js";
-import { Identification } from "ezly";
 import { SessionHandle } from "@blockshub/pawnote-lts";
-import { Client as ArdClient } from "@blockshub/blocksrd";
-import { Skolengo as SkolengoSession } from "skolengojs";
-import { Client as TurboselfClient } from "turboself-api";
 
-import { Appscho } from "@/services/appscho";
 import type { MockData } from "@/services/mock";
 import { Pronote } from "@/services/pronote";
 import { Attendance } from "@/services/shared/attendance";
@@ -26,13 +18,6 @@ import { News } from "@/services/shared/news";
 import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
 import { Auth, Services } from "@/stores/account/types";
 
-import { Alise } from "../alise";
-import { ARD } from "../ard";
-import { EcoleDirecte } from "../ecoledirecte";
-import { Izly } from "../izly";
-import { Multi } from "../multi";
-import { Skolengo } from "../skolengo";
-import { TurboSelf } from "../turboself";
 import { Balance } from "./balance";
 import { Kid } from "./kid";
 
@@ -50,19 +35,12 @@ export interface SchoolServicePlugin {
   requiresInternet?: boolean;
   session:
     | any
-    | Identification
-    | MultiClient
     | SessionHandle
-    | SkolengoSession
-    | Client
-    | ArdClient
-    | TurboselfClient
-    | User
     | undefined;
 
   refreshAccount: (
     credentials: Auth
-  ) => Promise<Pronote | Skolengo | EcoleDirecte | Multi | TurboSelf | ARD | Izly | Alise | Appscho | MockData>;
+  ) => Promise<Pronote | MockData>;
   getKids?: () => Kid[];
   getCanteenKind?: () => CanteenKind;
   getHomeworks?: (weekNumber: number) => Promise<Homework[]>;

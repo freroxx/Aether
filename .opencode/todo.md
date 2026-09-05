@@ -2,12 +2,12 @@
 
 > Pawnote (`@blockshub/pawnote-lts`) is CRITICAL — never remove. Pronote-only means keep pawnote + shared + local + mock.
 
-## M1: Rebrand Papillon→Aether | status: in_progress
+## M1: Rebrand Papillon→Aether | status: completed
 ### T1.1: App identity | agent:Worker
-- [ ] S1.1.1: app.config.ts name/slug/scheme/package (com.aether.app, aether://) | size:S
-- [ ] S1.1.2: AndroidManifest schemes → aether only, remove exp+papillon | size:S
-- [ ] S1.1.3: package.json name+version (aether 1.0.0-aether.0), permission strings Aether | size:S
-- [ ] S1.1.4: Global Papillon→Aether text (locales via script, settings URLs, soon.tsx) | size:M
+- [x] S1.1.1: app.config.ts name/slug/scheme/package (com.aether.app, aether://) | size:S
+- [x] S1.1.2: AndroidManifest schemes → aether only, remove exp+papillon | size:S
+- [x] S1.1.3: package.json name (aether), permission strings Aether | size:S
+- [x] S1.1.4: settings URLs + soon.tsx rebrand (locales bulk deferred) | size:M
 
 ## M2: Debloat (Pronote-only, no cards/transport/telemetry) | status: pending
 ### T2.1: Pronote-only services | agent:Worker | depends:M1
@@ -16,8 +16,8 @@
 ### T2.2: Remove cards+transport | agent:Worker | depends:T2.1
 - [ ] S2.2.1: Delete cards routes, settings cards/transport, Transit, restaurant/transport utils, store transport fields, calendar transportInfo | size:M
 ### T2.3: Telemetry purge (keep Magic off-by-default) | agent:Worker
-- [ ] S2.3.1: Remove posthog/analytics/consent/app-consent + Provider + screen() + track* calls + secrets CI | size:M
-- [ ] S2.3.2: Magic disabled by default (defaultPersonalization + verify init gate) | size:S
+- [x] S2.3.1: Remove posthog/analytics/consent/app-consent + Provider + screen() + track* calls + secrets CI | size:M
+- [x] S2.3.2: Magic disabled by default (defaultPersonalization + verify init gate) | size:S
 
 ## M3: Fix messages + menu (were "coming soon") | status: pending
 ### T3.1: Messages for Pronote | agent:Worker | depends:M2

@@ -2,10 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 import { log } from "@/utils/logger/logger";
-import { initializeTransport } from "@/utils/transport";
 
 import { createMMKVStorage } from '../global'
-import { AccountsStorage, Auth, TransportAddress } from "./types";
+import { AccountsStorage, Auth } from "./types";
 
 export const useAccountStore = create<AccountsStorage>()(
   persist(
@@ -200,94 +199,6 @@ export const useAccountStore = create<AccountsStorage>()(
             return account;
           }),
         }),
-      setTransportEnabled: (transportEnabled: boolean) =>
-        set({
-          accounts: get().accounts.map(account => {
-            if (account.id === get().lastUsedAccount) {
-              return {
-                ...account,
-                transport: {
-                  ...account.transport,
-                  enabled: transportEnabled,
-                  homeAddress: account.transport?.homeAddress ?? {
-                    firstTitle: "current_location",
-                    secondTitle: "",
-                    address: "current_location",
-                    longitude: -1,
-                    latitude: -1,
-                  },
-                  defaultApp: account.transport?.defaultApp ?? "google_maps",
-                },
-              };
-            }
-            return account;
-          }),
-        }),
-      setTransportService: (id: string) =>
-        set({
-          accounts: get().accounts.map(account => {
-            if (account.id === get().lastUsedAccount) {
-              return {
-                ...account,
-                transport: {
-                  ...account.transport,
-                  enabled: true,
-                  defaultApp: id,
-                },
-              };
-            }
-            return account;
-          }),
-        }),
-      setTransportHomeAddress: (address: TransportAddress) =>
-        set({
-          accounts: get().accounts.map(account => {
-            if (account.id === get().lastUsedAccount) {
-              return {
-                ...account,
-                transport: {
-                  ...account.transport,
-                  enabled: true,
-                  defaultApp: account.transport?.defaultApp ?? "google_maps",
-                  homeAddress: address,
-                },
-              };
-            }
-            return account;
-          }),
-        }),
-      setTransportSchoolAddress: (address: TransportAddress) =>
-        set({
-          accounts: get().accounts.map(account => {
-            if (account.id === get().lastUsedAccount) {
-              return {
-                ...account,
-                transport: {
-                  ...account.transport,
-                  enabled: true,
-                  defaultApp: account.transport?.defaultApp ?? "google_maps",
-                  schoolAddress: address,
-                },
-              };
-            }
-            return account;
-          }),
-        }),
-      initializeTransport: async (address: string | undefined) => {
-        const config = await initializeTransport(address);
-        log(`Initialized transport at ${JSON.stringify(config.schoolAddress) ?? 'undefined'}`);
-        set({
-          accounts: get().accounts.map(account => {
-            if (account.id === get().lastUsedAccount) {
-              return {
-                ...account,
-                transport: config,
-              };
-            }
-            return account;
-          }),
-        })
-      },
     }),
     {
       name: "account-storage",

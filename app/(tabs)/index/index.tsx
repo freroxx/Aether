@@ -40,10 +40,6 @@ const HomeScreen = () => {
       router.replace("/(onboarding)/welcome");
       return;
     }
-
-    if (account && account.transport === undefined) {
-      store.initializeTransport(account.schoolName);
-    }
   }, [account, accounts.length, router, store]);
 
   useHomeData();

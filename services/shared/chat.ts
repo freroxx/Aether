@@ -1,5 +1,4 @@
 import { Discussion, NewDiscussionRecipient } from "@blockshub/pawnote-lts";
-import { Mail, Recipients } from "skolengojs";
 
 import { Attachment } from "@/services/shared/attachment";
 import { GenericInterface } from "@/services/shared/types";
@@ -10,14 +9,14 @@ export interface Chat extends GenericInterface {
   recipient?: string;
   creator?: string;
   date: Date;
-  ref?: Discussion | Mail;
+  ref?: Discussion;
 }
 
 export interface Recipient {
   id: string;
   name: string;
   class?: string;
-  ref?: NewDiscussionRecipient | Recipients
+  ref?: NewDiscussionRecipient
 }
 
 export interface Message {

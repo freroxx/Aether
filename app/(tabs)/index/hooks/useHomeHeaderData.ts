@@ -4,7 +4,6 @@ import { Attendance } from '@/services/shared/attendance';
 import { Period } from '@/services/shared/grade';
 import { getCurrentPeriod } from '@/utils/grades/helper/period';
 import { useAccountStore } from '@/stores/account';
-import { Services } from '@/stores/account/types';
 import { useNews } from '@/database/useNews';
 
 export const useHomeHeaderData = () => {
@@ -13,16 +12,7 @@ export const useHomeHeaderData = () => {
   const account = accounts.find((a) => a.id === lastUsedAccount);
 
   const availableCanteenCards = useMemo(
-    () =>
-      account?.services.filter(service =>
-        [
-          Services.TURBOSELF,
-          Services.ALISE,
-          Services.ARD,
-          Services.ECOLEDIRECTE,
-          Services.IZLY,
-        ].includes(service.serviceId)
-      ) ?? [],
+    () => [],
     [account]
   );
 

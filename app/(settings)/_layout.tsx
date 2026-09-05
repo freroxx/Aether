@@ -58,16 +58,6 @@ export default function Layout() {
         />
 
         <Stack.Screen
-          name="cards"
-          options={{
-            headerShown: true,
-            headerTitle: t("Settings_Cards_Title"),
-            headerLargeTitle: false,
-            headerBackButtonDisplayMode: "minimal",
-            gestureEnabled: true,
-          }}
-        />
-        <Stack.Screen
           name="about"
           options={{
             headerTitle: t("Settings_About_Title"),
@@ -133,12 +123,6 @@ export default function Layout() {
             headerLargeTitle: false,
           }}
         />
-        {/*<Stack.Screen
-          name="transport"
-          options={{
-            headerTitle: t("Settings_Transport_Title"),
-          }}
-        />*/}
         <Stack.Screen
           name="features"
           options={{

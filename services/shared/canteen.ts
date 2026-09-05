@@ -1,6 +1,3 @@
-import { BookingDay as TurboBookingDay } from "turboself-api";
-import { BookingDay as AliseBookingDay } from "alise-api";
-
 import { GenericInterface } from "./types";
 
 export interface CanteenMenu extends GenericInterface {
@@ -50,7 +47,7 @@ export interface Booking extends GenericInterface  {
 	label: string,
 	canBook: boolean,
 	booked: boolean,
-	ref?: TurboBookingDay
+	ref?: unknown
 }
 
 export enum CanteenKind {

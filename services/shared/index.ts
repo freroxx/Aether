@@ -621,54 +621,6 @@ export class AccountManager {
       return new module.Pronote(service.id);
     }
 
-    if (service.serviceId === Services.SKOLENGO) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/skolengo/index");
-      return new module.Skolengo(service.id);
-    }
-
-    if (service.serviceId === Services.ECOLEDIRECTE) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/ecoledirecte/index");
-      return new module.EcoleDirecte(service.id);
-    }
-
-    if (service.serviceId === Services.MULTI) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/multi/index");
-      return new module.Multi(service.id);
-    }
-
-    if (service.serviceId === Services.TURBOSELF) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/turboself/index");
-      return new module.TurboSelf(service.id);
-    }
-
-    if (service.serviceId === Services.ARD) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/ard/index");
-      return new module.ARD(service.id);
-    }
-
-    if (service.serviceId === Services.IZLY) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/izly/index");
-      return new module.Izly(service.id);
-    }
-
-    if (service.serviceId === Services.ALISE) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/alise/index");
-      return new module.Alise(service.id);
-    }
-
-    if (service.serviceId === Services.APPSCHO) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const module = require("@/services/appscho/index");
-      return new module.Appscho(service.id);
-    }
-
     if (service.serviceId === Services.MOCK_DATA) {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const module = require("@/services/mock/index");
