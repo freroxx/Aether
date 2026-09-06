@@ -38,6 +38,10 @@ export default function OnboardingLayout() {
           options={{ ...newScreenOptions, title: t("ONBOARDING_HEADER_ENT_LOGIN"), presentation: "modal", headerBackground: null }}
         />
         <Stack.Screen
+          name="credentials"
+          options={{ ...newScreenOptions, title: t("ONBOARDING_LOGIN_CREDENTIALS") }}
+        />
+        <Stack.Screen
           name="qrcode"
           options={{ ...newScreenOptions, title: t("ONBOARDING_HEADER_QRCODE_LOGIN") }}
         />

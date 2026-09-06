@@ -111,7 +111,7 @@ const GradeItem = React.memo(({ grade, subjectName, subjectColor }: { grade: Gra
                   color={trailingForeground + "99"}
                   variant="body2"
                 >
-                  /{grade.outOf.value}
+                  /{grade.outOf?.value ?? 20}
                 </LegacyTypography>
               </>
             )
@@ -144,18 +144,18 @@ export const SubjectItem: React.FC<{ subject: Subject, displayScale: GradeDispla
   const subjectName = useMemo(() => getSubjectName(subject.name), [subject.name]);
   const subjectEmoji = useMemo(() => getSubjectEmoji(subject.name), [subject.name]);
   const displayedSubjectAverage = useMemo(() => {
-    return formatScoreForDisplay(subject.studentAverage.value, subject.outOf.value, displayScale);
-  }, [subject.studentAverage.value, subject.outOf.value, displayScale]);
+    return formatScoreForDisplay(subject.studentAverage.value, subject.outOf?.value ?? 20, displayScale);
+  }, [subject.studentAverage.value, subject.outOf?.value, displayScale]);
   const displayedMaximumAverage = useMemo(() => {
-    return formatScoreForDisplay(subject.maximum?.value, subject.outOf.value, displayScale).value;
-  }, [subject.maximum?.value, subject.outOf.value, displayScale]);
+    return formatScoreForDisplay(subject.maximum?.value ?? 0, subject.outOf?.value ?? 20, displayScale).value;
+  }, [subject.maximum?.value, subject.outOf?.value, displayScale]);
   const computedSubjectAverage = useMemo(() => {
     const calculatedAverage = getSubjectAverage(subject.grades as unknown as ServiceGrade[]);
     if (calculatedAverage === -1) {
       return null;
     }
-    return formatScoreForDisplay(calculatedAverage, subject.outOf.value, displayScale);
-  }, [subject.grades, subject.outOf.value, displayScale]);
+    return formatScoreForDisplay(calculatedAverage, subject.outOf?.value ?? 20, displayScale);
+  }, [subject.grades, subject.outOf?.value, displayScale]);
   const isUnknownSubjectAverage = useMemo(() => {
     if (!subject.studentAverage.disabled) {
       return false;
@@ -253,9 +253,9 @@ export const SubjectItem: React.FC<{ subject: Subject, displayScale: GradeDispla
                       color={theme.colors.text + "99"}
                       style={{ marginBottom: 4 }}
                     >
-                      {isUnknownSubjectAverage && computedSubjectAverage
+                      {(isUnknownSubjectAverage && computedSubjectAverage
                         ? computedSubjectAverage.denominator
-                        : displayedSubjectAverage.denominator}
+                        : displayedSubjectAverage.denominator) ?? "/20"}
                     </LegacyTypography>
                   </>
                 )}

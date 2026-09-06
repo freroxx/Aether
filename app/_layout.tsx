@@ -3,10 +3,10 @@ import 'react-native-reanimated';
 import "@/utils/i18n";
 
 import { Buffer } from 'buffer';
+import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 
 import { AppProviders } from '@/components/AppProviders';
-import FakeSplash from '@/components/FakeSplash';
 import { RootNavigator } from '@/components/RootNavigator';
 import { useAppInitialization } from '@/hooks/useAppInitialization';
 import { useNetworkStore } from '@/stores/logs';
@@ -31,6 +31,8 @@ LogBox.ignoreLogs([
 
 export default function RootLayout() {
   const { isAppReady, fontsLoaded } = useAppInitialization();
+
+  useEffect(() => { if (isAppReady) { SplashScreen.hideAsync().catch(() => { }); } }, [isAppReady]);
 
   useEffect(() => {
     if (!__DEV__) { return; }
@@ -69,7 +71,6 @@ export default function RootLayout() {
 
   return (
     <AppProviders>
-      <FakeSplash isAppReady={isAppReady} instant={false} />
       <RootNavigator />
     </AppProviders>
   );

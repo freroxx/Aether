@@ -38,6 +38,15 @@ export interface Wallpaper {
   isBundled?: boolean;
 }
 
+export interface NotificationsPrefs {
+  tasksEnabled?: boolean;
+  tasksDelayMin?: number;
+  notesEnabled?: boolean;
+  messagesEnabled?: boolean;
+  permissionGranted?: boolean;
+  lastNotifiedTaskIds?: string[];
+}
+
 export interface Personalization {
   fontFamily?: AppFontFamily;
   gradesDisplayScale?: "20" | "10" | "5" | "percentage";
@@ -62,4 +71,11 @@ export interface Personalization {
   enabledCalendarIds?: string[];
   showWeekendsOnTimetable?: boolean;
   pronoteApiUrl?: string;
+  notifications?: NotificationsPrefs;
+  /** Flat notifications prefs (contract): Tasks live, Notes/Messages locked. */
+  notificationsTasksEnabled?: boolean;
+  notificationsTasksDelayMin?: number;
+  notificationsNotesEnabled?: boolean;
+  notificationsMessagesEnabled?: boolean;
+  lastNotifiedTaskIds?: string[];
 }

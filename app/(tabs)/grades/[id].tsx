@@ -339,7 +339,7 @@ export default function GradesModal() {
                     }
                     denominator={"/" + (grade.outOf?.value ?? 20)}
                   >
-                    {grade.averageScore?.value.toFixed(2)}
+                    {grade.averageScore?.value != null ? grade.averageScore.value.toFixed(2) : "—"}
                   </ContainedNumber>
                 </Stack>
               </Stack>
@@ -429,7 +429,7 @@ export default function GradesModal() {
                   }
                   denominator={"/" + (grade.outOf?.value ?? 20)}
                 >
-                  {grade.maxScore?.value.toFixed(2)}
+                  {grade.maxScore?.value != null ? grade.maxScore.value.toFixed(2) : "—"}
                 </ContainedNumber>
               </List.Trailing>
             </List.Item>
@@ -455,7 +455,7 @@ export default function GradesModal() {
                   }
                   denominator={"/" + (grade.outOf?.value ?? 20)}
                 >
-                  {grade.minScore?.value.toFixed(2)}
+                  {grade.minScore?.value != null ? grade.minScore.value.toFixed(2) : "—"}
                 </ContainedNumber>
               </List.Trailing>
             </List.Item>

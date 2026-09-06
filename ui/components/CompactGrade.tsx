@@ -54,6 +54,7 @@ export const CompactGrade = ({
   const trailingBase = adjust(color, theme.dark ? 0.2 : -0.4);
   const trailingBackground = hasMaxScore ? trailingBase : trailingBase + "15";
   const trailingForeground = hasMaxScore ? "#FFFFFF" : trailingBase;
+  const safeOutOf = outOf ?? 20;
 
   return (
     <CompactGradeContainer color={color}>
@@ -239,7 +240,7 @@ export const CompactGrade = ({
                 </>
               ) : (
                 <>
-                  {score ? (
+                  {score !== undefined && score !== null ? (
                     <>
                       <Typography
                         color={trailingForeground}
@@ -251,7 +252,7 @@ export const CompactGrade = ({
                         color={trailingForeground + "99"}
                         variant="body2"
                       >
-                        /{outOf ?? 20}
+                        /{safeOutOf}
                       </Typography>
                     </>
                   ) : (

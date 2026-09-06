@@ -79,6 +79,7 @@
   "ONBOARDING_LAST_NAME": "Nom",
   "ONBOARDING_CREATE_ACCOUNT": "Créer le compte",
   "ONBOARDING_CANCEL": "Annuler",
+  "ONBOARDING_SERVICE_SELECTION_TITLE_PARENTS": "Sélectionne ton service (Espace Parents)",
   "ONBOARDING_SERVICE_SELECTION_TITLE_UNIV": "Quel service souhaites-tu utiliser ?",
   "ONBOARDING_SERVICE_SELECTION_TITLE_SCHOOL": "Quelle application utilises-tu habituellement ?",
   "ONBOARDING_SERVICE_SELECTION_DESCRIPTION": "Sélectionne le service que tu as l’habitude d’utiliser dans ton établissement.",

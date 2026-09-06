@@ -337,7 +337,7 @@ const GradesView: React.FC = () => {
           </ErrorBoundary>
 
           {serviceRank && (
-            <List style={{ marginTop: 8 }}>
+            <List style={{ marginTop: 12 }}>
               <List.Item>
                 <List.Leading>
                   <Icon opacity={0.5}>
@@ -360,10 +360,10 @@ const GradesView: React.FC = () => {
                     hAlign="end"
                   >
                     <LegacyTypography variant="h3" inline color="text">
-                      {serviceRank.value}
+                      {serviceRank.value ?? "—"}
                     </LegacyTypography>
                     <LegacyTypography variant="body1" inline color="secondary">
-                      /{serviceRank.outOf}
+                      /{serviceRank.outOf ?? 20}
                     </LegacyTypography>
                   </Stack>
                 </List.Trailing>

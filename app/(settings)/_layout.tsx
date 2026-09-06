@@ -141,6 +141,15 @@ export default function Layout() {
             headerLargeTitle: false,
           }}
         />
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerTitle: "Notifications",
+            headerBackButtonDisplayMode: "minimal",
+            headerTransparent: false,
+            headerLargeTitle: false,
+          }}
+        />
       </Stack>
     </>
   );

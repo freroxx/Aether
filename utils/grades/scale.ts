@@ -51,12 +51,14 @@ export const formatScoreForDisplay = (
   outOf: number,
   scale: GradeDisplayScale,
 ): { value: number; denominator: string } => {
-  if (outOf === 20) {
-    return formatAssumed20ForDisplay(value, scale);
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const safeOutOf = Number.isFinite(outOf) ? outOf : 20;
+  if (safeOutOf === 20) {
+    return formatAssumed20ForDisplay(safeValue, scale);
   }
 
   return {
-    value,
-    denominator: `/${outOf}`,
+    value: safeValue,
+    denominator: `/${safeOutOf}`,
   };
 };

@@ -23,7 +23,7 @@ const PronoteSearchHeader = memo(({
 
   const submitURL = () => {
     if (url.trim().length === 0) {return;}
-    navigation.navigate("browser", { url, accountType });
+    navigation.navigate("credentials", { url, accountType });
   };
 
   const urlValid = url.trim().length > 0 && (url.startsWith("http://") || url.startsWith("https://"));

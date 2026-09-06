@@ -80,7 +80,7 @@ export default function PronoteLoginSelectEtab() {
   const filteredSchools = schools.filter(school => school.name.toLowerCase().includes(search.toLowerCase()));
 
   const selectSchool = (school: School) => {
-    navigation.navigate("browser", { url: school.url, school, accountType });
+    navigation.navigate("credentials", { url: school.url, school, accountType });
   }
 
   return (

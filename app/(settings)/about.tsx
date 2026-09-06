@@ -1,23 +1,19 @@
 import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
-import { useRouter } from "expo-router";
-import { Github, Heart, Info, Lock, ShieldCheck, Sparkles } from "lucide-react-native";
+import { Github, ShieldCheck } from "lucide-react-native";
 import React, { useState } from "react";
-import { Alert, Linking, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Linking, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import packageJson from "@/package.json";
 import { useSettingsStore } from "@/stores/settings";
 import Avatar from "@/ui/components/Avatar";
-import Icon from "@/ui/components/Icon";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
-import { getInitials } from "@/utils/chats/initials";
 
 export default function SettingsAbout() {
   const theme = useTheme();
   const { colors, dark } = theme;
-  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const settingsStore = useSettingsStore(state => state.personalization);
@@ -81,58 +77,7 @@ export default function SettingsAbout() {
         >
           Fork moderne et indépendant de Papillon, exclusivement pensé pour Pronote et optimisé pour Android.
         </Typography>
-
-        {/* Feature Badges Row */}
-        <View style={styles.badgeRow}>
-          <View style={[styles.pillBadge, { backgroundColor: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" }]}>
-            <ShieldCheck size={14} color="#29947A" />
-            <Typography variant="caption" weight="bold" style={{ color: "#29947A" }}>
-              100% FOSS
-            </Typography>
-          </View>
-
-          <View style={[styles.pillBadge, { backgroundColor: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" }]}>
-            <Lock size={14} color="#29947A" />
-            <Typography variant="caption" weight="bold" style={{ color: "#29947A" }}>
-              Zéro pistage
-            </Typography>
-          </View>
-
-          <View style={[styles.pillBadge, { backgroundColor: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" }]}>
-            <Sparkles size={14} color="#29947A" />
-            <Typography variant="caption" weight="bold" style={{ color: "#29947A" }}>
-              Pronote-only
-            </Typography>
-          </View>
-        </View>
       </View>
-
-      {/* Team section */}
-      <List.Section>
-        <List.SectionTitle>
-          <List.Label>Équipe Aether</List.Label>
-        </List.SectionTitle>
-
-        <List.Item onPress={() => Linking.openURL("https://github.com/freroxx")}>
-          <List.Leading>
-            <Avatar
-              size={42}
-              shape="square"
-              initials="FX"
-              imageUrl="https://github.com/freroxx.png"
-            />
-          </List.Leading>
-          <Typography variant="title" weight="bold">
-            Frerox
-          </Typography>
-          <Typography variant="body1" color="textSecondary">
-            Créateur & Mainteneur principal (@freroxx)
-          </Typography>
-          <List.Trailing>
-            <Github size={20} color={colors.text} style={{ opacity: 0.6 }} />
-          </List.Trailing>
-        </List.Item>
-      </List.Section>
 
       {/* Community and links */}
       <List.Section>
@@ -152,45 +97,7 @@ export default function SettingsAbout() {
             Dépôt GitHub
           </Typography>
           <Typography variant="body1" color="textSecondary">
-            Consulter le code source, signaler un bug ou contribuer
-          </Typography>
-          <List.Trailing>
-            <Papicons name="ChevronRight" opacity={0.5} size={20} />
-          </List.Trailing>
-        </List.Item>
-
-        <List.Item
-          onPress={() => Linking.openURL("https://github.com/freroxx/Aether/issues")}
-        >
-          <List.Leading>
-            <View style={styles.iconCircle}>
-              <Info size={20} color={colors.text} />
-            </View>
-          </List.Leading>
-          <Typography variant="title" weight="bold">
-            Signaler un problème
-          </Typography>
-          <Typography variant="body1" color="textSecondary">
-            Proposer une amélioration ou rapporter un dysfonctionnement
-          </Typography>
-          <List.Trailing>
-            <Papicons name="ChevronRight" opacity={0.5} size={20} />
-          </List.Trailing>
-        </List.Item>
-
-        <List.Item
-          onPress={() => router.push("/(settings)/contributors")}
-        >
-          <List.Leading>
-            <View style={styles.iconCircle}>
-              <Heart size={20} color="#E05D34" />
-            </View>
-          </List.Leading>
-          <Typography variant="title" weight="bold">
-            Contributeurs
-          </Typography>
-          <Typography variant="body1" color="textSecondary">
-            Remerciements aux personnes qui aident le projet
+            Code source du projet
           </Typography>
           <List.Trailing>
             <Papicons name="ChevronRight" opacity={0.5} size={20} />
@@ -265,21 +172,6 @@ const styles = StyleSheet.create({
   },
   heroLogoContainer: {
     marginBottom: 4,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 6,
-  },
-  pillBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
   },
   iconCircle: {
     width: 38,

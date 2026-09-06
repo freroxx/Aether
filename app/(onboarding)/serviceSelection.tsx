@@ -47,7 +47,7 @@ export default function ServiceSelection() {
     case "univ":
       return t("ONBOARDING_SERVICE_SELECTION_TITLE_UNIV");
     case "parents":
-      return "Sélectionne ton service (Espace Parents)";
+      return t("ONBOARDING_SERVICE_SELECTION_TITLE_PARENTS");
     default:
       return t("ONBOARDING_SERVICE_SELECTION_TITLE_SCHOOL");
     }

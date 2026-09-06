@@ -3,7 +3,7 @@ import { useTheme, useHeaderHeight } from "expo-router/react-navigation";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { t } from "i18next";
-import { Calendar, InfoIcon, Palette, Sparkles, User, ShieldCheck } from "lucide-react-native";
+import { Calendar, InfoIcon, Palette, Sparkles, User, ShieldCheck, Bell } from "lucide-react-native";
 import React, { useCallback, useMemo } from "react";
 import { Alert, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -94,6 +94,12 @@ export default function SettingsIndex() {
           description: "Synchroniser avec les agendas de l'appareil",
           icon: <Calendar size={20} color={theme.colors.primary} />,
           onPress: () => router.push("/(settings)/android-calendars"),
+        },
+        {
+          title: "Notifications",
+          description: "Rappels de devoirs et alertes",
+          icon: <Bell size={20} color={theme.colors.primary} />,
+          onPress: () => router.push("/(settings)/notifications"),
         },
       ],
     },

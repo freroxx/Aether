@@ -23,6 +23,19 @@ const defaultPersonalization: Personalization = {
   mockDataEnabled: false,
   gradesDisplayScale: "20",
   welcomeModalSeen: false,
+  notifications: {
+    tasksEnabled: false,
+    tasksDelayMin: 120,
+    notesEnabled: false,
+    messagesEnabled: false,
+    permissionGranted: false,
+    lastNotifiedTaskIds: [],
+  },
+  notificationsTasksEnabled: false,
+  notificationsTasksDelayMin: 120,
+  notificationsNotesEnabled: false,
+  notificationsMessagesEnabled: false,
+  lastNotifiedTaskIds: [],
 };
 
 export const useSettingsStore = create<SettingsStorage>()(

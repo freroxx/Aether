@@ -1,4 +1,4 @@
-import * as Calendar from 'expo-calendar';
+import * as Calendar from 'expo-calendar/legacy';
 import { Course, CourseStatus, CourseType } from '@/services/shared/timetable';
 import { error, log } from '@/utils/logger/logger';
 
@@ -46,13 +46,16 @@ export async function getDeviceCalendars(): Promise<DeviceCalendarInfo[]> {
     const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
     if (!calendars || !Array.isArray(calendars)) return [];
 
-    return calendars.map(cal => ({
-      id: String(cal.id),
-      title: cal.title || 'Calendrier',
-      source: cal.source?.name || cal.source?.type || 'Appareil',
-      color: cal.color || '#3568D4',
-      isPrimary: cal.isPrimary,
-    }));
+    return calendars
+      .filter(Boolean)
+      .map(cal => ({
+        id: String(cal?.id ?? ''),
+        title: cal?.title || 'Calendrier',
+        source: cal?.source?.name || cal?.source?.type || 'Appareil',
+        color: cal?.color || '#3568D4',
+        isPrimary: cal?.isPrimary,
+      }))
+      .filter(cal => cal.id.length > 0);
   } catch (e) {
     error('Error fetching device calendars: ' + e);
     return [];
@@ -64,9 +67,9 @@ export async function getDeviceCalendarEvents(
   startDate: Date,
   endDate: Date
 ): Promise<Course[]> {
-  if (!calendarIds || calendarIds.length === 0) return [];
-
   try {
+    if (!calendarIds || !calendarIds.length) return [];
+
     if (!Calendar?.getEventsAsync || !Calendar?.getCalendarsAsync) {
       return [];
     }

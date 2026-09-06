@@ -28,8 +28,15 @@ export default function PronoteENTLogin() {
   const navigation = useNavigation();
   const { params } = useRoute<any>();
   const { url: rawUrl = "", school, accountType = "eleve" } = (params as any) || {};
-  // Normalize: strip trailing slash so all URL constructions are consistent
-  const url = rawUrl.replace(/\/+$/, "");
+
+  // Normalize: strip query/hash, then extract the base Pronote URL by removing any .html filename and trailing slashes.
+  // Note: credentials.tsx provides a direct identifiant/mot de passe fallback (pronotepy Client) when ENT WebView login fails.
+  // The direct-login URL is base + targetHtml (appended at usage since base never ends with .html here).
+  const url = (rawUrl || "")
+    .split("?")[0].split("#")[0]
+    .replace(/\/(?:eleve|parent|mobile\.(?:eleve|parent))\.html$/, "")
+    .replace(/\/+$/, "");
+
   const isParent = accountType === "parent";
   const targetHtml = isParent ? "mobile.parent.html" : "mobile.eleve.html";
   const baseURL = url.split("/pronote")[0] || "";
