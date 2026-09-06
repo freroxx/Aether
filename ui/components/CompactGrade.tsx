@@ -6,6 +6,7 @@ import { Platform, Text, View } from "react-native";
 
 import SkeletonView from "@/ui/components/SkeletonView";
 import adjust from "@/utils/adjustColor";
+import { formatDenominator } from "@/utils/grades/scale";
 import i18n from "@/utils/i18n";
 
 import Stack from "./Stack";
@@ -20,7 +21,7 @@ interface CompactGradeProps {
   title: string;
   description: string;
   score?: number;
-  outOf?: number;
+  outOf?: number | string;
   skillLevel: number[];
   date: Date | undefined;
   disabled?: boolean;
@@ -54,7 +55,6 @@ export const CompactGrade = ({
   const trailingBase = adjust(color, theme.dark ? 0.2 : -0.4);
   const trailingBackground = hasMaxScore ? trailingBase : trailingBase + "15";
   const trailingForeground = hasMaxScore ? "#FFFFFF" : trailingBase;
-  const safeOutOf = outOf ?? 20;
 
   return (
     <CompactGradeContainer color={color}>
@@ -251,8 +251,9 @@ export const CompactGrade = ({
                       <Typography
                         color={trailingForeground + "99"}
                         variant="body2"
+                        numberOfLines={1}
                       >
-                        /{safeOutOf}
+                        {formatDenominator(outOf)}
                       </Typography>
                     </>
                   ) : (

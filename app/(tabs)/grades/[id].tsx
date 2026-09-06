@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import List from '@/ui/new/List';
 import Typography from '@/ui/new/Typography';
 import { useSettingsStore } from '@/stores/settings';
-import { formatAssumed20ForDisplay, getGradeDisplayScale, getDisplayScaleMax } from '@/utils/grades/scale';
+import { formatAssumed20ForDisplay, formatDenominator, getGradeDisplayScale, getDisplayScaleMax } from '@/utils/grades/scale';
 import { SkillChip } from "@/ui/components/SkillChip";
 import { getCurrentPeriod } from "@/utils/grades/helper/period";
 import { useGradeInfluence } from "./hooks/useGradeInfluence";
@@ -250,7 +250,7 @@ export default function GradesModal() {
                         ? String(grade.studentScore?.value.toFixed(2))
                         : undefined
                   }
-                  outOf={grade.outOf?.value ?? 20}
+                  outOf={Number(grade.outOf?.value) > 0 ? Number(grade.outOf?.value) : 20}
                 />
               }
               subjectVariant={grade.studentScore ? undefined : "h2"}
@@ -337,7 +337,7 @@ export default function GradesModal() {
                         ? theme.colors.tint
                         : adjust(subjectInfo.color, theme.dark ? 0.3 : -0.3)
                     }
-                    denominator={"/" + (grade.outOf?.value ?? 20)}
+                    denominator={formatDenominator(grade.outOf?.value)}
                   >
                     {grade.averageScore?.value != null ? grade.averageScore.value.toFixed(2) : "—"}
                   </ContainedNumber>
@@ -427,7 +427,7 @@ export default function GradesModal() {
                       ? theme.colors.tint
                       : adjust(subjectInfo.color, theme.dark ? 0.3 : -0.3)
                   }
-                  denominator={"/" + (grade.outOf?.value ?? 20)}
+                  denominator={formatDenominator(grade.outOf?.value)}
                 >
                   {grade.maxScore?.value != null ? grade.maxScore.value.toFixed(2) : "—"}
                 </ContainedNumber>
@@ -453,7 +453,7 @@ export default function GradesModal() {
                       ? theme.colors.tint
                       : adjust(subjectInfo.color, theme.dark ? 0.3 : -0.3)
                   }
-                  denominator={"/" + (grade.outOf?.value ?? 20)}
+                  denominator={formatDenominator(grade.outOf?.value)}
                 >
                   {grade.minScore?.value != null ? grade.minScore.value.toFixed(2) : "—"}
                 </ContainedNumber>

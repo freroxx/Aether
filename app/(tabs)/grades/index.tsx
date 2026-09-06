@@ -24,7 +24,7 @@ import { getCurrentPeriod } from '@/utils/grades/helper/period';
 import i18n from '@/utils/i18n';
 import { getPeriodName, getPeriodNumber, isPeriodWithNumber } from "@/utils/services/periods";
 import { getSubjectName } from "@/utils/subjects/name";
-import { getGradeDisplayScale } from "@/utils/grades/scale";
+import { formatDenominator, getGradeDisplayScale } from "@/utils/grades/scale";
 
 import Averages from './atoms/Averages';
 import FeaturesMap from './atoms/FeaturesMap';
@@ -362,8 +362,8 @@ const GradesView: React.FC = () => {
                     <LegacyTypography variant="h3" inline color="text">
                       {serviceRank.value ?? "—"}
                     </LegacyTypography>
-                    <LegacyTypography variant="body1" inline color="secondary">
-                      /{serviceRank.outOf ?? 20}
+                    <LegacyTypography variant="body1" inline color="secondary" numberOfLines={1}>
+                      {formatDenominator(serviceRank.outOf)}
                     </LegacyTypography>
                   </Stack>
                 </List.Trailing>

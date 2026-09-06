@@ -33,7 +33,7 @@ import AetherGradesAveragesOverTime from "@/utils/grades/algorithms/time";
 import AetherWeightedAvg from "@/utils/grades/algorithms/weighted";
 import {
   GradeDisplayScale,
-  getDisplayDenominator,
+  formatDenominatorForScale,
   getDisplayScaleMax,
   toDisplayScaleFrom20,
 } from "@/utils/grades/scale";
@@ -452,7 +452,7 @@ const Averages = ({
                           foregroundStyle(adjustedColor),
                         ]}
                       >
-                        {getDisplayDenominator(displayScale)}
+                        {formatDenominatorForScale(displayScale)}
                       </Text>
                     </HStack>
                   </Host>
@@ -480,7 +480,7 @@ const Averages = ({
                           opacity: 0.7,
                         }}
                       >
-                        {getDisplayDenominator(displayScale)}
+                        {formatDenominatorForScale(displayScale)}
                       </Typography>
                     </Dynamic>
                   </Stack>
@@ -543,12 +543,14 @@ const Averages = ({
                       vAlign={"start"}
                       direction="horizontal"
                       width={"100%"}
-                      style={{ marginTop: 0 }}
+                      style={{ marginTop: 0, flexShrink: 1 }}
                     >
                       <Typography
                         variant={inline ? "body1" : "title"}
                         weight="bold"
                         align="left"
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                       >
                         {algorithm.label}
                       </Typography>

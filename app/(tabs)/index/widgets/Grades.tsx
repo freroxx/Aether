@@ -204,7 +204,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
     }
 
     return (
-      <View style={{ width: "100%" }}>
+      <View style={{ width: "100%", paddingTop: 4, paddingBottom: 12 }}>
         <Averages grades={grades} realAverage={serviceAverage} inline displayScale={displayScale} />
       </View>
     );

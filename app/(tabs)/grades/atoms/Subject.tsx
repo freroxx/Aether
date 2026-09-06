@@ -15,7 +15,7 @@ import { getSubjectEmoji } from '@/utils/subjects/emoji';
 import { getSubjectName } from '@/utils/subjects/name';
 import List from '@/ui/new/List';
 import Typography from '@/ui/new/Typography';
-import { GradeDisplayScale, formatScoreForDisplay } from '@/utils/grades/scale';
+import { GradeDisplayScale, formatDenominator, formatScoreForDisplay } from '@/utils/grades/scale';
 import { getSubjectAverage } from '@/utils/grades/algorithms/subject';
 import { Grade as ServiceGrade } from '@/services/shared/grade';
 import { SkillChip } from "@/ui/components/SkillChip";
@@ -110,8 +110,9 @@ const GradeItem = React.memo(({ grade, subjectName, subjectColor }: { grade: Gra
                 <LegacyTypography
                   color={trailingForeground + "99"}
                   variant="body2"
+                  numberOfLines={1}
                 >
-                  /{grade.outOf?.value ?? 20}
+                  {formatDenominator(grade.outOf?.value)}
                 </LegacyTypography>
               </>
             )
@@ -144,17 +145,17 @@ export const SubjectItem: React.FC<{ subject: Subject, displayScale: GradeDispla
   const subjectName = useMemo(() => getSubjectName(subject.name), [subject.name]);
   const subjectEmoji = useMemo(() => getSubjectEmoji(subject.name), [subject.name]);
   const displayedSubjectAverage = useMemo(() => {
-    return formatScoreForDisplay(subject.studentAverage.value, subject.outOf?.value ?? 20, displayScale);
+    return formatScoreForDisplay(subject.studentAverage.value, subject.outOf?.value, displayScale);
   }, [subject.studentAverage.value, subject.outOf?.value, displayScale]);
   const displayedMaximumAverage = useMemo(() => {
-    return formatScoreForDisplay(subject.maximum?.value ?? 0, subject.outOf?.value ?? 20, displayScale).value;
+    return formatScoreForDisplay(subject.maximum?.value ?? 0, subject.outOf?.value, displayScale).value;
   }, [subject.maximum?.value, subject.outOf?.value, displayScale]);
   const computedSubjectAverage = useMemo(() => {
     const calculatedAverage = getSubjectAverage(subject.grades as unknown as ServiceGrade[]);
     if (calculatedAverage === -1) {
       return null;
     }
-    return formatScoreForDisplay(calculatedAverage, subject.outOf?.value ?? 20, displayScale);
+    return formatScoreForDisplay(calculatedAverage, subject.outOf?.value, displayScale);
   }, [subject.grades, subject.outOf?.value, displayScale]);
   const isUnknownSubjectAverage = useMemo(() => {
     if (!subject.studentAverage.disabled) {
@@ -255,7 +256,7 @@ export const SubjectItem: React.FC<{ subject: Subject, displayScale: GradeDispla
                     >
                       {(isUnknownSubjectAverage && computedSubjectAverage
                         ? computedSubjectAverage.denominator
-                        : displayedSubjectAverage.denominator) ?? "/20"}
+                        : displayedSubjectAverage.denominator) || "/20"}
                     </LegacyTypography>
                   </>
                 )}

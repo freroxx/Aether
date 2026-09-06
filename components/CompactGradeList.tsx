@@ -62,7 +62,7 @@ export function CompactGradeList({
                 description={grade.description}
                 skillLevel={grade.skills?.map(v => v.score) ?? []}
                 score={grade.studentScore?.value || 0}
-                outOf={grade.outOf?.value || 20}
+                outOf={Number(grade.outOf?.value) > 0 ? Number(grade.outOf?.value) : 20}
                 disabled={grade.studentScore?.disabled}
                 status={grade.studentScore?.status}
                 color={getSubjectColor(getSubjectById(grade.subjectId)?.name || "")}

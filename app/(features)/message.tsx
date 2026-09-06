@@ -13,9 +13,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Send, Sparkles } from "lucide-react-native";
+import { Papicons } from "@getpapillon/papicons";
+import * as Haptics from "expo-haptics";
 
 import { Chat, Message } from "@/services/shared/chat";
 import { getManager } from "@/services/shared";
@@ -25,6 +26,7 @@ import { useSettingsStore } from "@/stores/settings";
 import { error } from "@/utils/logger/logger";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import Avatar from "@/ui/components/Avatar";
+import Icon from "@/ui/components/Icon";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
 import Typography from "@/ui/new/Typography";
@@ -178,6 +180,7 @@ export default function MessageThreadView() {
         };
         setMessages(prev => [...prev, newMsg]);
         setDraft("");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -186,11 +189,13 @@ export default function MessageThreadView() {
 
       await manager.sendMessageInChat(chat, content);
       setDraft("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await load();
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (e) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       error(String(e));
     } finally {
       setSending(false);
@@ -198,6 +203,33 @@ export default function MessageThreadView() {
   }, [draft, chat, sending, isUsingMock, load, account]);
 
   const correspondent = chat?.recipient || chat?.creator || "Discussion";
+
+  const dayLabel = useCallback((date: Date) => {
+    if (isToday(date)) return "Aujourd'hui";
+    if (isYesterday(date)) return "Hier";
+    const label = format(date, "EEEE d MMM", { locale: fr });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }, []);
+
+  const threadItems = useMemo(() => {
+    const items: (
+      | { kind: "day"; key: string; date: Date }
+      | { kind: "message"; key: string; message: Message }
+    )[] = [];
+    let lastDay = "";
+    for (const message of messages) {
+      const date = new Date(message.date);
+      const dayKey = isNaN(date.getTime())
+        ? "unknown"
+        : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      if (dayKey !== lastDay) {
+        lastDay = dayKey;
+        items.push({ kind: "day", key: `day-${dayKey}`, date });
+      }
+      items.push({ kind: "message", key: message.id, message });
+    }
+    return items;
+  }, [messages]);
 
   return (
     <KeyboardAvoidingView
@@ -256,7 +288,7 @@ export default function MessageThreadView() {
                   },
                 ]}
               >
-                <Sparkles size={14} color="#29947A" />
+                <Papicons name="Sparkles" size={14} color="#29947A" />
                 <Typography
                   variant="caption"
                   weight="bold"
@@ -269,12 +301,38 @@ export default function MessageThreadView() {
 
             {messages.length === 0 ? (
               <View style={[styles.emptyCard, { backgroundColor: theme.colors.card }]}>
+                <Icon size={32} opacity={0.4}>
+                  {/* "Messages" n'existe pas dans papicons — TextBubble est l'équivalent */}
+                  <Papicons name="TextBubble" />
+                </Icon>
                 <Typography variant="body1" color="textSecondary" align="center">
                   Aucun message dans cette discussion.
                 </Typography>
               </View>
             ) : (
-              messages.map(message => {
+              threadItems.map(item => {
+                if (item.kind === "day") {
+                  return (
+                    <View key={item.key} style={styles.dayDividerRow}>
+                      <View
+                        style={[
+                          styles.dayDividerPill,
+                          { backgroundColor: theme.colors.card },
+                        ]}
+                      >
+                        <Typography
+                          variant="caption"
+                          weight="bold"
+                          color="textSecondary"
+                        >
+                          {dayLabel(item.date)}
+                        </Typography>
+                      </View>
+                    </View>
+                  );
+                }
+
+                const message = item.message;
                 const authorLower = message.author.toLowerCase();
                 const mine =
                   myName.length > 0
@@ -397,7 +455,12 @@ export default function MessageThreadView() {
               ]}
               hitSlop={8}
             >
-              <Send size={18} color="#FFFFFF" />
+              {sending ? (
+                <ActivityIndicator size={18} color="#FFFFFF" />
+              ) : (
+                /* "Send" n'existe pas dans papicons — ArrowUp (style iOS) */
+                <Papicons name="ArrowUp" size={18} color="#FFFFFF" />
+              )}
             </Pressable>
           </View>
         </>
@@ -433,11 +496,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
+    gap: 12,
   },
   messageRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+  },
+  dayDividerRow: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 2,
+  },
+  dayDividerPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
   myMessageRow: {
     justifyContent: "flex-end",
@@ -459,15 +533,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   myBubble: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderBottomLeftRadius: 20,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 18,
     borderBottomRightRadius: 4,
   },
   theirBubble: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderBottomRightRadius: 18,
     borderBottomLeftRadius: 4,
   },
   inputBarContainer: {

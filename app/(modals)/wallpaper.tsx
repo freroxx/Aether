@@ -1,28 +1,27 @@
 import { useSettingsStore } from "@/stores/settings";
-import { Wallpaper } from "@/stores/settings/types";
-import AnimatedPressable from "@/ui/components/AnimatedPressable";
-import Stack from "@/ui/components/Stack";
-import Typography from "@/ui/components/Typography";
-import { useHeaderHeight, useTheme } from "expo-router/react-navigation";
+import {
+  NativeHeaderPressable,
+  NativeHeaderSide,
+} from "@/ui/components/NativeHeader";
+import Icon from "@/ui/components/Icon";
+import List from "@/ui/new/List";
+import Typography from "@/ui/new/Typography";
+import { useTheme } from "expo-router/react-navigation";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  FlatList,
   Image,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 import { Directory, File, Paths } from "expo-file-system";
-import { NativeHeaderPressable, NativeHeaderSide } from "@/ui/components/NativeHeader";
-import Icon from "@/ui/components/Icon";
-import MaterialIcon from "@/ui/components/MaterialIcon";
 import { router } from "expo-router";
 import { Papicons } from "@getpapillon/papicons";
-import { ImagePlus, Palette, Sparkles, Trash2, Check } from "lucide-react-native";
+import { ImagePlus } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LinearGradient from "react-native-linear-gradient";
 
@@ -118,6 +117,12 @@ const RADIANCE_PRESETS: RadiancePreset[] = [
   },
 ];
 
+const playSelection = () => {
+  try {
+    Haptics.selectionAsync();
+  } catch {}
+};
+
 const WallpaperModal = () => {
   const { colors, dark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -207,6 +212,7 @@ const WallpaperModal = () => {
   };
 
   const isDefaultSelected = !currentWallpaper;
+  const isCustomActive = currentWallpaper?.id?.startsWith("custom:") ?? false;
 
   const [customImageUri, setCustomImageUri] = useState<string | null>(null);
 
@@ -235,7 +241,11 @@ const WallpaperModal = () => {
           <View
             style={[
               styles.dragHandle,
-              { backgroundColor: dark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.18)" },
+              {
+                backgroundColor: dark
+                  ? "rgba(255,255,255,0.25)"
+                  : "rgba(0,0,0,0.18)",
+              },
             ]}
           />
           <View style={styles.sheetHeader}>
@@ -243,12 +253,11 @@ const WallpaperModal = () => {
               <Typography variant="title" weight="bold">
                 Fond d&apos;écran d&apos;accueil
               </Typography>
-              <Typography variant="caption" color="secondary">
-                Personnalisez le style de votre accueil
-              </Typography>
             </View>
 
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
               {currentWallpaper && (
                 <Pressable
                   onPress={resetToDefault}
@@ -256,12 +265,17 @@ const WallpaperModal = () => {
                   style={({ pressed }) => [
                     styles.headerIconButton,
                     {
-                      backgroundColor: dark ? "rgba(224,93,52,0.15)" : "rgba(224,93,52,0.1)",
+                      backgroundColor: dark
+                        ? "rgba(224,93,52,0.15)"
+                        : "rgba(224,93,52,0.1)",
                       opacity: pressed ? 0.7 : 1,
+                      transform: [{ scale: pressed ? 0.96 : 1 }],
                     },
                   ]}
                 >
-                  <Trash2 size={18} color="#E05D34" />
+                  <Icon size={18}>
+                    <Papicons name="Trash" color="#E05D34" />
+                  </Icon>
                 </Pressable>
               )}
 
@@ -271,8 +285,11 @@ const WallpaperModal = () => {
                 style={({ pressed }) => [
                   styles.headerIconButton,
                   {
-                    backgroundColor: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                    backgroundColor: dark
+                      ? "rgba(255,255,255,0.08)"
+                      : "rgba(0,0,0,0.06)",
                     opacity: pressed ? 0.7 : 1,
+                    transform: [{ scale: pressed ? 0.96 : 1 }],
                   },
                 ]}
               >
@@ -285,194 +302,178 @@ const WallpaperModal = () => {
         </View>
       )}
 
-      <ScrollView
+      <List
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: Platform.OS === "android" ? 8 : 16,
+          padding: 16,
           paddingBottom: insets.bottom + 32,
-          paddingHorizontal: 16,
-          gap: 22,
         }}
-        contentInsetAdjustmentBehavior="automatic"
+        contentInsetAdjustmentBehavior="always"
       >
-        {/* Gallery upload card */}
-        <View style={styles.sectionContainer}>
-          <Typography variant="title" weight="bold">
-            Image personnalisée
-          </Typography>
-          <Typography variant="body2" color="secondary">
-            Choisissez une photo depuis votre galerie pour l&apos;accueil.
-          </Typography>
-
-          <Pressable
-            onPress={uploadCustomWallpaper}
-            style={({ pressed }) => [
-              styles.uploadCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: currentWallpaper?.id?.startsWith("custom:")
-                  ? colors.primary
-                  : dark
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.08)",
-                borderWidth: currentWallpaper?.id?.startsWith("custom:") ? 2 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              },
-            ]}
-          >
-            {customImageUri ? (
-              <Image
-                source={{ uri: customImageUri }}
-                style={styles.customThumbnail}
-                resizeMode="cover"
-              />
-            ) : (
-              <View
-                style={[
-                  styles.uploadIconCircle,
-                  { backgroundColor: dark ? "rgba(41,148,122,0.2)" : "rgba(41,148,122,0.12)" },
-                ]}
-              >
-                <ImagePlus size={28} color="#29947A" />
-              </View>
-            )}
-
-            <View style={{ flex: 1, gap: 2 }}>
-              <Typography variant="body1" weight="bold">
-                {currentWallpaper?.id?.startsWith("custom:")
-                  ? "Modifier la photo"
-                  : "Choisir depuis la galerie"}
-              </Typography>
-              <Typography variant="caption" color="secondary">
-                {currentWallpaper?.id?.startsWith("custom:")
-                  ? "Image personnalisée active"
-                  : "Sélectionnez un fichier JPG ou PNG"}
-              </Typography>
-            </View>
-
-            {currentWallpaper?.id?.startsWith("custom:") && (
-              <View style={[styles.activeCheckBadge, { backgroundColor: colors.primary }]}>
-                <Check size={16} color="#FFFFFF" />
-              </View>
-            )}
-          </Pressable>
-        </View>
-
-        {/* Gradients section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Palette size={18} color={colors.primary} />
-            <Typography variant="title" weight="bold" style={{ flex: 1 }}>
-              Dégradés modernes
+        <List.Section>
+          <List.SectionTitle>
+            <List.Label>Photo</List.Label>
+          </List.SectionTitle>
+          <List.Item onPress={uploadCustomWallpaper}>
+            <List.Leading>
+              {customImageUri ? (
+                <Image
+                  source={{ uri: customImageUri }}
+                  style={styles.galleryThumb}
+                />
+              ) : (
+                <Icon>
+                  <ImagePlus size={22} color={colors.text} />
+                </Icon>
+              )}
+            </List.Leading>
+            <Typography variant="title">Depuis la galerie</Typography>
+            <Typography color="textSecondary">
+              {isCustomActive ? "Image personnalisée" : "JPG ou PNG"}
             </Typography>
-          </View>
+            <List.Trailing>
+              {isCustomActive ? (
+                <Icon size={22} papicon>
+                  <Papicons name="Check" color={String(colors.primary)} />
+                </Icon>
+              ) : (
+                <Icon>
+                  <Papicons name="ChevronRight" opacity={0.7} />
+                </Icon>
+              )}
+            </List.Trailing>
+          </List.Item>
+        </List.Section>
 
-          <View style={styles.gradientGrid}>
-            {GRADIENT_PRESETS.map(gradient => {
-              const isSelected = selectedId === gradient.id;
-              return (
-                <Pressable
-                  key={gradient.id}
-                  onPress={() => selectGradient(gradient)}
-                  style={({ pressed }) => [
-                    styles.gradientCardWrapper,
-                    {
-                      borderColor: isSelected ? colors.primary : "transparent",
-                      borderWidth: isSelected ? 2.5 : 0,
-                      transform: [{ scale: pressed ? 0.96 : 1 }],
-                    },
-                  ]}
-                >
-                  <LinearGradient
-                    colors={gradient.colors}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gradientPreview}
+        <List.Section>
+          <List.SectionTitle>
+            <List.Label>Dégradés</List.Label>
+          </List.SectionTitle>
+          <List.View>
+            <View style={styles.gradientGrid}>
+              {GRADIENT_PRESETS.map(gradient => {
+                const isSelected = selectedId === gradient.id;
+                return (
+                  <Pressable
+                    key={gradient.id}
+                    onPress={() => {
+                      playSelection();
+                      selectGradient(gradient);
+                    }}
+                    style={({ pressed }) => [
+                      styles.gradientCardWrapper,
+                      {
+                        borderColor: isSelected
+                          ? colors.primary
+                          : "transparent",
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      },
+                    ]}
                   >
-                    {isSelected && (
-                      <View style={styles.checkPill}>
-                        <Check size={14} color="#FFFFFF" />
-                      </View>
-                    )}
-                  </LinearGradient>
-                  <Typography
-                    variant="caption"
-                    weight="medium"
-                    align="center"
-                    numberOfLines={1}
-                    style={{ marginTop: 4, fontSize: 11 }}
-                  >
-                    {gradient.name}
-                  </Typography>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Radiance & Presets section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Sparkles size={18} color={colors.primary} />
-            <Typography variant="title" weight="bold" style={{ flex: 1 }}>
-              Ambiances Aether
-            </Typography>
-          </View>
-
-          <View style={styles.gradientGrid}>
-            {RADIANCE_PRESETS.map(preset => {
-              const isSelected =
-                (preset.id === "radiance_default_clouds" && isDefaultSelected) ||
-                selectedId === preset.id;
-
-              return (
-                <Pressable
-                  key={preset.id}
-                  onPress={() => selectRadiance(preset)}
-                  style={({ pressed }) => [
-                    styles.gradientCardWrapper,
-                    {
-                      borderColor: isSelected ? colors.primary : "transparent",
-                      borderWidth: isSelected ? 2.5 : 0,
-                      transform: [{ scale: pressed ? 0.96 : 1 }],
-                    },
-                  ]}
-                >
-                  {preset.type === "image" ? (
-                    <Image
-                      source={require("@/assets/images/wallpapers/clouds.jpg")}
-                      style={styles.gradientPreview}
-                    />
-                  ) : (
-                    <LinearGradient
-                      colors={preset.colors!}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.gradientPreview}
-                    />
-                  )}
-
-                  {isSelected && (
-                    <View style={styles.checkPill}>
-                      <Check size={14} color="#FFFFFF" />
+                    <View style={styles.previewWrap}>
+                      <LinearGradient
+                        colors={gradient.colors}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.gradientPreview}
+                      />
+                      {isSelected && (
+                        <View style={styles.checkOverlay} pointerEvents="none">
+                          <View style={styles.checkPill}>
+                            <Icon size={14}>
+                              <Papicons name="Check" color="#FFFFFF" />
+                            </Icon>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                  )}
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      align="center"
+                      numberOfLines={1}
+                      style={{ marginTop: 4, fontSize: 11 }}
+                    >
+                      {gradient.name}
+                    </Typography>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </List.View>
+        </List.Section>
 
-                  <Typography
-                    variant="caption"
-                    weight="medium"
-                    align="center"
-                    numberOfLines={1}
-                    style={{ marginTop: 4, fontSize: 11 }}
+        <List.Section>
+          <List.SectionTitle>
+            <List.Label>Ambiances</List.Label>
+          </List.SectionTitle>
+          <List.View>
+            <View style={styles.gradientGrid}>
+              {RADIANCE_PRESETS.map(preset => {
+                const isSelected =
+                  (preset.id === "radiance_default_clouds" &&
+                    isDefaultSelected) ||
+                  selectedId === preset.id;
+
+                return (
+                  <Pressable
+                    key={preset.id}
+                    onPress={() => {
+                      playSelection();
+                      selectRadiance(preset);
+                    }}
+                    style={({ pressed }) => [
+                      styles.gradientCardWrapper,
+                      {
+                        borderColor: isSelected
+                          ? colors.primary
+                          : "transparent",
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      },
+                    ]}
                   >
-                    {preset.name}
-                  </Typography>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      </ScrollView>
+                    <View style={styles.previewWrap}>
+                      {preset.type === "image" ? (
+                        <Image
+                          source={require("@/assets/images/wallpapers/clouds.jpg")}
+                          style={styles.gradientPreview}
+                        />
+                      ) : (
+                        <LinearGradient
+                          colors={preset.colors!}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.gradientPreview}
+                        />
+                      )}
+
+                      {isSelected && (
+                        <View style={styles.checkOverlay} pointerEvents="none">
+                          <View style={styles.checkPill}>
+                            <Icon size={14}>
+                              <Papicons name="Check" color="#FFFFFF" />
+                            </Icon>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      align="center"
+                      numberOfLines={1}
+                      style={{ marginTop: 4, fontSize: 11 }}
+                    >
+                      {preset.name}
+                    </Typography>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </List.View>
+        </List.Section>
+      </List>
 
       {/* iOS Header controls */}
       {Platform.OS === "ios" && (
@@ -488,7 +489,9 @@ const WallpaperModal = () => {
           <NativeHeaderSide side="Right">
             {currentWallpaper && (
               <NativeHeaderPressable onPress={resetToDefault}>
-                <Trash2 size={22} color="#E05D34" />
+                <Icon>
+                  <Papicons name="Trash" color="#E05D34" />
+                </Icon>
               </NativeHeaderPressable>
             )}
           </NativeHeaderSide>
@@ -501,6 +504,9 @@ const WallpaperModal = () => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
   },
   sheetHeaderWrapper: {
     paddingHorizontal: 16,
@@ -527,44 +533,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  customThumbnail: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-  },
-  sectionContainer: {
-    gap: 10,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  uploadCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 22,
-    gap: 14,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  uploadIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  activeCheckBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
+  galleryThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
   },
   gradientGrid: {
     flexDirection: "row",
@@ -576,14 +548,26 @@ const styles = StyleSheet.create({
     width: "48%",
     borderRadius: 18,
     padding: 2,
+    borderWidth: 2.5,
   },
   gradientPreview: {
     width: "100%",
     height: 84,
     borderRadius: 16,
+    overflow: "hidden",
+  },
+  previewWrap: {
+    width: "100%",
+    height: 84,
+    borderRadius: 16,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
+  },
+  checkOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
   },
   checkPill: {
     width: 26,

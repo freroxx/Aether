@@ -1,18 +1,16 @@
-import { router } from "expo-router";
 import { useTheme } from "expo-router/react-navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Mail, MessageSquare, Sparkles, User } from "lucide-react-native";
+import { Papicons } from "@getpapillon/papicons";
 
 import { Chat } from "@/services/shared/chat";
 import { getManager } from "@/services/shared";
@@ -22,9 +20,11 @@ import { useSettingsStore } from "@/stores/settings";
 import { error } from "@/utils/logger/logger";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import Avatar from "@/ui/components/Avatar";
+import Icon from "@/ui/components/Icon";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
 import Typography from "@/ui/new/Typography";
+import List from "@/ui/new/List";
 import { getInitials } from "@/utils/chats/initials";
 
 export default function MessagesView() {
@@ -94,6 +94,28 @@ export default function MessagesView() {
     setRefreshing(false);
   }, [load]);
 
+  const mockNotice = isUsingMock ? (
+    <View
+      style={[
+        styles.mockNotice,
+        {
+          backgroundColor: isDark
+            ? "rgba(41, 148, 122, 0.15)"
+            : "rgba(41, 148, 122, 0.1)",
+        },
+      ]}
+    >
+      <Papicons name="Sparkles" size={14} color="#29947A" />
+      <Typography
+        variant="caption"
+        weight="bold"
+        style={{ color: "#29947A", flex: 1 }}
+      >
+        Mode démo actif : conversations simulées
+      </Typography>
+    </View>
+  ) : null;
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
       <TabHeader
@@ -113,7 +135,7 @@ export default function MessagesView() {
         <View style={styles.centerContainer}>
           <ActivityIndicator />
         </View>
-      ) : (
+      ) : chats.length === 0 ? (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={{
@@ -131,56 +153,58 @@ export default function MessagesView() {
             />
           }
         >
-          {isUsingMock && (
+          {mockNotice}
+          <View style={[styles.emptyCard, { backgroundColor: theme.colors.card }]}>
             <View
               style={[
-                styles.mockNotice,
+                styles.emptyIconCircle,
                 {
                   backgroundColor: isDark
-                    ? "rgba(41, 148, 122, 0.15)"
-                    : "rgba(41, 148, 122, 0.1)",
+                    ? "rgba(255,255,255,0.06)"
+                    : "rgba(0,0,0,0.04)",
                 },
               ]}
             >
-              <Sparkles size={14} color="#29947A" />
-              <Typography
-                variant="caption"
-                weight="bold"
-                style={{ color: "#29947A", flex: 1 }}
-              >
-                Mode démo actif : conversations simulées
-              </Typography>
+              <Icon size={36} opacity={0.4}>
+                {/* "Messages" n'existe pas dans papicons — TextBubble est l'équivalent */}
+                <Papicons name="TextBubble" />
+              </Icon>
             </View>
-          )}
-
-          {chats.length === 0 ? (
-            <View style={[styles.emptyCard, { backgroundColor: theme.colors.card }]}>
-              <View
-                style={[
-                  styles.emptyIconCircle,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(255,255,255,0.06)"
-                      : "rgba(0,0,0,0.04)",
-                  },
-                ]}
-              >
-                <Mail size={36} color={theme.colors.text} style={{ opacity: 0.4 }} />
-              </View>
-              <Typography variant="title" weight="bold" align="center">
-                Aucun message
-              </Typography>
-              <Typography
-                variant="body1"
-                color="textSecondary"
-                align="center"
-                style={{ maxWidth: 280 }}
-              >
-                Vos échanges avec les enseignants et la vie scolaire apparaîtront ici.
-              </Typography>
-            </View>
-          ) : (
-            chats.map(chat => {
+            <Typography variant="title" weight="bold" align="center">
+              Aucun message
+            </Typography>
+            <Typography
+              variant="body1"
+              color="textSecondary"
+              align="center"
+              style={{ maxWidth: 280 }}
+            >
+              Vos échanges avec les enseignants et la vie scolaire apparaîtront ici.
+            </Typography>
+          </View>
+        </ScrollView>
+      ) : (
+        <List
+          contentContainerStyle={{
+            paddingTop: headerHeight + 8,
+            paddingBottom: insets.bottom + 24,
+            paddingHorizontal: 16,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
+            />
+          }
+          ListHeaderComponent={mockNotice}
+        >
+          <List.Section>
+            <List.SectionTitle>
+              <List.Label>Messages</List.Label>
+            </List.SectionTitle>
+            {chats.map(chat => {
               const correspondent = (chat.recipient || chat.creator || "Enseignant").trim();
               const initials = getInitials(correspondent);
               const relativeTime = formatDistanceToNow(new Date(chat.date), {
@@ -189,74 +213,50 @@ export default function MessagesView() {
               });
 
               return (
-                <Pressable
+                <List.Item
                   key={chat.id}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(features)/message",
-                      params: { id: chat.id },
-                    })
-                  }
-                  style={({ pressed }) => [
-                    styles.chatCard,
-                    {
-                      backgroundColor: theme.colors.card,
-                      transform: [{ scale: pressed ? 0.985 : 1 }],
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                  ]}
+                  href={{
+                    pathname: "/(features)/message",
+                    params: { id: chat.id },
+                  }}
                 >
-                  <Avatar
-                    size={48}
-                    initials={initials}
-                    shape="circle"
-                    style={styles.avatar}
-                  />
+                  <List.Leading>
+                    <Avatar
+                      size={44}
+                      initials={initials}
+                      shape="circle"
+                    />
+                  </List.Leading>
 
-                  <View style={styles.chatInfo}>
-                    <View style={styles.chatTopRow}>
-                      <Typography
-                        variant="title"
-                        weight="bold"
-                        numberOfLines={1}
-                        style={{ flex: 1, fontSize: 16 }}
-                      >
-                        {correspondent}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        style={{ fontSize: 11 }}
-                      >
-                        {relativeTime}
-                      </Typography>
-                    </View>
+                  <Typography
+                    variant="title"
+                    weight="bold"
+                    numberOfLines={1}
+                    style={{ fontSize: 16 }}
+                  >
+                    {chat.subject || "Discussion"}
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    color="textSecondary"
+                    numberOfLines={1}
+                    style={{ fontSize: 14 }}
+                  >
+                    {correspondent} · {relativeTime}
+                  </Typography>
 
-                    <Typography
-                      variant="body1"
-                      weight="medium"
-                      numberOfLines={1}
-                      style={{ color: theme.colors.primary, fontSize: 14 }}
-                    >
-                      {chat.subject || "Discussion"}
-                    </Typography>
-
-                    {chat.creator && chat.creator !== correspondent && (
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        numberOfLines={1}
-                        style={{ fontSize: 12 }}
-                      >
-                        Initié par {chat.creator}
-                      </Typography>
-                    )}
-                  </View>
-                </Pressable>
+                  <List.Trailing>
+                    <Papicons
+                      name="ChevronRight"
+                      size={20}
+                      opacity={0.5}
+                    />
+                  </List.Trailing>
+                </List.Item>
               );
-            })
-          )}
-        </ScrollView>
+            })}
+          </List.Section>
+        </List>
       )}
     </View>
   );
@@ -282,31 +282,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 16,
     marginBottom: 4,
-  },
-  chatCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: 22,
-    gap: 14,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  avatar: {
-    alignSelf: "center",
-  },
-  chatInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  chatTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
   },
   emptyCard: {
     borderRadius: 24,

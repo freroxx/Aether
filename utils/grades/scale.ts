@@ -36,6 +36,21 @@ export const getDisplayDenominator = (scale: GradeDisplayScale): string => {
   return `/${scale}`;
 };
 
+export function formatDenominator(outOf: unknown, fallback = 20): string {
+  const n = typeof outOf === "string" ? Number(outOf) : (outOf as number);
+  return Number.isFinite(n) && (n as number) > 0 ? `/${n}` : `/${fallback}`;
+}
+
+export function formatDenominatorForScale(scale: unknown): string {
+  if (scale === "percentage") {
+    return "%";
+  }
+  if (scale === "20" || scale === "10" || scale === "5") {
+    return `/${scale}`;
+  }
+  return "/20";
+}
+
 export const formatAssumed20ForDisplay = (
   value: number,
   scale: GradeDisplayScale,
@@ -48,17 +63,19 @@ export const formatAssumed20ForDisplay = (
 
 export const formatScoreForDisplay = (
   value: number,
-  outOf: number,
+  outOf: unknown,
   scale: GradeDisplayScale,
 ): { value: number; denominator: string } => {
   const safeValue = Number.isFinite(value) ? value : 0;
-  const safeOutOf = Number.isFinite(outOf) ? outOf : 20;
+  const parsed = typeof outOf === "string" ? Number(outOf) : (outOf as number);
+  const safeOutOf =
+    Number.isFinite(parsed) && (parsed as number) > 0 ? (parsed as number) : 20;
   if (safeOutOf === 20) {
     return formatAssumed20ForDisplay(safeValue, scale);
   }
 
   return {
     value: safeValue,
-    denominator: `/${safeOutOf}`,
+    denominator: formatDenominator(safeOutOf),
   };
 };
