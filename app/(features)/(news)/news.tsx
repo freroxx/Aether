@@ -1,4 +1,4 @@
-import { useNews } from '@/database/useNews'
+import { purgeOrphanNews, useNews } from '@/database/useNews'
 import { getManager, subscribeManagerUpdate } from '@/services/shared'
 import Avatar from '@/ui/components/Avatar'
 import ChipButton from '@/ui/components/ChipButton'
@@ -58,6 +58,8 @@ const NewsView = () => {
         return
       }
       await manager.getNews()
+      // Nettoie les actus orphelines (anciennes démos) en tâche de fond
+      purgeOrphanNews().catch(() => {})
     } catch (error) {
       warn(`Error fetching news: ${String(error)}`)
     } finally {

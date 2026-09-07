@@ -13,9 +13,10 @@ const ContainedNumber: React.FC<ContainedNumberProps> = ({ denominator, color, c
   const theme = useTheme();
   const finalColor = color || theme.colors.tint;
 
+  const t = String(denominator ?? "").trim();
   const normalizedDenominator =
-    !denominator || denominator === "/" || denominator === "/undefined" || denominator === "/null"
-      ? (denominator ? "/20" : undefined)
+    !t || t === "/" || t === "/undefined" || t === "/null" || t === "/NaN" || t === "/0"
+      ? (t ? "/20" : undefined)
       : denominator;
 
   return (

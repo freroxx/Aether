@@ -6,6 +6,7 @@ import Reanimated, { Easing, LinearTransition } from "react-native-reanimated";
 import Stack from "./Stack";
 import Typography from "./Typography";
 import SkeletonView from "@/ui/components/SkeletonView";
+import { formatDenominator } from "@/utils/grades/scale";
 
 const ListGradesLayoutTransition = LinearTransition.easing(Easing.inOut(Easing.circle)).duration(300);
 
@@ -68,7 +69,7 @@ const Subject: React.FC<SubjectProps> = ({
                 {disabled ? status : (average ?? 0).toFixed(2)}
               </Typography>
               <Typography variant="caption" weight="semibold" color={color + "DF"} style={{ fontSize: 13, opacity: 0.8 }}>
-                {`/${outOf ?? 20}`}
+                {formatDenominator(outOf)}
               </Typography>
             </>
           )}

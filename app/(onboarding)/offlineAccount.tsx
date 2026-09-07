@@ -55,7 +55,7 @@ export default function OfflineAccount() {
     store.setLastUsedAccount(id);
 
     router.dismissAll();
-    router.push("/" as Href);
+    router.replace("/(tabs)/index");
   };
 
   return (

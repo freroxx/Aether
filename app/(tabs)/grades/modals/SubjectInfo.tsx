@@ -19,7 +19,7 @@ import Icon from "@/ui/components/Icon";
 import { useSettingsStore } from "@/stores/settings";
 import { formatScoreForDisplay, getGradeDisplayScale } from "@/utils/grades/scale";
 import { getSubjectAverage } from "@/utils/grades/algorithms/subject";
-import { Grade } from "@/services/shared/grade";
+import { Grade, GradeScore } from "@/services/shared/grade";
 
 const SubjectInfo = () => {
   const { params } = useRoute();
@@ -27,28 +27,36 @@ const SubjectInfo = () => {
   const colors = theme.colors;
 
   const subject: Subject = params?.subject;
+  // Garde-fous : le sujet peut arriver incomplet (moyennes jamais calculées
+  // côté Pronote) → jamais de crash ni de dénominateur vide, "—" sinon.
+  const studentAverage = (subject?.studentAverage ?? { disabled: true, status: "—" }) as GradeScore;
+  const subjectOutOf = (subject?.outOf ?? { value: 20 }) as GradeScore;
+  const classAverage = (subject?.classAverage ?? { disabled: true, status: "—" }) as GradeScore;
+  const subjectMaximum = (subject?.maximum ?? { disabled: true, status: "—" }) as GradeScore;
+  const subjectMinimum = (subject?.minimum ?? { disabled: true, status: "—" }) as GradeScore;
+  const subjectGrades = subject?.grades ?? [];
   const displayScale = getGradeDisplayScale(useSettingsStore(state => state.personalization.gradesDisplayScale));
   const subjectColor = getSubjectColor(subject?.name);
   const subjectName = getSubjectName(subject?.name);
   const subjectEmoji = getSubjectEmoji(subject?.name);
 
   const displayedSubjectAverage = useMemo(() => {
-    return formatScoreForDisplay(subject.studentAverage.value, subject.outOf.value, displayScale);
-  }, [subject.studentAverage.value, subject.outOf.value, displayScale]);
+    return formatScoreForDisplay(studentAverage.value, subjectOutOf.value, displayScale);
+  }, [studentAverage.value, subjectOutOf.value, displayScale]);
   const displayedDenominator = useMemo(() => {
-    return formatScoreForDisplay(0, subject.outOf.value, displayScale).denominator;
-  }, [subject.outOf.value, displayScale]);
+    return formatScoreForDisplay(0, subjectOutOf.value, displayScale).denominator;
+  }, [subjectOutOf.value, displayScale]);
   const computedSubjectAverage = useMemo(() => {
-    const computedSubjectAverageValue = getSubjectAverage(subject.grades as unknown as Grade[]);
+    const computedSubjectAverageValue = getSubjectAverage(subjectGrades as unknown as Grade[]);
     if (computedSubjectAverageValue === -1) {
       return null;
     }
-    return formatScoreForDisplay(computedSubjectAverageValue, subject.outOf.value, displayScale);
-  }, [subject.grades, subject.outOf.value, displayScale]);
+    return formatScoreForDisplay(computedSubjectAverageValue, subjectOutOf.value, displayScale);
+  }, [subjectGrades, subjectOutOf.value, displayScale]);
   const isUnknownSubjectAverage = useMemo(() => {
-    return subject.studentAverage.disabled
-      && String(subject.studentAverage.status ?? "").trim().toLowerCase() === "unknown";
-  }, [subject.studentAverage.disabled, subject.studentAverage.status]);
+    return studentAverage.disabled
+      && String(studentAverage.status ?? "").trim().toLowerCase() === "unknown";
+  }, [studentAverage.disabled, studentAverage.status]);
   const fallbackDisplayedDenominator = useMemo(() => {
     return isUnknownSubjectAverage && computedSubjectAverage
       ? computedSubjectAverage.denominator
@@ -64,25 +72,25 @@ const SubjectInfo = () => {
     {
       title: i18n.t("SubjectInfo_ClassAverage_Label"),
       subtitle: i18n.t("SubjectInfo_ClassAverage_Description"),
-      disabled: subject.classAverage.disabled,
-      value: formatScoreForDisplay(subject.classAverage.value, subject.outOf.value, displayScale).value,
-      status: subject.classAverage.status,
+      disabled: classAverage.disabled,
+      value: formatScoreForDisplay(classAverage.value, subjectOutOf.value, displayScale).value,
+      status: classAverage.status,
       icon: "GraduationHat",
     },
     {
       title: i18n.t("SubjectInfo_MaxAverage_Label"),
       subtitle: i18n.t("SubjectInfo_MaxAverage_Description"),
-      disabled: subject.maximum.disabled,
-      value: formatScoreForDisplay(subject.maximum.value, subject.outOf.value, displayScale).value,
-      status: subject.maximum.status,
+      disabled: subjectMaximum.disabled,
+      value: formatScoreForDisplay(subjectMaximum.value, subjectOutOf.value, displayScale).value,
+      status: subjectMaximum.status,
       icon: "ArrowRightUp",
     },
     {
       title: i18n.t("SubjectInfo_MinAverage_Label"),
       subtitle: i18n.t("SubjectInfo_MinAverage_Description"),
-      disabled: subject.minimum.disabled,
-      value: formatScoreForDisplay(subject.minimum.value, subject.outOf.value, displayScale).value,
-      status: subject.minimum.status,
+      disabled: subjectMinimum.disabled,
+      value: formatScoreForDisplay(subjectMinimum.value, subjectOutOf.value, displayScale).value,
+      status: subjectMinimum.status,
       icon: "Minus",
     }
   ]
@@ -121,10 +129,10 @@ const SubjectInfo = () => {
                 <ModalOverHeadScore
                   color={Platform.OS === "ios" ? subjectColor : colors.primary}
                   score={
-                    subject.studentAverage.disabled
+                    studentAverage.disabled
                       ? isUnknownSubjectAverage && computedSubjectAverage
                         ? String(computedSubjectAverage.value.toFixed(2))
-                        : String(subject.studentAverage.status)
+                        : String(studentAverage.status ?? "—")
                       : String(displayedSubjectAverage.value.toFixed(2))
                   }
                   outOf={fallbackOutOf}
@@ -132,15 +140,15 @@ const SubjectInfo = () => {
               }
               style={{
                 marginBottom:
-                  !subject.studentAverage.disabled &&
-                  subject.studentAverage.value === subject.maximum.value
+                  !studentAverage.disabled &&
+                  studentAverage.value === subjectMaximum.value
                     ? 12
                     : 0,
               }}
             />
 
-            {!subject.studentAverage.disabled &&
-              subject.studentAverage.value === subject.maximum.value && (
+            {!studentAverage.disabled &&
+              studentAverage.value === subjectMaximum.value && (
                 <Stack
                   direction="horizontal"
                   gap={8}

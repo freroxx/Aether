@@ -21,4 +21,5 @@ export default class Course extends Model {
   @field('status') status?: number;
   @field('customStatus') customStatus?: string;
   @field('url') url?: string;
+  @field('contentRaw') contentRaw?: string;
 }

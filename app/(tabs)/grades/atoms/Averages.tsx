@@ -96,6 +96,10 @@ const Averages = ({
     const accent = color || theme.colors.primary;
     const adjustedColor = adjust(accent, theme.dark ? 0.2 : -0.2);
     const papillonFont = useFont();
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.log("[Averages]", { displayScale, gradesCount: grades?.length ?? 0, realAverage, inline });
+    }
     const [containerWidth, setContainerWidth] = useState(0);
     const isLargeLayout = !inline && containerWidth >= 600;
 
@@ -330,10 +334,11 @@ const Averages = ({
                   ? {
                       position: "absolute",
                       top: 0,
-                      right: 12,
+                      right: 4,
                       bottom: 0,
-                      left: "52%",
+                      left: "58%",
                       justifyContent: "center",
+                      overflow: "hidden",
                     }
                   : {
                       height: 120,
@@ -382,9 +387,12 @@ const Averages = ({
               style={
                 inline
                   ? {
-                      position: "absolute",
-                      inset: 0,
+                      // En-flow à gauche : le graphe absolu reste confiné à droite (58%+),
+                      // le texte ne le chevauche plus jamais.
+                      alignSelf: "flex-start",
+                      width: "55%",
                       height: "100%",
+                      justifyContent: "center",
                     }
                   : undefined
               }
@@ -397,7 +405,9 @@ const Averages = ({
                 style={[
                   {
                     paddingHorizontal: inline ? 16 : 24,
-                    width: inline ? "58%" : isLargeLayout ? 200 : "100%",
+                    width: "100%",
+                    flexShrink: inline ? 1 : undefined,
+                    overflow: inline ? "visible" : undefined,
                     marginTop: inline ? 0 : -12,
                   },
                   isLargeLayout && {
@@ -407,10 +417,7 @@ const Averages = ({
                     marginTop: 0,
                   },
                   inline && {
-                    position: "absolute",
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
+                    position: "relative",
                   },
                 ]}
               >
@@ -471,18 +478,20 @@ const Averages = ({
                       {shownAverage ? shownAverage.toFixed(2) : "0.00"}
                     </AnimatedNumber>
 
-                    <Dynamic animated>
-                      <Typography
-                        variant="title"
-                        style={{
-                          color: adjustedColor,
-                          marginBottom: inline ? 1 : 3,
-                          opacity: 0.7,
-                        }}
-                      >
-                        {formatDenominatorForScale(displayScale)}
-                      </Typography>
-                    </Dynamic>
+                      <Dynamic animated>
+                        <Typography
+                          variant="title"
+                          numberOfLines={1}
+                          style={{
+                            color: adjustedColor,
+                            marginBottom: inline ? 1 : 3,
+                            opacity: 0.7,
+                            flexShrink: 1,
+                          }}
+                        >
+                          {formatDenominatorForScale(displayScale)}
+                        </Typography>
+                      </Dynamic>
                   </Stack>
                 )}
 

@@ -1,6 +1,7 @@
 import { Papicons } from '@getpapillon/papicons';
 import { useTheme } from "expo-router/react-navigation";
 import { useLocalSearchParams } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { formatDistanceStrict, formatDistanceToNow } from 'date-fns'
 import * as DateLocale from 'date-fns/locale';
 import i18n, { t } from "i18next";
@@ -227,6 +228,60 @@ export default function CourseModal() {
             </Typography>
           </List.Item>
         </List.Section>
+
+        {Array.isArray(course.content) && course.content.length > 0 && (
+          <List.Section>
+            <List.SectionTitle>
+              <List.Label>{t("Modal_Course_Content", "Contenu et ressources")}</List.Label>
+            </List.SectionTitle>
+
+            {course.content.map((c, i) => (
+              <React.Fragment key={`${c.title ?? ""}-${i}`}>
+                {(c.title || c.description) && (
+                  <List.Item>
+                    <List.Leading>
+                      <Icon>
+                        <Papicons name="Info" />
+                      </Icon>
+                    </List.Leading>
+                    {!!c.title && (
+                      <Typography variant="title" numberOfLines={2}>
+                        {c.title}
+                      </Typography>
+                    )}
+                    {!!c.description && (
+                      <Typography variant="body1" color="textSecondary" numberOfLines={4}>
+                        {c.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
+                      </Typography>
+                    )}
+                  </List.Item>
+                )}
+                {(c.attachments ?? []).map((a, j) => (
+                  <List.Item
+                    key={`${a.name}-${j}`}
+                    onPress={a.url ? () => void WebBrowser.openBrowserAsync(a.url, {
+                      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+                    }) : undefined}
+                  >
+                    <List.Leading>
+                      <Icon>
+                        <Papicons name="Link" />
+                      </Icon>
+                    </List.Leading>
+                    <Typography variant="title" numberOfLines={2}>
+                      {a.name || t("Modal_Course_File", "Fichier")}
+                    </Typography>
+                    {!!a.url && (
+                      <Typography variant="body1" color="textSecondary" numberOfLines={1}>
+                        {t("Modal_Course_Open", "Ouvrir")}
+                      </Typography>
+                    )}
+                  </List.Item>
+                ))}
+              </React.Fragment>
+            ))}
+          </List.Section>
+        )}
       </List>
     </View>
   );

@@ -150,6 +150,15 @@ export default function Layout() {
             headerLargeTitle: false,
           }}
         />
+        <Stack.Screen
+          name="rappels"
+          options={{
+            headerTitle: "Rappels",
+            headerBackButtonDisplayMode: "minimal",
+            headerTransparent: false,
+            headerLargeTitle: false,
+          }}
+        />
       </Stack>
     </>
   );

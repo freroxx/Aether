@@ -116,6 +116,23 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
     fetchWeeklyTimetable(weekNumber, true);
   }, [weekNumber]);
 
+  // Miroir auto vers le calendrier appareil "Aether" (7 j, futurs uniquement).
+  // Déclenché à chaque refresh EDT (ouverture, focus, horaire) si activé.
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      const allCourses = timetable.flatMap(d => d.courses ?? []);
+      if (allCourses.length === 0) return;
+      import("@/services/local/android-calendar-sync")
+        .then(m => m.syncCoursesToDeviceCalendar(allCourses))
+        .catch(() => {});
+    }, 2000);
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    };
+  }, [timetable]);
+
   return {
     timetable,
     refresh,

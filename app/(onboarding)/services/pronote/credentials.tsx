@@ -126,18 +126,8 @@ const PronoteCredentialsForm = memo(({
       });
       useAccountStore.getState().setLastUsedAccount(accountID);
 
-      const parent = navigation.getParent();
-      if (parent) {
-        parent.goBack();
-        const parentsParent = parent.getParent();
-        if (parentsParent) {
-          parentsParent.goBack();
-        }
-      }
-
-      router.back();
       router.dismissAll();
-      return router.push("/(tabs)/index");
+      return router.replace("/(tabs)/index");
     } catch (e: any) {
       const message = e?.message || "Identifiants incorrects. Vérifie ton identifiant et ton mot de passe.";
       setError(message);

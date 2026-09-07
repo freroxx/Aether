@@ -7,7 +7,6 @@ import { Platform, StatusBar, View } from 'react-native';
 import {
   AI_SCREEN_OPTIONS,
   ALERT_SCREEN_OPTIONS,
-  CHANGELOG_SCREEN_OPTIONS,
   DEMO_SCREEN_OPTIONS,
   DEVMODE_REQUESTS_SCREEN_OPTIONS,
   DEVMODE_SCREEN_OPTIONS,
@@ -66,7 +65,6 @@ function RootNavigatorContent() {
         />
         <Stack.Screen name="page" />
         <Stack.Screen name="demo" options={DEMO_SCREEN_OPTIONS} />
-        <Stack.Screen name="changelog" options={CHANGELOG_SCREEN_OPTIONS} />
         <Stack.Screen name="ai" options={AI_SCREEN_OPTIONS} />
         <Stack.Screen name="devmode" options={DEVMODE_SCREEN_OPTIONS} />
         <Stack.Screen
@@ -104,11 +102,10 @@ function RootNavigatorContent() {
             headerTransparent: Platform.OS === "ios",
             headerTitle: t("Modal_Wallpaper_Title"),
             contentStyle: {
-              backgroundColor: theme.colors.card,
-              borderTopLeftRadius: Platform.OS === "android" ? 28 : 0,
-              borderTopRightRadius: Platform.OS === "android" ? 28 : 0,
+              backgroundColor: "transparent",
               overflow: "hidden",
             },
+            sheetCornerRadius: 28,
             headerBackground: AndroidHeaderBackground,
           }}
         />
@@ -241,6 +238,17 @@ function RootNavigatorContent() {
           options={{
             headerShown: false,
             headerTitle: "Messages",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+            presentation: "modal",
+          }}
+        />
+
+        <Stack.Screen
+          name="(features)/message-new"
+          options={{
+            headerShown: false,
+            headerTitle: "Nouveau message",
             headerTransparent: runsIOS26,
             headerLargeTitle: false,
             presentation: "modal",

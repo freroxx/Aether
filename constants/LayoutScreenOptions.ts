@@ -35,11 +35,6 @@ export const DEMO_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: "minimal" as const,
 };
 
-export const CHANGELOG_SCREEN_OPTIONS = {
-  headerTitle: t("Changelog_Title"),
-  headerLargeTitle: false,
-};
-
 export const AI_SCREEN_OPTIONS = {
   headerTitle: "AI",
   headerShown: false,

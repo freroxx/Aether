@@ -21,6 +21,8 @@ export interface Course extends GenericInterface {
   customStatus?: string;
   url?: string;
   resourceId?: string;
+  /** Contenu et ressources du cours (cahier de textes). */
+  content?: CourseResource[];
 }
 
 export interface CourseResource {

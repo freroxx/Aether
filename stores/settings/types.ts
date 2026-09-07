@@ -65,8 +65,6 @@ export interface Personalization {
   disabledTabsByAccount?: Record<string, string[]>;
   gradesSortMethod?: string;
   gradesPeriodName?: string;
-  installedVersion?: string;
-  releaseNotesSeenForVersion?: string;
   welcomeModalSeen?: boolean;
   enabledCalendarIds?: string[];
   showWeekendsOnTimetable?: boolean;
@@ -78,4 +76,23 @@ export interface Personalization {
   notificationsNotesEnabled?: boolean;
   notificationsMessagesEnabled?: boolean;
   lastNotifiedTaskIds?: string[];
+  lastNotifiedGradeIds?: string[];
+  /** Rappels liés aux tâches. */
+  taskReminders?: TaskReminder[];
+  /** Sync auto des cours vers un calendrier appareil dédié "Aether". */
+  androidCalendarSyncEnabled?: boolean;
+  aetherCalendarId?: string;
+  /** Mapping cours Aether (courseId) -> événement appareil (eventId). */
+  calendarEventMap?: Record<string, string>;
+}
+
+export interface TaskReminder {
+  id: string;
+  homeworkId: string;
+  title: string;
+  remindAt: number;
+  enabled: boolean;
+  createdAt: number;
+  /** Répétition : none (défaut), hourly (toutes les heures), bihourly (toutes les 2h). */
+  repeat?: "none" | "hourly" | "bihourly";
 }

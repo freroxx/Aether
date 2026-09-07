@@ -139,6 +139,7 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
                 customStatus: item.customStatus,
                 url: item.url,
                 kidName: item.kidName,
+                contentRaw: item.content ? JSON.stringify(item.content) : undefined,
               });
             });
           } else {
@@ -159,6 +160,7 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
                 customStatus: item.customStatus ?? course.customStatus,
                 url: item.url ?? course.url,
                 kidName: item.kidName ?? course.kidName,
+                contentRaw: item.content ? JSON.stringify(item.content) : course.contentRaw,
               });
             });
           }

@@ -337,7 +337,8 @@ const GradesView: React.FC = () => {
           </ErrorBoundary>
 
           {serviceRank && (
-            <List style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 20 }}>
+            <List>
               <List.Item>
                 <List.Leading>
                   <Icon opacity={0.5}>
@@ -369,6 +370,7 @@ const GradesView: React.FC = () => {
                 </List.Trailing>
               </List.Item>
             </List>
+            </View>
           )}
 
           <View style={{ height: 16 }} />

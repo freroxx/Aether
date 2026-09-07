@@ -4,9 +4,9 @@ import { useTheme, useRoute } from "expo-router/react-navigation";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Linking, Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import Reanimated, { FadeInUp, FadeOutUp, LinearTransition } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -29,6 +29,15 @@ export default function PronoteLoginWithQR() {
   const { colors } = theme;
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  const handleRequestPermission = useCallback(() => {
+    if (permission?.canAskAgain === false) {
+      Linking.openSettings().catch(() => {});
+      return;
+    }
+    requestPermission().catch(() => {});
+  }, [permission?.canAskAgain, requestPermission]);
 
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
@@ -112,15 +121,18 @@ export default function PronoteLoginWithQR() {
         updatedAt: (new Date()).toISOString()
       });
       useAccountStore.getState().setLastUsedAccount(accountID);
-      setTimeout(() => {
-        setLoadingModalVisible(false);
-        router.push({
-          pathname: "../end/color",
-          params: {
-            accountId: accountID
-          }
-        });
-      }, 1000);
+      // Vérifie que le compte s'initialise (manager + première session) AVANT
+      // de quitter l'onboarding : sinon écran blanc + app vide en silence.
+      try {
+        const { initializeAccountManager } = await import("@/services/shared");
+        await initializeAccountManager(accountID);
+      } catch (e) {
+        console.error("QR post-login init failed:", e);
+        throw new Error("Session créée mais synchronisation impossible. Vérifie ta connexion puis réessaie.");
+      }
+      setLoadingModalVisible(false);
+      router.dismissAll();
+      router.replace("/(tabs)/index");
     } catch (error: any) {
       console.error("QR Login Error:", error);
       setLoadingModalVisible(false);
@@ -132,8 +144,8 @@ export default function PronoteLoginWithQR() {
   }
 
   useEffect(() => {
-    if (!permission?.granted) {
-      requestPermission();
+    if (permission && !permission.granted && permission.canAskAgain !== false) {
+      requestPermission().catch(() => {});
     }
   }, [permission?.granted, requestPermission]);
 
@@ -368,31 +380,68 @@ export default function PronoteLoginWithQR() {
         </Typography>
       </View>
 
-      <MaskedView
-        style={StyleSheet.absoluteFillObject}
-        maskElement={
-          <View style={styles.maskContainer}>
-            <View style={styles.transparentSquare} />
-          </View>
-        }
-      >
-        <View
-          style={styles.maskContainer}
-        />
-        {permission?.granted && (
+      <View style={StyleSheet.absoluteFill}>
+        {permission?.granted && !cameraError ? (
           <CameraView
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
             onBarcodeScanned={
               scanned ? undefined : handleBarCodeScanned
             }
-            style={StyleSheet.absoluteFillObject}
+            onMountError={() => setCameraError("Impossible d'ouvrir la caméra")}
+            style={StyleSheet.absoluteFill}
           />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", padding: 32 }]}>
+            {!permission ? (
+              <ActivityIndicator size="large" color="#FFFFFF" />
+            ) : cameraError ? (
+              <>
+                <Typography style={[styles.text, { textAlign: "center", marginBottom: 16 }]}>
+                  {cameraError}
+                </Typography>
+                <Pressable
+                  onPress={() => {
+                    setCameraError(null);
+                    setScanned(false);
+                  }}
+                  style={{ backgroundColor: "#FFFFFF2A", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16 }}
+                >
+                  <Typography style={styles.title}>Réessayer</Typography>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Typography style={[styles.text, { textAlign: "center", marginBottom: 16 }]}>
+                  {t("ONBOARDING_CAMERA_PERMISSION") || "Aether a besoin de la caméra pour scanner le QR Code."}
+                </Typography>
+                <Pressable
+                  onPress={handleRequestPermission}
+                  style={{ backgroundColor: "#FFFFFF", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16 }}
+                >
+                  <Typography style={{ fontSize: 16, fontWeight: "600", color: "#000", textAlign: "center" }}>
+                    {permission?.canAskAgain === false ? "Ouvrir les réglages" : "Autoriser la caméra"}
+                  </Typography>
+                </Pressable>
+              </>
+            )}
+          </View>
         )}
-        {permission?.granted && (
+        <MaskedView
+          style={StyleSheet.absoluteFill}
+          maskElement={
+            <View style={styles.maskContainer}>
+              <View style={styles.transparentSquare} />
+            </View>
+          }
+          pointerEvents="none"
+        >
+          <View
+            style={styles.maskContainer}
+          />
           <View style={styles.transparentSquareBorder} />
-        )}
-      </MaskedView>
+        </MaskedView>
+      </View>
     </SafeAreaView>
   );
 }

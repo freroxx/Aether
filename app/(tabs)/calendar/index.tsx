@@ -1,6 +1,6 @@
 import { useTheme } from "expo-router/react-navigation";
 import { t } from "i18next";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Platform, StyleSheet,View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -43,6 +43,31 @@ function TabOneScreen() {
     handleRefresh,
     isLoading
   } = useTimetableData(weekNumber, date);
+
+  // Smart initial day: si journée d'école terminée → prochain jour avec cours,
+  // sinon reste sur aujourd'hui. Une seule fois au chargement.
+  const didSmartJump = useRef(false);
+  useEffect(() => {
+    if (didSmartJump.current || timetable.length === 0) return;
+    const now = new Date();
+    const todayKey = new Date(now).setHours(0, 0, 0, 0);
+    const todayEntry = timetable.find(d => new Date(d.date).setHours(0, 0, 0, 0) === todayKey);
+    if (!todayEntry || todayEntry.courses.length === 0) return;
+    const lastEnd = todayEntry.courses.reduce((m, c) => {
+      const end = new Date((c as { to?: unknown }).to ?? (c as { from?: unknown }).from).getTime();
+      return Number.isFinite(end) && end > m ? end : m;
+    }, 0);
+    if (lastEnd > 0 && now.getTime() > lastEnd) {
+      const next = timetable
+        .map(d => new Date(d.date))
+        .filter(d => d.setHours(0, 0, 0, 0) > todayKey)
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      if (next) {
+        didSmartJump.current = true;
+        handleDateChange(next);
+      }
+    }
+  }, [timetable, handleDateChange]);
 
   const renderDay = useCallback(({ index }: { index: number }) => {
     const dayDate = getDateFromIndex(index);

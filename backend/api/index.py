@@ -340,6 +340,31 @@ def get_timetable(
         end_time = getattr(l, "end", None)
         end_iso = end_time.isoformat() if end_time else (l.start + timedelta(hours=1)).isoformat()
 
+        # Contenu et ressources du cours (cahier de textes) — getattr-guarded,
+        # liste vide si l'établissement ne l'expose pas.
+        lesson_contents = []
+        try:
+            raw_contents = getattr(l, "content", None) or []
+            for c in raw_contents:
+                files = []
+                try:
+                    for f in (getattr(c, "files", None) or []):
+                        files.append({
+                            "name": getattr(f, "name", "Fichier"),
+                            "url": getattr(f, "url", None),
+                            "type": getattr(f, "type", None),
+                        })
+                except Exception:
+                    pass
+                lesson_contents.append({
+                    "title": getattr(c, "title", None),
+                    "description": getattr(c, "description", None),
+                    "category": getattr(c, "category", None),
+                    "files": files,
+                })
+        except Exception:
+            lesson_contents = []
+
         result.append({
             "id": getattr(l, "id", f"{l.start}_{getattr(l.subject, 'name', '')}"),
             "subject": getattr(l.subject, "name", "Matière") if hasattr(l, "subject") and l.subject else "Matière",
@@ -352,6 +377,7 @@ def get_timetable(
             "color": getattr(l.subject, "color", None) if hasattr(l, "subject") and l.subject else None,
             "memo": getattr(l, "memo", None),
             "is_outing": getattr(l, "outing", False),
+            "content": lesson_contents,
         })
 
     return {"lessons": result}

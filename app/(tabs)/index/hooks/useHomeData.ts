@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { t } from 'i18next';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 
 import { getWeekNumberFromDate } from '@/database/useHomework';
 import { AuthenticationError } from '@/services/errors/AuthenticationError';
@@ -49,7 +50,7 @@ export const useHomeData = () => {
     }
   }, []);
 
-  const initialize = useCallback(async () => {
+  const initialize = useCallback(async (force = false) => {
     if (!lastUsedAccount) {
       return;
     }
@@ -91,12 +92,21 @@ export const useHomeData = () => {
       return;
     }
 
-    if (Date.now() - state.lastSyncedAt < HOME_SYNC_TTL_MS) {
+    if (!force && Date.now() - state.lastSyncedAt < HOME_SYNC_TTL_MS) {
       return;
     }
 
     state.inFlight = (async () => {
     try {
+      // Toast "syncing" à chaque sync réelle
+      alert.showAlert({
+        title: "Synchronisation…",
+        description: "Mise à jour de tes données…",
+        icon: "Refresh",
+        color: "#007AFF",
+        withoutNavbar: true,
+        delay: 2000,
+      });
       await initializeAccountManager(lastUsedAccount);
       log("Refreshed Manager received");
 
@@ -117,7 +127,9 @@ export const useHomeData = () => {
     } catch (error) {
       if (String(error).includes("Unable to find")) { return; }
       if (error instanceof AuthenticationError) {
-        const instanceURL = error?.service?.auth?.additionals?.["instanceURL"] ?? "";
+        const additionals = error?.service?.auth?.additionals ?? {};
+        const instanceURL = additionals["instanceURL"] ?? additionals["url"] ?? "";
+        const accountType = additionals["accountType"] ?? additionals["account_type"] ?? "eleve";
 
         alert.showAlert({
           title: "Vous avez été déconnecté",
@@ -137,10 +149,11 @@ export const useHomeData = () => {
               }
 
               const authUrl = instanceURL;
+              const authType = accountType;
               setTimeout(() => {
                 router.navigate("/(onboarding)/ageSelection");
                 setTimeout(() => {
-                  router.navigate({ pathname: "/(onboarding)/services/pronote/browser", params: { url: authUrl, school: "Pronote" } });
+                  router.navigate({ pathname: "/(onboarding)/services/pronote/browser", params: { url: authUrl, school: "Pronote", accountType: authType } });
                 }, 400);
               }, 100);
             }
@@ -169,4 +182,28 @@ export const useHomeData = () => {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Live sync: foreground + hourly (Android only, no iOS bg)
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (appStateRef.current.match(/inactive|background/) && next === "active") {
+        initialize(false);
+      }
+      appStateRef.current = next;
+    });
+    // Poll horaire data fraîche (Android)
+    const timer = Platform.OS === "android"
+      ? setInterval(() => initialize(true), 60 * 60 * 1000)
+      : undefined;
+    return () => {
+      sub.remove();
+      if (timer) clearInterval(timer);
+    };
+  }, [initialize]);
+
+  return {
+    /** Force un pull-to-sync manuel (pull-to-refresh). */
+    refresh: useCallback(() => initialize(true), [initialize]),
+  };
 };

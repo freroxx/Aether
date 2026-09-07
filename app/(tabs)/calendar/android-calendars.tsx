@@ -25,7 +25,31 @@ export default function AndroidCalendarsScreen() {
 
   const rawIds = useSettingsStore(s => s.personalization.enabledCalendarIds);
   const enabledCalendarIds = rawIds ?? [];
+  const syncEnabled = useSettingsStore(s => s.personalization.androidCalendarSyncEnabled ?? false);
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
+
+  const handleSyncToggle = useCallback(async (next: boolean) => {
+    if (next) {
+      const granted = await hasCalendarPermissions();
+      if (!granted) {
+        const ok = await requestCalendarPermissions();
+        if (!ok) return;
+        setHasPermission(true);
+      }
+      mutateProperty("personalization", { androidCalendarSyncEnabled: true });
+      try {
+        const { ensureAetherCalendar } = await import("@/services/local/android-calendar-sync");
+        await ensureAetherCalendar();
+        const list = await getDeviceCalendars();
+        setCalendars(Array.isArray(list) ? list : []);
+      } catch {
+        // best-effort
+      }
+    } else {
+      // Désactivé : on garde les événements déjà écrits (passé conservé).
+      mutateProperty("personalization", { androidCalendarSyncEnabled: false });
+    }
+  }, [mutateProperty]);
 
   const checkAndLoad = useCallback(async () => {
     try {
@@ -100,7 +124,34 @@ export default function AndroidCalendarsScreen() {
             </Typography>
           </List.Item>
         </List.Section>
-      ) : hasPermission === false ? (
+      ) : null}
+
+      {!loading && hasPermission !== false && (
+        <List.Section>
+          <List.SectionTitle>
+            <List.Label>Synchronisation Aether</List.Label>
+          </List.SectionTitle>
+          <List.Item onPress={() => void handleSyncToggle(!syncEnabled)}>
+            <List.Leading>
+              <Icon>
+                <Papicons name={"Refresh"} />
+              </Icon>
+            </List.Leading>
+            <Typography variant="title">Exporter mes cours</Typography>
+            <Typography color="textSecondary" numberOfLines={3}>
+              Écrit tes cours (7 prochains jours) dans un calendrier « Aether ». Le passé est conservé, le futur suit ton emploi du temps.
+            </Typography>
+            <List.Trailing>
+              <NativeSwitch
+                value={syncEnabled}
+                onValueChange={v => void handleSyncToggle(v)}
+              />
+            </List.Trailing>
+          </List.Item>
+        </List.Section>
+      )}
+
+      {!loading && (hasPermission === false ? (
         <List.Section>
           <List.SectionTitle>
             <List.Label>Autorisation</List.Label>
@@ -171,7 +222,7 @@ export default function AndroidCalendarsScreen() {
               );
             })}
           </List.Section>
-        ))
+        )))
       )}
     </List>
   );

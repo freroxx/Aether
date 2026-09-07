@@ -8,25 +8,32 @@ import { info,warn } from "@/utils/logger/logger";
 
 import { getDatabaseInstance, useDatabase } from "./DatabaseProvider";
 import News from "./models/News";
+import { useAccountStore } from "@/stores/account";
 import { parseJsonArray } from "./useHomework";
 import { safeWrite } from "./utils/safeTransaction";
 
 export function useNews(refresh = 0) {
   const database = useDatabase();
   const [news, setNews] = useState<SharedNews[]>([]);
+  // Anti-fuite : ne montrer que les actus du compte actif (les mocks démo
+  // ont createdByAccount = mock-id et ne doivent jamais fuir vers Pronote)
+  const lastUsedAccount = useAccountStore(s => s.lastUsedAccount);
 
   useEffect(() => {
 
     const query = database.get<News>('news').query();
 
-    const sub = query.observe().subscribe(news =>
+    const sub = query.observe().subscribe(all =>
       setNews(
-        news.map(mapNewsToShared).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        all
+          .map(mapNewsToShared)
+          .filter(item => !lastUsedAccount || item.createdByAccount === lastUsedAccount)
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       )
     );
 
     return () => sub.unsubscribe();
-  }, [refresh, database]);
+  }, [refresh, database, lastUsedAccount]);
 
   return news;
 }
@@ -122,6 +129,8 @@ export async function addNewsToDatabase(news: SharedNews[]) {
 export async function getNewsFromCache(): Promise<SharedNews[]> {
   try {
     const database = getDatabaseInstance();
+    const { useAccountStore } = await import("@/stores/account");
+    const lastUsedAccount = useAccountStore.getState().lastUsedAccount;
 
     const news = await database
       .get<News>('news')
@@ -130,10 +139,36 @@ export async function getNewsFromCache(): Promise<SharedNews[]> {
 
     return news
       .map(mapNewsToShared)
+      .filter(item => !lastUsedAccount || item.createdByAccount === lastUsedAccount)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   } catch (e) {
     warn(String(e));
     return [];
+  }
+}
+
+/** Supprime les actus orphelines (ex-démos supprimés) : garde uniquement les comptes connus. */
+export async function purgeOrphanNews(): Promise<void> {
+  try {
+    const { useAccountStore } = await import("@/stores/account");
+    const known = new Set(useAccountStore.getState().accounts.map(a => a.id));
+    const database = getDatabaseInstance();
+    const all = await database.get<News>('news').query().fetch();
+    const orphans = all.filter(r => {
+      const owner = (r as News).createdByAccount;
+      return owner && !known.has(owner);
+    });
+    if (orphans.length === 0) return;
+    await safeWrite(
+      database,
+      async () => {
+        await Promise.all(orphans.map(r => r.destroyPermanently()));
+      },
+      10000,
+      `purge_orphan_news_${orphans.length}`
+    );
+  } catch (e) {
+    warn(String(e));
   }
 }
 

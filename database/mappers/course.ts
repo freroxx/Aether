@@ -1,6 +1,17 @@
-import { Course as SharedCourse } from "@/services/shared/timetable";
+import { Course as SharedCourse, CourseResource } from "@/services/shared/timetable";
 
 import Course from "../models/Timetable";
+
+function parseContent(raw: unknown): CourseResource[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return undefined;
+    return parsed as CourseResource[];
+  } catch {
+    return undefined;
+  }
+}
 
 export function mapCourseToShared(course: Course): SharedCourse {
   return {
@@ -19,6 +30,7 @@ export function mapCourseToShared(course: Course): SharedCourse {
     status: course.status,
     customStatus: course.customStatus,
     url: course.url,
-    kidName: course.kidName
+    kidName: course.kidName,
+    content: parseContent((course as { contentRaw?: unknown }).contentRaw),
   }
 }

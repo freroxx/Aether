@@ -36,9 +36,24 @@ export const getDisplayDenominator = (scale: GradeDisplayScale): string => {
   return `/${scale}`;
 };
 
+function normalizeOutOf(outOf: unknown): number | null {
+  let v: unknown = outOf;
+  if (typeof v === "object" && v !== null && "value" in (v as Record<string, unknown>)) {
+    v = (v as Record<string, unknown>).value;
+  }
+  const n = typeof v === "string" ? Number(v) : (v as number);
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export function formatDenominator(outOf: unknown, fallback = 20): string {
-  const n = typeof outOf === "string" ? Number(outOf) : (outOf as number);
-  return Number.isFinite(n) && (n as number) > 0 ? `/${n}` : `/${fallback}`;
+  const n = normalizeOutOf(outOf);
+  if (n !== null) return `/${n}`;
+  if (__DEV__ && outOf !== undefined && outOf !== null) {
+    // eslint-disable-next-line no-console
+    console.log("[formatDenominator] fallback exclu:", JSON.stringify(outOf));
+  }
+  const f = typeof fallback === "number" && Number.isFinite(fallback) && fallback > 0 ? fallback : 20;
+  return `/${f}`;
 }
 
 export function formatDenominatorForScale(scale: unknown): string {
@@ -67,9 +82,7 @@ export const formatScoreForDisplay = (
   scale: GradeDisplayScale,
 ): { value: number; denominator: string } => {
   const safeValue = Number.isFinite(value) ? value : 0;
-  const parsed = typeof outOf === "string" ? Number(outOf) : (outOf as number);
-  const safeOutOf =
-    Number.isFinite(parsed) && (parsed as number) > 0 ? (parsed as number) : 20;
+  const safeOutOf = normalizeOutOf(outOf) ?? 20;
   if (safeOutOf === 20) {
     return formatAssumed20ForDisplay(safeValue, scale);
   }

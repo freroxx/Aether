@@ -22,7 +22,6 @@ import { Chat, Message } from "@/services/shared/chat";
 import { getManager } from "@/services/shared";
 import { generateMockChatMessages, generateMockChats } from "@/services/mock/data";
 import { useAccountStore } from "@/stores/account";
-import { useSettingsStore } from "@/stores/settings";
 import { error } from "@/utils/logger/logger";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import Avatar from "@/ui/components/Avatar";
@@ -41,9 +40,6 @@ export default function MessageThreadView() {
 
   const account = useAccountStore(state =>
     state.accounts.find(a => a.id === state.lastUsedAccount)
-  );
-  const mockDataEnabled = useSettingsStore(
-    state => state.personalization.mockDataEnabled ?? false
   );
 
   const myName = useMemo(
@@ -92,27 +88,23 @@ export default function MessageThreadView() {
   const load = useCallback(async () => {
     try {
       const manager = getManager();
-      if (!manager || !account) {
-        const mockChats = generateMockChats("guest");
+      // Mocks TUÉS sur vrai compte : uniquement compte démo/invité
+      const isDemoAccount = !account || (account.services?.length ?? 0) === 0;
+      if (isDemoAccount) {
+        const mockChats = generateMockChats(account?.id || "guest");
         const found = mockChats.find(c => c.id === chatId) || mockChats[0];
         setChat(found);
         if (found) {
-          const mockMsgs = generateMockChatMessages("guest", found.id);
+          const mockMsgs = generateMockChatMessages(account?.id || "guest", found.id);
           setMessages([...mockMsgs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
         }
         setIsUsingMock(true);
         return;
       }
-
-      if (mockDataEnabled) {
-        const mockChats = generateMockChats(account.id);
-        const found = mockChats.find(c => c.id === chatId) || mockChats[0];
-        setChat(found);
-        if (found) {
-          const mockMsgs = generateMockChatMessages(account.id, found.id);
-          setMessages([...mockMsgs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-        }
-        setIsUsingMock(true);
+      if (!manager) {
+        setChat(undefined);
+        setMessages([]);
+        setIsUsingMock(false);
         return;
       }
 
@@ -131,22 +123,11 @@ export default function MessageThreadView() {
       setIsUsingMock(false);
     } catch (e) {
       error(String(e));
-      if (mockDataEnabled || !account) {
-        const mockChats = generateMockChats(account?.id || "guest");
-        const found = mockChats.find(c => c.id === chatId) || mockChats[0];
-        setChat(found);
-        if (found) {
-          const mockMsgs = generateMockChatMessages(account?.id || "guest", found.id);
-          setMessages([...mockMsgs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-        }
-        setIsUsingMock(true);
-      } else {
-        setChat(undefined);
-        setMessages([]);
-        setIsUsingMock(false);
-      }
+      setChat(undefined);
+      setMessages([]);
+      setIsUsingMock(false);
     }
-  }, [chatId, account, mockDataEnabled]);
+  }, [chatId, account]);
 
   useEffect(() => {
     setLoading(true);

@@ -82,6 +82,24 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
         }));
         if (done) {
           notificationAsync(NotificationFeedbackType.Success);
+          // Tâche terminée → stoppe ses rappels (dont répétés)
+          try {
+            const { cancelTaskRemindersForHomework } = await import("@/services/local/reminders");
+            const { getHomeworkRouteId } = await import("@/database/useHomework");
+            const ids = new Set<string>();
+            const rawId = (item as { id?: unknown }).id;
+            if (rawId !== undefined && rawId !== null) ids.add(String(rawId));
+            try {
+              ids.add(getHomeworkRouteId(item));
+            } catch {
+              // ignore route id
+            }
+            for (const hid of ids) {
+              await cancelTaskRemindersForHomework(hid);
+            }
+          } catch {
+            // best-effort
+          }
         }
       }
       catch (err) {

@@ -32,6 +32,7 @@ interface TaskProps {
   magic?: string;
   onToggle: () => void;
   onPress?: () => void;
+  onLongPress?: () => void;
 }
 
 const Task: React.FC<TaskProps> = ({
@@ -45,7 +46,8 @@ const Task: React.FC<TaskProps> = ({
   hasAttachments,
   magic,
   onToggle,
-  onPress
+  onPress,
+  onLongPress
 }) => {
   const theme = useTheme();
   const tintedColor = adjust(color, theme.dark ? 0.3 : -0.3);
@@ -70,7 +72,9 @@ const Task: React.FC<TaskProps> = ({
   }
 
   return (
-    <ListTouchable onPress={onPress}>
+    <ListTouchable
+      {...({ onPress, onLongPress, delayLongPress: 450 } as object)}
+    >
       <Stack animated layout={Animation(LinearTransition, "list")} card radius={20} style={{ borderColor: theme.colors.text + "32", borderWidth: Platform.OS === "android" ? 0 : 1, backgroundColor: (Platform.OS === 'android' && !theme.dark) ? "#FFF" : theme.colors.item, elevation: 2, overflow: "hidden" }}>
         <Stack animated layout={Animation(LinearTransition, "list")} padding={[16, 14]} gap={12} radius={20} style={{ overflow: "hidden" }}>
           {Platform.OS !== "android" && (

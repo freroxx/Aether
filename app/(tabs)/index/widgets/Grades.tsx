@@ -49,6 +49,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
     const [subjects, setSubjects] = useState<SharedSubject[]>([]);
     const [currentPeriod, setCurrentPeriod] = useState<Period | undefined>(period);
     const [serviceAverage, setServiceAverage] = useState<number | undefined>(undefined);
+    const [loaded, setLoaded] = useState(false);
     const displayScale = getGradeDisplayScale(useSettingsStore(state => state.personalization.gradesDisplayScale));
 
     const grades = useMemo(
@@ -135,6 +136,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
     const fetchGradesForPeriod = useCallback(
       async (periodToFetch: Period | undefined, managerToUse = manager) => {
         if (!periodToFetch || !managerToUse) {
+          setLoaded(true);
           return;
         }
 
@@ -144,6 +146,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
         if (cache && Date.now() - cache.fetchedAt < GRADES_TTL_MS) {
           setSubjects(cache.subjects);
           setServiceAverage(cache.serviceAverage);
+          setLoaded(true);
           return;
         }
 
@@ -151,6 +154,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
           const cachedGrades = await cache.inFlight;
           setSubjects(cachedGrades.subjects);
           setServiceAverage(cachedGrades.serviceAverage);
+          setLoaded(true);
           return;
         }
 
@@ -184,6 +188,8 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
         } catch (err) {
           gradesCache.delete(periodKey);
           error(`Failed to fetch grades: ${err}`);
+        } finally {
+          setLoaded(true);
         }
       },
       [manager],
@@ -200,6 +206,14 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
     }, [period]);
 
     if (grades.length === 0) {
+      // Placeholder stable pendant le chargement (évite le pop-in/out de la carte)
+      if (!loaded) {
+        return (
+          <View style={{ width: "100%", paddingTop: 4, paddingBottom: 12, height: 132, opacity: 0.5 }}>
+            <Averages grades={[]} realAverage={undefined} inline displayScale={displayScale} />
+          </View>
+        );
+      }
       return null;
     }
 

@@ -504,8 +504,9 @@ const WallpaperModal = () => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: undefined,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     overflow: "hidden",
   },
   sheetHeaderWrapper: {

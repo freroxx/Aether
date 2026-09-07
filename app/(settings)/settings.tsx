@@ -1,9 +1,8 @@
 import { Papicons } from '@getpapillon/papicons';
 import { useTheme, useHeaderHeight } from "expo-router/react-navigation";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { t } from "i18next";
-import { Calendar, InfoIcon, Palette, Sparkles, User, ShieldCheck, Bell } from "lucide-react-native";
+import { Calendar, Palette, Sparkles, User, ShieldCheck, Bell } from "lucide-react-native";
 import React, { useCallback, useMemo } from "react";
 import { Alert, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,7 +30,6 @@ export default function SettingsIndex() {
   const lastUsedAccount = useAccountStore((state) => state.lastUsedAccount);
   const settingsStore = useSettingsStore(state => state.personalization);
   const currentVersion = packagejson.version;
-  const releaseNotesUrl = `https://github.com/aether-app/releases/tag/v${currentVersion}`;
 
   const account = accounts.find((a) => a.id === lastUsedAccount);
 
@@ -101,6 +99,12 @@ export default function SettingsIndex() {
           icon: <Bell size={20} color={theme.colors.primary} />,
           onPress: () => router.push("/(settings)/notifications"),
         },
+        {
+          title: "Rappels",
+          description: "Mes rappels pour les tâches",
+          icon: <Bell size={20} color={theme.colors.primary} />,
+          onPress: () => router.push("/(settings)/rappels"),
+        },
       ],
     },
     {
@@ -108,18 +112,9 @@ export default function SettingsIndex() {
       content: [
         {
           title: "À propos d'Aether",
-          description: `Version ${currentVersion} · FOSS & Transparent`,
+          description: `Version ${currentVersion} · FOSS & Indépendant`,
           icon: <ShieldCheck size={20} color="#29947A" />,
           onPress: () => router.navigate("/(settings)/about"),
-        },
-        {
-          title: t("Settings_ReleaseNotes_Title"),
-          description: "Découvrir les nouveautés de cette version",
-          icon: <InfoIcon size={20} color={theme.colors.primary} />,
-          onPress: () =>
-            WebBrowser.openBrowserAsync(releaseNotesUrl, {
-              presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-            }),
         },
       ],
     },

@@ -18,6 +18,7 @@ import { Balance } from './models/Balance';
 import CanteenHistoryItem from './models/CanteenHistory';
 import Kid from './models/Kid';
 import { mySchema } from './schema';
+import { migrations } from './migrations';
 
 const appGroupId = 'group.xyz.getpapillon.ios';
 const databaseFilename = 'watermelon.db';
@@ -40,6 +41,7 @@ function resolveSharedDbName(): string | undefined {
 
 const adapter = new SQLiteAdapter({
   schema: mySchema,
+  migrations,
   dbName: resolveSharedDbName(),
 });
 

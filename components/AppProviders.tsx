@@ -7,6 +7,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DatabaseProvider } from "@/database/DatabaseProvider";
 import { DEFAULT_MATERIAL_YOU_ENABLED, useSettingsStore } from '@/stores/settings';
 import { AlertProvider } from '@/ui/components/AlertProvider';
+import { useNewItemsCheck } from "@/services/local/notifications";
+import { syncTaskRemindersFromStore } from "@/services/local/reminders";
 import { runsIOS26 } from '@/ui/utils/IsLiquidGlass';
 import { AppColors } from "@/utils/colors";
 import { createDarkTheme, createDefaultTheme } from '@/utils/theme/Theme';
@@ -48,6 +50,14 @@ export function AppProviders({ children }: AppProvidersProps) {
       SystemUI.setBackgroundColorAsync("#000000");
     }
   }, [backgroundColor]);
+
+  // Notifications background watchers (tâches + notes, 15 min foreground)
+  useNewItemsCheck(15 * 60 * 1000, true);
+
+  // Restaure les rappels de tâches planifiés après redémarrage
+  useEffect(() => {
+    syncTaskRemindersFromStore().catch(() => {});
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "black" }}>

@@ -6,6 +6,7 @@ import Reanimated, { Easing, LinearTransition } from "react-native-reanimated";
 import Stack from "./Stack";
 import Typography from "./Typography";
 import i18n from "@/utils/i18n";
+import { formatDenominator } from "@/utils/grades/scale";
 
 const ListGradesLayoutTransition = LinearTransition.easing(Easing.inOut(Easing.circle)).duration(300);
 
@@ -37,7 +38,7 @@ const Grade: React.FC<GradeProps> = React.memo(
       }),
       [date],
     );
-    const formattedScore = useMemo(() => score.toFixed(2), [score]);
+    const formattedScore = useMemo(() => Number.isFinite(score) ? (score as number).toFixed(2) : "—", [score]);
 
     const styles = useMemo(
       () =>
@@ -169,7 +170,7 @@ const Grade: React.FC<GradeProps> = React.memo(
                       color={color}
                       style={{ marginBottom: 4 }}
                     >
-                      /{outOf}
+                      {formatDenominator(outOf)}
                     </Typography>
                   </>
                 )}

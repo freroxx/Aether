@@ -3,7 +3,7 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { useRouter } from 'expo-router';
 import { t } from 'i18next';
 import React from 'react';
-import { FlatList, Platform, StatusBar, View } from 'react-native';
+import { FlatList, Platform, RefreshControl, StatusBar, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccountStore } from '@/stores/account';
@@ -18,6 +18,7 @@ import { useTimetableWidgetData } from './hooks/useTimetableWidgetData';
 import { useTimetableWidgetTitle } from './hooks/useTimetableWidgetTitle';
 import HomeTimeTableWidget from './widgets/timetable';
 import GradesWidget from './widgets/Grades';
+import LessonContentWidget from './widgets/LessonContent';
 import MaskedView from '@react-native-masked-view/masked-view';
 import LinearGradient from 'react-native-linear-gradient';
 import MainTabErrorBoundary from '@/ui/components/MainTabErrorBoundary';
@@ -42,19 +43,40 @@ const HomeScreen = () => {
     }
   }, [account, accounts.length, router, store]);
 
-  useHomeData();
+  const { refresh } = useHomeData();
+  const [homeRefreshing, setHomeRefreshing] = React.useState(false);
+  const onHomeRefresh = React.useCallback(async () => {
+    setHomeRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setHomeRefreshing(false);
+    }
+  }, [refresh]);
   const { courses } = useTimetableWidgetData();
   const timetableTitle = useTimetableWidgetTitle(courses);
 
   const [gradesWidgetHidden, setGradesWidgetHidden] = React.useState(true);
+  const [lessonContentHidden, setLessonContentHidden] = React.useState(true);
 
   const renderTimeTable = React.useCallback(() => <HomeTimeTableWidget />, []);
   const renderGrades = React.useCallback(
     () => <GradesWidget onEmptyStateChange={setGradesWidgetHidden} />,
     []
   );
+  const renderLessonContent = React.useCallback(
+    () => <LessonContentWidget onEmptyStateChange={setLessonContentHidden} />,
+    []
+  );
 
   const data: HomeWidgetItem[] = React.useMemo(() => [
+    {
+      icon: <Papicons name={"Info"} />,
+      title: t("Home_Widget_LessonContent", "Contenu et ressources"),
+      redirect: "(tabs)/calendar",
+      hidden: lessonContentHidden,
+      render: renderLessonContent
+    },
     {
       icon: <Papicons name={"Calendar"} />,
       title: timetableTitle,
@@ -68,7 +90,7 @@ const HomeScreen = () => {
       hidden: gradesWidgetHidden,
       render: renderGrades
     }
-  ], [renderTimeTable, renderGrades, gradesWidgetHidden, timetableTitle]);
+  ], [renderTimeTable, renderGrades, renderLessonContent, gradesWidgetHidden, lessonContentHidden, timetableTitle]);
 
   React.useEffect(() => {
     if (!account || welcomeModalSeen) {
@@ -89,6 +111,9 @@ const HomeScreen = () => {
           renderItem={({ item }) => <HomeWidget item={item} />}
           keyExtractor={(item) => item.title}
           ListHeaderComponent={<HomeHeader />}
+          refreshControl={
+            <RefreshControl refreshing={homeRefreshing} onRefresh={onHomeRefresh} />
+          }
           style={{ flex: 1 }}
           contentContainerStyle={{
             paddingBottom: Platform.OS === 'ios' ? bottomTabBarHeight : 16,

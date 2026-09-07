@@ -240,7 +240,7 @@ export const CompactGrade = ({
                 </>
               ) : (
                 <>
-                  {score !== undefined && score !== null ? (
+                  {typeof score === "number" && Number.isFinite(score) ? (
                     <>
                       <Typography
                         color={trailingForeground}

@@ -71,8 +71,18 @@ export class Pronote implements SchoolServicePlugin {
     if (Date.now() <= this.tokenExpiration) return;
 
     this.refreshInFlight = (async () => {
-      await this.refreshAccount(this.authData);
-      this.tokenExpiration = Date.now() + 5 * 60 * 1000;
+      try {
+        const refresh = await refreshPronoteAccount(this.accountId, this.authData);
+        this.authData = refresh.auth;
+        this.session = refresh.session;
+        if (refresh.refreshed) {
+          this.tokenExpiration = Date.now() + 5 * 60 * 1000;
+        }
+      } catch (e) {
+        // Échec de refresh : on propage pour laisser le manager lever AuthenticationError
+        // (écran "déconnecté / Me reconnecter") plutôt qu'un token mort en silence.
+        throw e;
+      }
     })().finally(() => {
       this.refreshInFlight = null;
     });

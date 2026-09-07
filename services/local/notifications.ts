@@ -10,6 +10,10 @@ export const TASKS_REMINDER_ID = "tasks-reminder";
 export const NEW_TASKS_ID = "new-tasks";
 /** Android notification channel id for homework reminders. */
 export const TASKS_CHANNEL_ID = "tasks";
+/** Identifier (data kind) for new-grades alerts. */
+export const NEW_GRADES_ID = "new-grades";
+/** Android notification channel id for grades. */
+export const GRADES_CHANNEL_ID = "grades";
 
 /** FR reminder variants. `{count}` is replaced with the undone count at schedule time. */
 export const TASKS_SENTENCES: string[] = [
@@ -379,4 +383,118 @@ export function useNewTasksCheck(
       if (timer) clearInterval(timer);
     };
   }, [getPendingCount, intervalMs, enabled]);
+}
+
+// --- New-grades watcher (ID compare, fast) ---
+
+async function ensureGradesChannel(): Promise<void> {
+  try {
+    if (Platform.OS !== "android") return;
+    await Notifications.setNotificationChannelAsync(GRADES_CHANNEL_ID, {
+      name: "Notes",
+      importance: Notifications.AndroidImportance.MAX,
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+interface GradeLike {
+  id: string;
+}
+
+export let __gradesSourceForTests: null | (() => Promise<GradeLike[]>) = null;
+
+export function __setGradesSourceForTests(src: null | (() => Promise<GradeLike[]>)): void {
+  __gradesSourceForTests = src;
+}
+
+async function loadGrades(): Promise<GradeLike[]> {
+  if (__gradesSourceForTests) {
+    try {
+      return (await __gradesSourceForTests()) ?? [];
+    } catch {
+      return [];
+    }
+  }
+  try {
+    const [{ getManager }, { getCurrentPeriod }] = await Promise.all([
+      import("@/services/shared"),
+      import("@/utils/grades/helper/period"),
+    ]);
+    const manager = getManager();
+    if (!manager) return [];
+    const periods = await manager.getGradesPeriods();
+    const current = getCurrentPeriod(periods);
+    if (!current) return [];
+    const result = await manager.getGradesForPeriod(current, current.createdByAccount);
+    const grades = (result.subjects ?? []).flatMap(s => s.grades ?? []);
+    return grades.map(g => ({ id: String((g as { id?: unknown })?.id ?? "") })).filter(g => g.id.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/** Diff grade IDs vs store, notify instantly on new notes. First run seeds. */
+export async function checkNewGradesAndNotify(): Promise<void> {
+  try {
+    const state = useSettingsStore.getState();
+    const enabled = state.personalization.notificationsNotesEnabled
+      ?? state.personalization.notifications?.notesEnabled ?? false;
+    if (!enabled) return;
+    const prev: string[] =
+      (state.personalization as { lastNotifiedGradeIds?: string[] }).lastNotifiedGradeIds ?? [];
+    const current = (await loadGrades()).map(g => g.id);
+    const fresh = current.filter(id => !prev.includes(id));
+    try {
+      state.mutateProperty("personalization", {
+        lastNotifiedGradeIds: current,
+      } as Partial<import("@/stores/settings/types").Personalization>);
+    } catch {
+      // best-effort
+    }
+    if (prev.length === 0 || fresh.length === 0) return;
+    const granted = await areNotificationsEnabled();
+    if (!granted) return;
+    await ensureGradesChannel();
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Nouvelle note reçue !",
+        body: fresh.length === 1
+          ? "Une nouvelle note est arrivée."
+          : `${fresh.length} nouvelles notes sont arrivées.`,
+        data: { kind: NEW_GRADES_ID, count: fresh.length },
+      },
+      trigger: null,
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+/** Foreground poll for new tasks + grades (default 15min, Android fast path). */
+export function useNewItemsCheck(intervalMs = 15 * 60 * 1000, enabled = true): void {
+  useEffect(() => {
+    if (!enabled) return;
+    let mounted = true;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const poll = async () => {
+      if (!mounted) return;
+      try {
+        const p = useSettingsStore.getState().personalization;
+        const tasksOn = p.notificationsTasksEnabled ?? p.notifications?.tasksEnabled ?? false;
+        const notesOn = p.notificationsNotesEnabled ?? p.notifications?.notesEnabled ?? false;
+        if (tasksOn) await checkNewTasksAndNotify();
+        if (notesOn) await checkNewGradesAndNotify();
+      } catch {
+        // ignore
+      }
+    };
+    poll();
+    timer = setInterval(poll, intervalMs);
+    return () => {
+      mounted = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [intervalMs, enabled]);
 }

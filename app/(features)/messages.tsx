@@ -1,7 +1,9 @@
 import { useTheme } from "expo-router/react-navigation";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,7 +18,6 @@ import { Chat } from "@/services/shared/chat";
 import { getManager } from "@/services/shared";
 import { generateMockChats } from "@/services/mock/data";
 import { useAccountStore } from "@/stores/account";
-import { useSettingsStore } from "@/stores/settings";
 import { error } from "@/utils/logger/logger";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import Avatar from "@/ui/components/Avatar";
@@ -41,24 +42,21 @@ export default function MessagesView() {
   const account = useAccountStore(state =>
     state.accounts.find(a => a.id === state.lastUsedAccount)
   );
-  const mockDataEnabled = useSettingsStore(
-    state => state.personalization.mockDataEnabled ?? false
-  );
 
   const load = useCallback(async () => {
     try {
       const manager = getManager();
-      if (!manager || !account) {
-        const mock = generateMockChats("guest");
-        setChats(mock);
+      // Mocks TUÉS sur vrai compte : uniquement compte démo/invité (aucun service lié)
+      const isDemoAccount = !account || (account.services?.length ?? 0) === 0;
+      if (isDemoAccount) {
+        setChats(generateMockChats(account?.id || "guest"));
         setIsUsingMock(true);
         return;
       }
-
-      if (mockDataEnabled) {
-        const mock = generateMockChats(account.id);
-        setChats(mock);
-        setIsUsingMock(true);
+      if (!manager) {
+        // Vrai compte, manager pas prêt : jamais de mock
+        setChats([]);
+        setIsUsingMock(false);
         return;
       }
 
@@ -72,16 +70,11 @@ export default function MessagesView() {
       }
     } catch (e) {
       error(String(e));
-      if (mockDataEnabled || !account) {
-        const mock = generateMockChats(account?.id || "guest");
-        setChats(mock);
-        setIsUsingMock(true);
-      } else {
-        setChats([]);
-        setIsUsingMock(false);
-      }
+      // Erreur sur vrai compte : jamais de mock, état vide
+      setChats([]);
+      setIsUsingMock(false);
     }
-  }, [account, mockDataEnabled]);
+  }, [account]);
 
   useEffect(() => {
     setLoading(true);
@@ -128,6 +121,24 @@ export default function MessagesView() {
             subtitle={`${chats.length} conversation${chats.length > 1 ? "s" : ""}`}
             loading={loading}
           />
+        }
+        trailing={
+          isUsingMock ? undefined : (
+            <Pressable
+              onPress={() => router.push("/(features)/message-new")}
+              hitSlop={10}
+              style={{
+                backgroundColor: `${String(theme.colors.primary)}1A`,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Papicons name="Plus" size={20} color={String(theme.colors.primary)} />
+            </Pressable>
+          )
         }
       />
 

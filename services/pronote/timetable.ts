@@ -1,4 +1,5 @@
 import { PronoteApiClient } from "@/services/pronote/api-client";
+import { AttachmentType } from "@/services/shared/attachment";
 import { Course, CourseDay, CourseResource, CourseStatus, CourseType } from "@/services/shared/timetable";
 import { getDateRangeOfWeek } from "@/database/useHomework";
 import { error } from "@/utils/logger/logger";
@@ -37,6 +38,17 @@ export async function fetchPronoteWeekTimetable(
         customStatus: l.status || undefined,
         type: CourseType.LESSON,
         createdByAccount: accountId,
+        content: Array.isArray(l.content) ? l.content.map((c: any): CourseResource => ({
+          title: c?.title ?? undefined,
+          description: c?.description ?? undefined,
+          category: typeof c?.category === "number" ? c.category : 0,
+          attachments: Array.isArray(c?.files) ? c.files.map((f: any) => ({
+            type: f?.type === 1 ? AttachmentType.FILE : AttachmentType.LINK,
+            name: f?.name ?? "Fichier",
+            url: f?.url ?? "",
+            createdByAccount: accountId,
+          })) : [],
+        })).filter((c: CourseResource) => c.title || c.description || (c.attachments?.length ?? 0) > 0) : undefined,
       });
     }
 

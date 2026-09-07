@@ -22,7 +22,6 @@ import { CanteenMenu, Food, Meal } from "@/services/shared/canteen";
 import { getManager } from "@/services/shared";
 import { generateMockCanteenMenu } from "@/services/mock/data";
 import { useAccountStore } from "@/stores/account";
-import { useSettingsStore } from "@/stores/settings";
 import { error } from "@/utils/logger/logger";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import MaterialIcon from "@/ui/components/MaterialIcon";
@@ -251,9 +250,6 @@ export default function CanteenMenuView() {
   const account = useAccountStore(state =>
     state.accounts.find(a => a.id === state.lastUsedAccount)
   );
-  const mockDataEnabled = useSettingsStore(
-    state => state.personalization.mockDataEnabled ?? false
-  );
 
   const monday = useMemo(() => {
     const base = startOfWeekMonday(new Date());
@@ -278,17 +274,16 @@ export default function CanteenMenuView() {
   const load = useCallback(async () => {
     try {
       const manager = getManager();
-      if (!manager || !account) {
-        const mockMenu = generateMockCanteenMenu("guest", monday);
-        setMenus(mockMenu);
+      // Mocks TUÉS sur vrai compte : uniquement compte démo/invité
+      const isDemoAccount = !account || (account.services?.length ?? 0) === 0;
+      if (isDemoAccount) {
+        setMenus(generateMockCanteenMenu(account?.id || "guest", monday));
         setIsUsingMock(true);
         return;
       }
-
-      if (mockDataEnabled) {
-        const mockMenu = generateMockCanteenMenu(account.id, monday);
-        setMenus(mockMenu);
-        setIsUsingMock(true);
+      if (!manager) {
+        setMenus([]);
+        setIsUsingMock(false);
         return;
       }
 
@@ -302,16 +297,10 @@ export default function CanteenMenuView() {
       }
     } catch (e) {
       error(String(e));
-      if (mockDataEnabled || !account) {
-        const fallback = generateMockCanteenMenu(account?.id || "guest", monday);
-        setMenus(fallback);
-        setIsUsingMock(true);
-      } else {
-        setMenus([]);
-        setIsUsingMock(false);
-      }
+      setMenus([]);
+      setIsUsingMock(false);
     }
-  }, [monday, mockDataEnabled, account]);
+  }, [monday, account]);
 
   useEffect(() => {
     setLoading(true);

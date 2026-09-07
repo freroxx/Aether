@@ -286,19 +286,8 @@ export default function PronoteENTLogin() {
         });
         useAccountStore.getState().setLastUsedAccount(deviceUUID);
 
-        const parent = navigation.getParent();
-        if (parent) {
-          parent.goBack();
-          
-          const parentsParent = parent.getParent();
-          if (parentsParent) {
-            parentsParent.goBack();
-          }
-        }
-
-        router.back();
         router.dismissAll();
-        return router.push("/(tabs)/index");
+        return router.replace("/(tabs)/index");
       } catch (error: any) {
         console.error("Error during login:", error);
         Alert.alert("Erreur", error?.message || "Une erreur est survenue lors de la connexion à Pronote. Veuillez réessayer.");
