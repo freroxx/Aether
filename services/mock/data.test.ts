@@ -4,10 +4,13 @@ import { afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { MockData } from "./index";
 import {
   generateMockAttendance,
+  generateMockEvaluations,
   generateMockGrades,
   generateMockHomeworks,
   generateMockNews,
   generateMockPeriods,
+  generateMockReport,
+  generateMockTeachingStaff,
   generateMockTimetable,
 } from "./data";
 
@@ -70,6 +73,40 @@ describe("Mock Data generators", () => {
         .flatMap(subject => subject.grades ?? [])
         .every(grade => grade.createdByAccount === accountId)
     ).toBe(true);
+  });
+
+  it("provides evaluations, report and teaching staff mocks", async () => {
+    const periods = generateMockPeriods(accountId, referenceDate);
+
+    const evaluations = generateMockEvaluations(accountId, periods[0]);
+    expect(evaluations.length).toBeGreaterThan(0);
+    expect(
+      evaluations.every(
+        item =>
+          item.createdByAccount === accountId &&
+          item.acquisitions.length > 0 &&
+          item.paliers.length > 0
+      )
+    ).toBe(true);
+
+    // Trimestres 1-2 : bulletin publié ; trimestre 3 : non publié.
+    expect(generateMockReport(accountId, periods[0])).not.toBeNull();
+    expect(generateMockReport(accountId, periods[1])).not.toBeNull();
+    expect(generateMockReport(accountId, periods[2])).toBeNull();
+    const report = generateMockReport(accountId, periods[0]);
+    expect(report?.subjects.length).toBeGreaterThan(0);
+    expect(report?.subjects[0].teachers.length).toBeGreaterThan(0);
+
+    const staff = generateMockTeachingStaff(accountId);
+    expect(staff.length).toBeGreaterThan(0);
+    expect(staff.every(member => member.name && member.email)).toBe(true);
+
+    const plugin = new MockData(accountId);
+    expect(await plugin.getEvaluationsForPeriod(periods[0])).toEqual(
+      evaluations
+    );
+    expect(await plugin.getReportForPeriod(periods[2])).toBeNull();
+    expect((await plugin.getTeachingStaff()).length).toBe(staff.length);
   });
 
   it("provides French news and all school-life categories", () => {

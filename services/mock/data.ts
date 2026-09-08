@@ -1,7 +1,13 @@
 import { Attendance, ObservationType } from "@/services/shared/attendance";
 import { CanteenMenu } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
-import { Period, PeriodGrades, Subject } from "@/services/shared/grade";
+import {
+  Evaluation,
+  Period,
+  PeriodGrades,
+  Report,
+  Subject,
+} from "@/services/shared/grade";
 import { Homework, ReturnFormat } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import {
@@ -273,15 +279,27 @@ export function generateMockGrades(
             "Devoir maison",
             "Participation orale",
           ][gradeIndex],
+          comment:
+            gradeIndex === 0
+              ? "Bon travail dans l'ensemble, soigne la rédaction."
+              : gradeIndex === 1 && subjectIndex === 0
+                ? "Résultats en progrès, poursuivre les efforts."
+                : undefined,
+          isBonus: subjectIndex === 4 && gradeIndex === 2,
+          isOptional: subjectIndex === 1 && gradeIndex === 2,
+          isOutOf20: subjectIndex === 5 && gradeIndex === 1,
           givenAt: addDays(
             period.start,
             14 + subjectIndex * 5 + gradeIndex * 18
           ),
           coefficient: gradeIndex === 0 ? 2 : 1,
-          outOf: { value: 20 },
+          outOf: { value: subjectIndex === 5 && gradeIndex === 1 ? 10 : 20 },
           studentScore: {
-            value: Math.max(8, adjustedAverage + gradeIndex - 1),
-            outOf: 20,
+            value:
+              subjectIndex === 5 && gradeIndex === 1
+                ? 8.5
+                : Math.max(8, adjustedAverage + gradeIndex - 1),
+            outOf: subjectIndex === 5 && gradeIndex === 1 ? 10 : 20,
           },
           averageScore: { value: classAverage, outOf: 20 },
           minScore: { value: 6.5, outOf: 20 },
@@ -359,6 +377,7 @@ export function generateMockAttendance(
         givenAt: new Date(year, 9, 7, 8, 12),
         reason: "Retard du bus",
         justified: true,
+        justification: "Motif pris en compte par la vie scolaire.",
         duration: 12,
         createdByAccount: accountId,
       },
@@ -370,6 +389,7 @@ export function generateMockAttendance(
         to: new Date(year, 10, 18, 12),
         reason: "Rendez-vous médical",
         timeMissed: 240,
+        days: 1,
         justified: true,
         createdByAccount: accountId,
       },
@@ -403,6 +423,8 @@ export function generateMockAttendance(
         duringLesson: false,
         nature: "Retenue",
         duration: 60,
+        durationMinutes: 60,
+        schedulable: true,
         homework: {
           text: "Rédiger une réflexion sur le respect du règlement intérieur.",
           documents: [],
@@ -617,8 +639,7 @@ const MOCK_MENUS_DATA: Array<{
   },
 ];
 
-export function generateMockCanteenMenu(accountId: string, startDate: Date): CanteenMenu[] {
-  const monday = new Date(startDate);
+export function generateMockCanteenMenu(accountId: string, startDate: Date): CanteenMenu[] {  const monday = new Date(startDate);
   monday.setHours(0, 0, 0, 0);
   const weekday = (monday.getDay() + 6) % 7;
   monday.setDate(monday.getDate() - weekday);
@@ -639,4 +660,254 @@ export function generateMockCanteenMenu(accountId: string, startDate: Date): Can
       dinner: undefined,
     };
   });
+}
+
+const MOCK_EVALUATIONS: Array<{
+  name: string;
+  subject: string;
+  teacher: string;
+  coefficient: number;
+  description: string;
+  daysAfterPeriodStart: number;
+  acquisitions: Array<[string, string, string, number, string, string]>;
+}> = [
+  {
+    name: "Proportionnalité et pourcentages",
+    subject: "Mathématiques",
+    teacher: "Mme Lefèvre",
+    coefficient: 2,
+    description: "Évaluation de fin de séquence : tableaux de proportionnalité, pourcentages et échelles.",
+    daysAfterPeriodStart: 42,
+    acquisitions: [
+      ["Chercher", "MS", "Maîtrise satisfaisante", 1, "Chercher", "D2 — Méthodes et outils"],
+      ["Modéliser", "TBM", "Très bonne maîtrise", 1, "Modéliser", "D4 — Systèmes naturels"],
+      ["Calculer", "MF", "Maîtrise fragile", 2, "Calculer", "D4 — Systèmes naturels"],
+      ["Communiquer", "MS", "Maîtrise satisfaisante", 1, "Communiquer", "D1 — Langages"],
+    ],
+  },
+  {
+    name: "Lecture analytique : Germinal",
+    subject: "Français",
+    teacher: "M. Dubois",
+    coefficient: 2,
+    description: "Commentaire guidé d'un extrait du chapitre 6, registre pathétique et champ lexical de la mine.",
+    daysAfterPeriodStart: 55,
+    acquisitions: [
+      ["Lire", "TBM", "Très bonne maîtrise", 2, "Lire", "D1 — Langages"],
+      ["Écrire", "MS", "Maîtrise satisfaisante", 2, "Écrire", "D1 — Langages"],
+      ["Dire", "MF", "Maîtrise fragile", 1, "Dire", "D1 — Langages"],
+    ],
+  },
+  {
+    name: "La Révolution française : 1789",
+    subject: "Histoire-Géographie",
+    teacher: "Mme Bernard",
+    coefficient: 1,
+    description: "Frise chronologique commentée et analyse d'une caricature d'époque.",
+    daysAfterPeriodStart: 63,
+    acquisitions: [
+      ["Se repérer dans le temps", "MS", "Maîtrise satisfaisante", 1, "Repères", "D5 — Représentations du monde"],
+      ["Analyser un document", "MI", "Maîtrise insuffisante", 2, "Analyser", "D2 — Méthodes et outils"],
+    ],
+  },
+  {
+    name: "Living in London — expression orale",
+    subject: "Anglais",
+    teacher: "Mme Martin",
+    coefficient: 1,
+    description: "Prise de parole en continu : présenter son quartier idéal à Londres, 2 minutes.",
+    daysAfterPeriodStart: 70,
+    acquisitions: [
+      ["Parler en continu", "TBM", "Très bonne maîtrise", 2, "Parler", "D1 — Langages"],
+      ["Réagir et dialoguer", "MS", "Maîtrise satisfaisante", 1, "Dialoguer", "D1 — Langages"],
+    ],
+  },
+  {
+    name: "TP : réfraction de la lumière",
+    subject: "Physique-Chimie",
+    teacher: "M. Robert",
+    coefficient: 1,
+    description: "Compte rendu de TP : protocole, mesures d'angles et tracé du rayon réfracté.",
+    daysAfterPeriodStart: 77,
+    acquisitions: [
+      ["Pratiquer des démarches scientifiques", "MS", "Maîtrise satisfaisante", 2, "Démarches", "D4 — Systèmes naturels"],
+      ["Utiliser des instruments", "MF", "Maîtrise fragile", 1, "Instruments", "D4 — Systèmes naturels"],
+    ],
+  },
+  {
+    name: "La cellule : schéma légendé",
+    subject: "Sciences de la vie et de la Terre",
+    teacher: "Mme Moreau",
+    coefficient: 1,
+    description: "Schéma légendé d'une cellule observée au microscope et restitution des fonctions.",
+    daysAfterPeriodStart: 84,
+    acquisitions: [
+      ["Observer", "TBM", "Très bonne maîtrise", 1, "Observer", "D4 — Systèmes naturels"],
+      ["Restituer des connaissances", "MS", "Maîtrise satisfaisante", 1, "Restituer", "D4 — Systèmes naturels"],
+    ],
+  },
+];
+
+export function generateMockEvaluations(
+  accountId: string,
+  period: Period
+): Evaluation[] {
+  return MOCK_EVALUATIONS.map((evaluation, index) => ({
+    id: `mock-evaluation-${period.name.slice(-1)}-${index}`,
+    name: evaluation.name,
+    subject: evaluation.subject,
+    teacher: evaluation.teacher,
+    coefficient: evaluation.coefficient,
+    description: evaluation.description,
+    date: addDays(period.start, evaluation.daysAfterPeriodStart),
+    paliers: ["MI", "MF", "MS", "TBM"],
+    acquisitions: evaluation.acquisitions.map(
+      ([name, abbreviation, level, coefficient, domain, pillar]) => ({
+        name,
+        abbreviation,
+        level,
+        coefficient,
+        domain,
+        pillar,
+      })
+    ),
+    createdByAccount: accountId,
+  }));
+}
+
+const MOCK_REPORT_SUBJECTS: Array<{
+  name: string;
+  color: string;
+  student: number;
+  classAverage: number;
+  min: number;
+  max: number;
+  coefficient: number;
+  teachers: string[];
+  comments: string[];
+}> = [
+  {
+    name: "Mathématiques",
+    color: "#3568D4",
+    student: 15.5,
+    classAverage: 13.2,
+    min: 7.5,
+    max: 19,
+    coefficient: 4,
+    teachers: ["Mme Lefèvre"],
+    comments: ["Très bon trimestre, travail sérieux et régulier."],
+  },
+  {
+    name: "Français",
+    color: "#D94B64",
+    student: 14,
+    classAverage: 12.8,
+    min: 8,
+    max: 18,
+    coefficient: 4,
+    teachers: ["M. Dubois"],
+    comments: ["Bonne participation orale, poursuivre les efforts à l'écrit."],
+  },
+  {
+    name: "Histoire-Géographie",
+    color: "#E29035",
+    student: 16,
+    classAverage: 13.7,
+    min: 9,
+    max: 18.5,
+    coefficient: 3,
+    teachers: ["Mme Bernard"],
+    comments: ["Excellent travail d'analyse, élève curieux et rigoureux."],
+  },
+  {
+    name: "Anglais",
+    color: "#8E5AC7",
+    student: 17.5,
+    classAverage: 14.1,
+    min: 9.5,
+    max: 19.5,
+    coefficient: 3,
+    teachers: ["Mme Martin"],
+    comments: ["Niveau remarquable, accent travaillé avec soin."],
+  },
+  {
+    name: "Physique-Chimie",
+    color: "#24A17A",
+    student: 13.5,
+    classAverage: 12.4,
+    min: 6.5,
+    max: 18,
+    coefficient: 3,
+    teachers: ["M. Robert"],
+    comments: ["Résultats corrects mais irréguliers, la rédaction doit progresser."],
+  },
+  {
+    name: "Sciences de la vie et de la Terre",
+    color: "#4A9B4F",
+    student: 15,
+    classAverage: 13.5,
+    min: 8,
+    max: 18,
+    coefficient: 2,
+    teachers: ["Mme Moreau"],
+    comments: ["Bon trimestre, schémas soignés."],
+  },
+];
+
+export function generateMockReport(
+  accountId: string,
+  period: Period
+): Report | null {
+  // Trimestre 3 : bulletin pas encore publié — teste l'état vide.
+  if (period.name.endsWith("3")) {
+    return null;
+  }
+  return {
+    comments: [
+      "Trimestre satisfaisant dans l'ensemble. Camille est un élève sérieux qui participe avec pertinence. Encouragements du conseil de classe.",
+    ],
+    subjects: MOCK_REPORT_SUBJECTS.map(subject => ({
+      name: subject.name,
+      color: subject.color,
+      comments: subject.comments,
+      classAverage: subject.classAverage,
+      studentAverage: subject.student,
+      minAverage: subject.min,
+      maxAverage: subject.max,
+      coefficient: subject.coefficient,
+      teachers: subject.teachers,
+    })),
+    createdByAccount: accountId,
+  };
+}
+
+export function generateMockTeachingStaff(accountId: string): Array<{
+  name: string;
+  subject: string;
+  email: string;
+}> {
+  void accountId;
+  return [
+    ...LESSONS.map(lesson => ({
+      name: lesson.teacher,
+      subject: lesson.subject,
+      email:
+        lesson.teacher
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/^(mme|m)\.\s+/, "")
+          .replace(/\s+/g, ".") + "@college-exemple.fr",
+    })),
+    {
+      name: "Mme Leroy",
+      subject: "Vie scolaire",
+      email: "vie-scolaire@college-exemple.fr",
+    },
+    {
+      name: "Mme Garcia",
+      subject: "Documentation",
+      email: "cdi@college-exemple.fr",
+    },
+  ];
 }

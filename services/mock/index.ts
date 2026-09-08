@@ -15,10 +15,13 @@ import {
   generateMockChatMessages,
   generateMockChatRecipients,
   generateMockChats,
+  generateMockEvaluations,
   generateMockGrades,
   generateMockHomeworks,
   generateMockNews,
   generateMockPeriods,
+  generateMockReport,
+  generateMockTeachingStaff,
   generateMockTimetable,
 } from "./data";
 
@@ -97,16 +100,16 @@ export class MockData implements SchoolServicePlugin {
     return generateMockGrades(this.accountId, period);
   }
 
-  async getEvaluationsForPeriod(_period: Period): Promise<Evaluation[]> {
-    return [];
+  async getEvaluationsForPeriod(period: Period): Promise<Evaluation[]> {
+    return generateMockEvaluations(this.accountId, period);
   }
 
-  async getReportForPeriod(_period: Period): Promise<Report | null> {
-    return null;
+  async getReportForPeriod(period: Period): Promise<Report | null> {
+    return generateMockReport(this.accountId, period);
   }
 
   async getTeachingStaff(): Promise<TeachingStaff[]> {
-    return [];
+    return generateMockTeachingStaff(this.accountId);
   }
 
   async getAttendancePeriods(): Promise<Period[]> {
