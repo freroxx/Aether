@@ -112,7 +112,7 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
                 ent=ent
             )
         else:
-            raise HTTPException(status_code=400, detail="Données d'authentification incomplètes")
+            raise HTTPException(status_code=401, detail="Données d'authentification incomplètes")
 
         if is_parent and child_name and hasattr(client, "set_child"):
             if hasattr(client, "children") and client.children:
@@ -125,8 +125,10 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
                 client.set_child(child_name)
 
         return client
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erreur d'initialisation Pronote: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Erreur d'initialisation Pronote: {str(e)}")
 
 # ----------------- Endpoints -----------------
 
@@ -235,10 +237,11 @@ def login_qrcode(req: QrCodeLoginRequest):
     if is_parent and hasattr(client, "children"):
         children = [{"name": c.name, "grade": getattr(c, "grade", "")} for c in client.children]
 
+    new_token = getattr(client, "password", "")
     auth_payload = {
         "url": getattr(client, "pronote_url", ""),
         "username": getattr(client, "username", ""),
-        "token": getattr(client, "password", ""),
+        "token": new_token,
         "uuid": req.uuid,
         "account_type": final_account_type,
     }
@@ -284,10 +287,11 @@ def login_token(req: TokenLoginRequest):
     if is_parent and hasattr(client, "children"):
         children = [{"name": c.name, "grade": getattr(c, "grade", "")} for c in client.children]
 
+    new_token = getattr(client, "password", req.token)
     auth_payload = {
         "url": req.url,
         "username": req.username,
-        "token": req.token,
+        "token": new_token,
         "uuid": req.uuid,
         "account_type": final_account_type,
     }
@@ -297,7 +301,8 @@ def login_token(req: TokenLoginRequest):
         "success": True,
         "user": user_info,
         "children": children,
-        "auth_token": encoded_token
+        "auth_token": encoded_token,
+        "credentials": auth_payload
     }
 
 @app.get("/parent/children")
@@ -406,6 +411,7 @@ def get_grades(
             "id": getattr(g, "id", f"{g.date}_{getattr(g.subject, 'name', '')}"),
             "subject": getattr(g.subject, "name", "Matière"),
             "description": getattr(g, "comment", "") or getattr(g, "description", ""),
+            "comment": getattr(g, "comment", "") or "",
             "date": g.date.isoformat(),
             "value": float(g.grade.replace(",", ".")) if getattr(g, "grade", None) and g.grade.replace(",", ".").replace(".", "", 1).isdigit() else None,
             "out_of": float(g.out_of.replace(",", ".")) if getattr(g, "out_of", None) and g.out_of.replace(",", ".").replace(".", "", 1).isdigit() else 20.0,
@@ -414,6 +420,9 @@ def get_grades(
             "min": float(g.min.replace(",", ".")) if getattr(g, "min", None) and g.min.replace(",", ".").replace(".", "", 1).isdigit() else None,
             "coefficient": float(g.coefficient.replace(",", ".")) if getattr(g, "coefficient", None) and g.coefficient.replace(",", ".").replace(".", "", 1).isdigit() else 1.0,
             "is_significant": getattr(g, "is_significant", True),
+            "is_bonus": bool(getattr(g, "is_bonus", False)),
+            "is_optionnal": bool(getattr(g, "is_optionnal", False)),
+            "is_out_of_20": bool(getattr(g, "is_out_of_20", False)),
         })
 
     def parse_float_safe(v):
@@ -525,6 +534,37 @@ def get_attendance(
     delays = []
     punishments = []
 
+    def _parse_int_safe(v, default=0):
+        try:
+            if v is None:
+                return default
+            if isinstance(v, bool):
+                return int(v)
+            if isinstance(v, int):
+                return v
+            if isinstance(v, float):
+                return int(v)
+            return int(str(v).strip())
+        except Exception:
+            return default
+
+    def _parse_float_safe(v, default=None):
+        if v is None:
+            return default
+        if isinstance(v, bool):
+            return float(v)
+        if isinstance(v, timedelta):
+            try:
+                return float(v.total_seconds() / 60)
+            except Exception:
+                return default
+        if isinstance(v, (int, float)):
+            return float(v)
+        try:
+            return float(str(v).replace(",", ".").strip())
+        except Exception:
+            return default
+
     periods = getattr(client, "periods", [])
     if not periods and hasattr(client, "current_period") and client.current_period:
         periods = [client.current_period]
@@ -545,7 +585,8 @@ def get_attendance(
                     "to": a.to_date.isoformat() if hasattr(a, "to_date") and a.to_date else None,
                     "justified": getattr(a, "justified", False),
                     "hours": getattr(a, "hours", ""),
-                    "reason": reason_str
+                    "reason": reason_str,
+                    "days": _parse_int_safe(getattr(a, "days", 0), 0)
                 })
 
         if hasattr(p, "delays"):
@@ -562,9 +603,10 @@ def get_attendance(
                 delays.append({
                     "id": getattr(d, "id", str(getattr(d, "date", ""))),
                     "date": d.date.isoformat() if hasattr(d, "date") and d.date else None,
-                    "duration": mins,
+                    "duration": _parse_float_safe(mins, 0),
                     "justified": getattr(d, "justified", False),
-                    "reason": reason_str
+                    "reason": reason_str,
+                    "justification": getattr(d, "justification", "") or ""
                 })
 
         if hasattr(p, "punishments"):
@@ -578,6 +620,12 @@ def get_attendance(
                     "reason": pun_reason,
                     "giver": getattr(pun, "giver", ""),
                     "nature": getattr(pun, "nature", ""),
+                    "exclusion": bool(getattr(pun, "exclusion", False)),
+                    "during_lesson": bool(getattr(pun, "during_lesson", False)),
+                    "homework": getattr(pun, "homework", "") or "",
+                    "circumstances": getattr(pun, "circumstances", "") or "",
+                    "duration_minutes": _parse_float_safe(getattr(pun, "duration", None), None),
+                    "schedulable": bool(getattr(pun, "schedulable", False)),
                 })
 
     return {
@@ -642,7 +690,7 @@ def get_canteen(
                 res = []
                 for f in food_list:
                     name = getattr(f, "name", str(f))
-                    labels = [getattr(l, "name", str(l)) for l in getattr(f, "labels", [])] if hasattr(f, "labels") else []
+                    labels = [{"name": getattr(l, "name", str(l)), "color": getattr(l, "color", None)} for l in getattr(f, "labels", [])] if hasattr(f, "labels") else []
                     res.append({"name": name, "labels": labels})
                 return res
 
@@ -791,3 +839,202 @@ def create_new_chat(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Impossible d'initier la discussion: {str(e)}")
     raise HTTPException(status_code=400, detail="Fonctionnalité non supportée par cet établissement")
+
+@app.get("/evaluations")
+def get_evaluations(
+    period: Optional[str] = Query(None),
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    client = init_client(auth, child_name=child)
+    periods = getattr(client, "periods", []) or []
+
+    target_period = None
+    if period:
+        target_period = next((p for p in periods if getattr(p, "name", None) == period), None)
+    if not target_period and periods:
+        target_period = periods[-1]
+
+    if not target_period:
+        return {"evaluations": []}
+
+    def parse_float_safe(v, default=None):
+        if v is None:
+            return default
+        if isinstance(v, (int, float)):
+            try:
+                return float(v)
+            except Exception:
+                return default
+        try:
+            return float(str(v).replace(",", ".").strip())
+        except Exception:
+            return default
+
+    try:
+        raw_evaluations = target_period.evaluations
+    except Exception:
+        raw_evaluations = []
+
+    result = []
+    for e in (raw_evaluations or []):
+        e_subject = getattr(e.subject, "name", "") if hasattr(e, "subject") and getattr(e, "subject", None) else ""
+        e_date = getattr(e, "date", None)
+        try:
+            date_iso = e_date.isoformat() if e_date and hasattr(e_date, "isoformat") else None
+        except Exception:
+            date_iso = None
+        paliers = getattr(e, "paliers", []) or []
+        if not isinstance(paliers, list):
+            try:
+                paliers = list(paliers)
+            except Exception:
+                paliers = []
+        acquisitions = []
+        for ac in (getattr(e, "acquisitions", []) or []):
+            acquisitions.append({
+                "name": getattr(ac, "name", "") or "",
+                "abbreviation": getattr(ac, "abbreviation", "") or "",
+                "level": getattr(ac, "level", "") or "",
+                "coefficient": parse_float_safe(getattr(ac, "coefficient", 1.0), 1.0),
+                "domain": getattr(ac, "domain", "") or "",
+                "pillar": getattr(ac, "pillar", "") or "",
+            })
+        result.append({
+            "id": getattr(e, "id", f"{getattr(e, 'name', '')}"),
+            "name": getattr(e, "name", "") or "",
+            "subject": e_subject or "",
+            "teacher": getattr(e, "teacher", "") or "",
+            "coefficient": parse_float_safe(getattr(e, "coefficient", 1.0), 1.0),
+            "description": getattr(e, "description", "") or "",
+            "date": date_iso,
+            "paliers": paliers,
+            "acquisitions": acquisitions,
+        })
+
+    return {"evaluations": result}
+
+@app.get("/report")
+def get_report(
+    period: Optional[str] = Query(None),
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    client = init_client(auth, child_name=child)
+    periods = getattr(client, "periods", []) or []
+
+    target_period = None
+    if period:
+        target_period = next((p for p in periods if getattr(p, "name", None) == period), None)
+    if not target_period and periods:
+        target_period = periods[-1]
+
+    if not target_period:
+        return {"report": None}
+
+    try:
+        r = getattr(target_period, "report", None)
+    except Exception:
+        r = None
+
+    if r is None:
+        return {"report": None}
+
+    subjects = []
+    for s in (getattr(r, "subjects", []) or []):
+        comments = getattr(s, "comments", []) or []
+        if not isinstance(comments, list):
+            try:
+                comments = list(comments)
+            except Exception:
+                comments = []
+        teachers = getattr(s, "teachers", []) or []
+        if not isinstance(teachers, list):
+            try:
+                teachers = list(teachers)
+            except Exception:
+                teachers = []
+        subjects.append({
+            "name": getattr(s, "name", "") or "",
+            "color": getattr(s, "color", None),
+            "comments": comments,
+            "class_average": getattr(s, "class_average", None),
+            "student_average": getattr(s, "student_average", None),
+            "min_average": getattr(s, "min_average", None),
+            "max_average": getattr(s, "max_average", None),
+            "coefficient": getattr(s, "coefficient", None),
+            "teachers": teachers,
+        })
+
+    top_comments = getattr(r, "comments", []) or []
+    if not isinstance(top_comments, list):
+        try:
+            top_comments = list(top_comments)
+        except Exception:
+            top_comments = []
+
+    return {"report": {"comments": top_comments, "subjects": subjects}}
+
+@app.get("/teaching-staff")
+def get_teaching_staff(
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    client = init_client(auth, child_name=child)
+    staff = []
+    try:
+        if hasattr(client, "get_teaching_staff") and callable(getattr(client, "get_teaching_staff")):
+            raw_staff = client.get_teaching_staff()
+        else:
+            raw_staff = []
+    except Exception:
+        raw_staff = []
+
+    for s in (raw_staff or []):
+        subjects = getattr(s, "subjects", []) or []
+        subject_str = ""
+        try:
+            if subjects and isinstance(subjects, list):
+                subject_str = getattr(subjects[0], "name", "") or ""
+            else:
+                fallback = getattr(s, "subject", "") or ""
+                subject_str = fallback if isinstance(fallback, str) else str(fallback)
+        except Exception:
+            subject_str = ""
+        try:
+            email_raw = getattr(s, "email", "") or ""
+            email_str = email_raw if isinstance(email_raw, str) else str(email_raw)
+        except Exception:
+            email_str = ""
+        staff.append({
+            "name": getattr(s, "name", "") or "",
+            "subject": subject_str or "",
+            "email": email_str or "",
+        })
+
+    return {"staff": staff}
+
+@app.get("/ical-url")
+def get_ical_url(
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    client = init_client(auth, child_name=child)
+    url = None
+    try:
+        if hasattr(client, "export_ical") and callable(getattr(client, "export_ical")):
+            raw_url = client.export_ical()
+            if isinstance(raw_url, str):
+                url = raw_url
+            elif raw_url:
+                try:
+                    url = str(raw_url)
+                except Exception:
+                    url = None
+            else:
+                url = None
+        else:
+            url = None
+    except Exception:
+        url = None
+    return {"url": url}

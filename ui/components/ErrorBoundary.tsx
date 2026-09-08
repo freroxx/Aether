@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { warn } from '@/utils/logger/logger';
 import Typography from './Typography';
 
 interface Props {
@@ -37,7 +38,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    warn(`ErrorBoundary caught an error: ${error?.message ?? String(error)}`);
     this.props.onError?.(error, errorInfo);
   }
 

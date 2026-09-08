@@ -14,15 +14,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getManager } from "@/services/shared";
 import type { Recipient } from "@/services/shared/chat";
+import type { TeachingStaff } from "@/services/shared/staff";
 import { useAccountStore } from "@/stores/account";
 import { useAlert } from "@/ui/components/AlertProvider";
-import Icon from "@/ui/components/Icon";
+import Avatar from "@/ui/components/Avatar";
 import Search from "@/ui/components/Search";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
+import { getInitials } from "@/utils/chats/initials";
 import { error as logError } from "@/utils/logger/logger";
+import { t } from "i18next";
 
 export default function NewMessageView() {
   const theme = useTheme();
@@ -35,6 +38,7 @@ export default function NewMessageView() {
   const [headerHeight, setHeaderHeight] = useState(0);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [loadingRecipients, setLoadingRecipients] = useState(true);
+  const [staff, setStaff] = useState<TeachingStaff[]>([]);
   const [searchText, setSearchText] = useState("");
   const [selected, setSelected] = useState<Recipient[]>([]);
   const [subject, setSubject] = useState("");
@@ -62,17 +66,41 @@ export default function NewMessageView() {
       } finally {
         if (!cancelled) setLoadingRecipients(false);
       }
+      try {
+        const manager = getManager();
+        const clientId = account?.services?.[0]?.id;
+        if (manager && clientId) {
+          const staffList = await manager.getTeachingStaff(clientId);
+          if (!cancelled && Array.isArray(staffList) && staffList.length > 0) {
+            setStaff(staffList);
+          }
+        }
+      } catch {
+        // Staff unavailable — section stays hidden.
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [alert]);
+  }, [alert, account?.id]);
 
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
     if (!q) return recipients;
-    return recipients.filter(r => (r.name ?? "").toLowerCase().includes(q));
+    return recipients.filter(r =>
+      (r.name ?? "").toLowerCase().includes(q) ||
+      (r.class ?? "").toLowerCase().includes(q)
+    );
   }, [recipients, searchText]);
+
+  const filteredStaff = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return staff;
+    return staff.filter(s =>
+      (s.name ?? "").toLowerCase().includes(q) ||
+      (s.subject ?? "").toLowerCase().includes(q)
+    );
+  }, [staff, searchText]);
 
   const toggleRecipient = useCallback((r: Recipient) => {
     setSelected(prev =>
@@ -231,9 +259,11 @@ export default function NewMessageView() {
               return (
                 <List.Item key={r.id} onPress={() => toggleRecipient(r)}>
                   <List.Leading>
-                    <Icon>
-                      <Papicons name={isSelected ? "Check" : "User"} />
-                    </Icon>
+                    <Avatar
+                      size={36}
+                      initials={getInitials(r.name ?? "")}
+                      shape="circle"
+                    />
                   </List.Leading>
                   <Typography variant="title" numberOfLines={1}>
                     {r.name}
@@ -263,6 +293,36 @@ export default function NewMessageView() {
               );
             })}
           </List>
+        )}
+
+        {filteredStaff.length > 0 && (
+          <>
+            <Typography variant="title" weight="bold">
+              {t("Messages_Staff_Title")}
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              {t("Messages_Staff_Description")}
+            </Typography>
+            <List style={{ backgroundColor: "transparent" }}>
+              {filteredStaff.map(s => (
+                <List.Item key={`staff-${s.name}-${s.subject}`}>
+                  <List.Leading>
+                    <Avatar
+                      size={36}
+                      initials={getInitials(s.name ?? "")}
+                      shape="circle"
+                    />
+                  </List.Leading>
+                  <Typography variant="title" numberOfLines={1}>
+                    {s.name}
+                  </Typography>
+                  <Typography color="textSecondary" numberOfLines={1}>
+                    {[s.subject, s.email].filter(Boolean).join(" · ")}
+                  </Typography>
+                </List.Item>
+              ))}
+            </List>
+          </>
         )}
       </ScrollView>
     </View>

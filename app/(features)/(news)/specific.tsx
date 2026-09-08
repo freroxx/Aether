@@ -25,6 +25,8 @@ import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
 import { useFont } from "@/utils/theme/fonts";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
+import { useAlert } from "@/ui/components/AlertProvider";
+import { error as logError } from "@/utils/logger/logger";
 
 const NewsPage = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,6 +36,7 @@ const NewsPage = () => {
   const router = useRouter()
   const { colors } = useTheme();
   const font = useFont();
+  const alert = useAlert();
   const [HTMLCleanupEnabled, setHTMLCleanupEnabled] = useState(true)
 
   useEffect(() => {
@@ -53,15 +56,35 @@ const NewsPage = () => {
 
   useEffect(() => {
     if (!news) return;
+    if (news.acknowledged) return;
+    let cancelled = false;
     const acknowledgeNews = async () => {
-      if (!news.acknowledged) {
+      try {
         const manager = getManager();
         await manager?.setNewsAsDone(news);
+        if (!cancelled) {
+          setNews(prev => (prev ? { ...prev, acknowledged: true } : prev));
+        }
+      } catch (e) {
+        logError(String(e));
+        if (!cancelled) {
+          alert.showAlert({
+            title: t("News_Empty_Title"),
+            description: t("News_Acknowledge_Failed"),
+            icon: "Cross",
+            color: "#D60046",
+            technical: String(e),
+            delay: 3000,
+          });
+        }
       }
     };
 
     acknowledgeNews();
-  }, [news])
+    return () => {
+      cancelled = true;
+    };
+  }, [news?.id])
 
   const stylesheet = StyleSheet.create({
     ...VARIANTS,

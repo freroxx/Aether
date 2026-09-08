@@ -20,8 +20,10 @@ import Avatar from "@/ui/components/Avatar";
 import Button from "@/ui/components/Button";
 import Icon from "@/ui/components/Icon";
 import { NativeHeaderPressable, NativeHeaderSide } from "@/ui/components/NativeHeader";
+import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
 import { getInitials } from "@/utils/chats/initials";
+import { formatSchoolName } from "@/utils/format/formatSchoolName";
 import ActionMenu from "@/ui/components/ActionMenu";
 
 export default function CustomProfileScreen() {
@@ -71,6 +73,10 @@ export default function CustomProfileScreen() {
 
   const { colors } = useTheme();
   const height = useHeaderHeight();
+
+  const className = account?.className?.trim() ?? "";
+  const schoolName = account?.schoolName?.trim() ?? "";
+  const showSchoolInfo = className.length > 0 || schoolName.length > 0;
 
   return (
     <KeyboardAvoidingView
@@ -165,6 +171,60 @@ export default function CustomProfileScreen() {
               inputProps={{}}
             />
           </View>
+          {showSchoolInfo && (
+            <View style={{ gap: 10 }}>
+              {className.length > 0 && (
+                <>
+                  <Typography color="secondary">{t("Profile_Class_Label")}</Typography>
+                  <Stack
+                    direction="horizontal"
+                    vAlign="center"
+                    hAlign="center"
+                    gap={10}
+                    style={{
+                      padding: 20,
+                      backgroundColor: colors.text + "08",
+                      borderRadius: 300,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Icon papicon size={24} fill={colors.text + "AF"}>
+                      <Papicons name="User" />
+                    </Icon>
+                    <Typography variant="body1" style={{ flex: 1 }}>
+                      {className}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+              {schoolName.length > 0 && (
+                <>
+                  <Typography color="secondary">{t("Profile_School_Label")}</Typography>
+                  <Stack
+                    direction="horizontal"
+                    vAlign="center"
+                    hAlign="center"
+                    gap={10}
+                    style={{
+                      padding: 20,
+                      backgroundColor: colors.text + "08",
+                      borderRadius: 300,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Icon papicon size={24} fill={colors.text + "AF"}>
+                      <Papicons name="MapPin" />
+                    </Icon>
+                    <Typography variant="body1" style={{ flex: 1 }} numberOfLines={2}>
+                      {formatSchoolName(schoolName)}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+            </View>
+          )}
         </View>
         <NativeHeaderSide side="Left" key={`${firstName}-${lastName}`}>
           <NativeHeaderPressable

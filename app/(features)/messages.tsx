@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Papicons } from "@getpapillon/papicons";
+import { t } from "i18next";
 
 import { Chat } from "@/services/shared/chat";
 import { getManager } from "@/services/shared";
@@ -38,6 +39,7 @@ export default function MessagesView() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isUsingMock, setIsUsingMock] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
 
   const account = useAccountStore(state =>
     state.accounts.find(a => a.id === state.lastUsedAccount)
@@ -215,9 +217,55 @@ export default function MessagesView() {
             <List.SectionTitle>
               <List.Label>Messages</List.Label>
             </List.SectionTitle>
-            {chats.map(chat => {
+            <View style={styles.filterRow}>
+              <Pressable
+                onPress={() => setUnreadOnly(false)}
+                hitSlop={8}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: !unreadOnly
+                      ? theme.colors.primary
+                      : theme.colors.card,
+                  },
+                ]}
+              >
+                <Typography
+                  variant="caption"
+                  weight="bold"
+                  style={{ color: !unreadOnly ? "#FFFFFF" : theme.colors.text }}
+                >
+                  {t("Messages_Filter_All")}
+                </Typography>
+              </Pressable>
+              <Pressable
+                onPress={() => setUnreadOnly(true)}
+                hitSlop={8}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: unreadOnly
+                      ? theme.colors.primary
+                      : theme.colors.card,
+                  },
+                ]}
+              >
+                <Typography
+                  variant="caption"
+                  weight="bold"
+                  style={{ color: unreadOnly ? "#FFFFFF" : theme.colors.text }}
+                >
+                  {t("Messages_Filter_Unread")}
+                </Typography>
+              </Pressable>
+            </View>
+            {(unreadOnly
+              ? chats.filter(c => Number((c as { unread?: unknown }).unread ?? 0) > 0)
+              : chats
+            ).map(chat => {
               const correspondent = (chat.recipient || chat.creator || "Enseignant").trim();
               const initials = getInitials(correspondent);
+              const unreadCount = Number((chat as { unread?: unknown }).unread ?? 0);
               const relativeTime = formatDistanceToNow(new Date(chat.date), {
                 addSuffix: true,
                 locale: fr,
@@ -257,11 +305,29 @@ export default function MessagesView() {
                   </Typography>
 
                   <List.Trailing>
-                    <Papicons
-                      name="ChevronRight"
-                      size={20}
-                      opacity={0.5}
-                    />
+                    <View style={styles.trailingRow}>
+                      {unreadCount > 0 && (
+                        <View
+                          style={[
+                            styles.unreadBadge,
+                            { backgroundColor: theme.colors.primary },
+                          ]}
+                        >
+                          <Typography
+                            variant="caption"
+                            weight="bold"
+                            style={{ color: "#FFFFFF", fontSize: 11 }}
+                          >
+                            {unreadCount > 99 ? "99+" : String(unreadCount)}
+                          </Typography>
+                        </View>
+                      )}
+                      <Papicons
+                        name="ChevronRight"
+                        size={20}
+                        opacity={0.5}
+                      />
+                    </View>
                   </List.Trailing>
                 </List.Item>
               );
@@ -309,5 +375,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trailingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
   },
 });

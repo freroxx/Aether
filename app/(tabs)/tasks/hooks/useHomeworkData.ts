@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { t } from 'i18next';
 import { useAccountStore } from "@/stores/account";
 import { getManager, subscribeManagerUpdate } from "@/services/shared";
 import { Homework } from "@/services/shared/homework";
@@ -66,20 +67,21 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
         new Date(item.dueDate).toDateString()
       );
 
+      // Optimistic update with rollback on failure.
+      setHomework(prev => ({
+        ...prev,
+        [id]: {
+          ...(prev[id] ?? item),
+          isDone: done,
+        }
+      }));
+      setRefreshTrigger(prev => prev + 1);
+      updateHomeworkIsDone(id, done).catch(() => {});
+
       try {
         const manager = getManager();
         await manager.setHomeworkCompletion(item, done)
 
-        updateHomeworkIsDone(id, done);
-        
-        setRefreshTrigger(prev => prev + 1);
-        setHomework(prev => ({
-          ...prev,
-          [id]: {
-            ...(prev[id] ?? item),
-            isDone: done,
-          }
-        }));
         if (done) {
           notificationAsync(NotificationFeedbackType.Success);
           // Tâche terminée → stoppe ses rappels (dont répétés)
@@ -103,17 +105,23 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
         }
       }
       catch (err) {
+        const message = String(err);
+        const outOfRange =
+          message.includes("404") ||
+          message.toLowerCase().includes("introuvable");
         alert.showAlert({
-            title: "Une erreur est survenue",
-            message: "Ce devoir n'a pas été mis à jour",
+            title: t("Task_ToggleFailed_Title"),
+            message: outOfRange ? t("Task_OutOfPeriod") : t("Task_ToggleFailed_Description"),
             description:
-              "Nous n'avons pas réussi à mettre à jour l'état du devoir, si ce devoir est important, merci de te rendre sur l'application officielle de ton établissement afin de définir son état.",
+              outOfRange
+                ? t("Task_OutOfPeriod")
+                : "Nous n'avons pas réussi à mettre à jour l'état du devoir, si ce devoir est important, merci de te rendre sur l'application officielle de ton établissement afin de définir son état.",
             color: "#D60046",
             icon: "AlertTriangle",
-            technical: String(err)
+            technical: message
           });
 
-        updateHomeworkIsDone(id, !done);
+        updateHomeworkIsDone(id, !done).catch(() => {});
         setRefreshTrigger(prev => prev + 1);
         setHomework(prev => ({
           ...prev,

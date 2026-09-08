@@ -67,13 +67,14 @@ export default function AttendanceView() {
     const [attendances, setAttendances] = useState<Attendance[]>(attendancesFromSearch);
     const [period, setPeriod] = useState<Period | undefined>(currentPeriod);
 
-    const { missedTime, missedTimeUnjustified, unjustifiedAbsenceCount, unjustifiedDelayCount, absenceCount, delayCount } = useMemo(() => {
+    const { missedTime, missedTimeUnjustified, unjustifiedAbsenceCount, unjustifiedDelayCount, absenceCount, delayCount, punishmentCount } = useMemo(() => {
       let missed = 0;
       let unjustified = 0;
       let unjustifiedAbs = 0;
       let unjustifiedDelays = 0;
       let Abs = 0
       let Delays = 0
+      let Punishments = 0
       for (const attendance of attendances) {
         for (const absence of attendance.absences) {
           Abs += 1;
@@ -91,8 +92,9 @@ export default function AttendanceView() {
           }
           missed += delay.duration
         }
+        Punishments += attendance.punishments?.length ?? 0;
       }
-      return { missedTime: missed, missedTimeUnjustified: unjustified, unjustifiedAbsenceCount: unjustifiedAbs, unjustifiedDelayCount: unjustifiedDelays, absenceCount: Abs, delayCount: Delays };
+      return { missedTime: missed, missedTimeUnjustified: unjustified, unjustifiedAbsenceCount: unjustifiedAbs, unjustifiedDelayCount: unjustifiedDelays, absenceCount: Abs, delayCount: Delays, punishmentCount: Punishments };
     }, [period, attendances]);
 
     const [headerHeight, setHeaderHeight] = useState(0);
@@ -198,7 +200,7 @@ export default function AttendanceView() {
                   <Typography variant="title" color={dangerColor}>
                     {t("Attendance_Hours_Unjustified_Value", { duration: formatEventTime(missedTimeUnjustified, true) })}
                   </Typography>
-                  <Typography color="textSecondary" color={dangerColor}>
+                  <Typography color={dangerColor}>
                     {t("Attendance_Unjustified_Description")}
                   </Typography>
                 </List.Item>
@@ -217,7 +219,7 @@ export default function AttendanceView() {
                   <Typography variant="title" color={successColor}>
                     {t("Attendance_NoUnjustified_Title")}
                   </Typography>
-                  <Typography color="textSecondary" color={successColor}>
+                  <Typography color={successColor}>
                     {t("Attendance_NoUnjustified_Description")}
                   </Typography>
                 </List.Item>
@@ -260,14 +262,15 @@ export default function AttendanceView() {
                   const dayString = formatDate(fromDate, "eeee d MMMM", {
                     locale: DateLocale[i18n.language as keyof typeof DateLocale] || DateLocale.enUS,
                   })
+                  const daysCount = typeof absence.days === "number" ? absence.days : 0;
 
                   return (
-                    <List.Item>
+                    <List.Item key={`${absence.id}-${absenceIndex}`}>
                       <Typography variant="title">
                         {absence.reason || t("Attendance_NoReason")}
                       </Typography>
                       <Typography color="textSecondary" numberOfLines={1}>
-                        {dateString} · {dayString}
+                        {dateString} · {dayString}{daysCount > 0 ? ` · ${t("Attendance_Days_Value", { count: daysCount })}` : ""}
                       </Typography>
                       <List.Trailing>
                         <AttendanceTimer evt={absence} />
@@ -304,15 +307,21 @@ export default function AttendanceView() {
                   const dayFormatted = formatDate(date, "eeee d MMMM", {
                     locale: DateLocale[i18n.language as keyof typeof DateLocale] || DateLocale.enUS,
                   })
+                  const justification = (delay.justification ?? "").trim();
                   
                   return (
-                    <List.Item>
+                    <List.Item key={`${delay.id}-${absenceIndex}`}>
                       <Typography variant="title">
                         {delay.reason || t("Attendance_NoReason")}
                       </Typography>
                       <Typography color="textSecondary">
                         {dateString} · {dayFormatted}
                       </Typography>
+                      {justification.length > 0 && (
+                        <Typography color="textSecondary" numberOfLines={2}>
+                          {t("Attendance_Justification_Label", { text: justification })}
+                        </Typography>
+                      )}
                       <List.Trailing>
                         <AttendanceTimer evt={delay} />
                       </List.Trailing>
@@ -323,11 +332,34 @@ export default function AttendanceView() {
             </List.Section>
           )}
 
+          {punishmentCount > 0 && (
+            <List.Section>
+              <List.Item onPress={() => router.push("/(features)/sanctions")}>
+                <List.Leading>
+                  <Icon opacity={0.5} size={20}>
+                    <Papicons name="AlertTriangle" />
+                  </Icon>
+                </List.Leading>
+                <Typography variant="title">
+                  {t("Attendance_ViewSanctions")}
+                </Typography>
+                <Typography color="textSecondary" numberOfLines={1}>
+                  {t("Attendance_Sanctions_Hint", { count: punishmentCount })}
+                </Typography>
+                <List.Trailing>
+                  <Icon opacity={0.5} size={20}>
+                    <Papicons name="ChevronRight" />
+                  </Icon>
+                </List.Trailing>
+              </List.Item>
+            </List.Section>
+          )}
+
         </List>
       </>
     )
   } catch (err) {
-    error(err.toString());
+    error(String(err));
     return null;
   }
 }
@@ -343,7 +375,7 @@ const AttendanceTimer = ({ evt }: { evt: any }) => {
 
   const durationData = evt.timeMissed || evt.duration || 0;
 
-  const durationText = formatEventTime(durationData);
+  const durationText = formatEventTime(durationData, false);
 
   return (
     <Stack direction="horizontal" hAlign="center" gap={8}>

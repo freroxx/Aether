@@ -28,6 +28,14 @@ export const useHomeData = () => {
   const lastUsedAccount = useAccountStore(state => state.lastUsedAccount);
   const accounts = useAccountStore(state => state.accounts);
   const removeAccount = useAccountStore(state => state.removeAccount);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
 
   const fetchEDT = useCallback(async () => {
     const manager = getManager();
@@ -108,12 +116,14 @@ export const useHomeData = () => {
         delay: 2000,
       });
       await initializeAccountManager(lastUsedAccount);
+      if (cancelledRef.current) return;
       log("Refreshed Manager received");
 
       await Promise.all([fetchEDT(), fetchGrades()]);
+      if (cancelledRef.current) return;
       state.lastSyncedAt = Date.now();
 
-      if (settingsstore.showAlertAtLogin) {
+      if (settingsstore.showAlertAtLogin && !cancelledRef.current) {
         alert.showAlert({
           title: "Synchronisation réussie",
           description: "Toutes vos données ont été mises à jour avec succès.",
@@ -125,6 +135,7 @@ export const useHomeData = () => {
       }
 
     } catch (error) {
+      if (cancelledRef.current) return;
       if (String(error).includes("Unable to find")) { return; }
       if (error instanceof AuthenticationError) {
         const additionals = error?.service?.auth?.additionals ?? {};

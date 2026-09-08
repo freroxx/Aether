@@ -136,7 +136,14 @@ function DishCard({
       </View>
 
       <View style={styles.dishesList}>
-        {foods.map((food, idx) => (
+        {foods.map((food, idx) => {
+          const rawLabels = (food as { labels?: unknown; allergens?: unknown }).labels
+            ?? food.allergens
+            ?? [];
+          const labels: Array<string | { name?: string; color?: string | null }> = Array.isArray(rawLabels)
+            ? (rawLabels as Array<string | { name?: string; color?: string | null }>)
+            : [];
+          return (
           <View
             key={`${food.name}-${idx}`}
             style={[
@@ -149,26 +156,35 @@ function DishCard({
               <Typography variant="body1" weight="medium">
                 {food.name}
               </Typography>
-              {food.allergens && food.allergens.length > 0 && (
+              {labels.length > 0 && (
                 <View style={styles.allergensContainer}>
-                  {food.allergens.map(allergen => (
+                  {labels.map((allergen, allergenIdx) => {
+                    const name = typeof allergen === "string" ? allergen : (allergen.name ?? "");
+                    const color = typeof allergen === "string" ? undefined : (allergen.color ?? undefined);
+                    if (!name) return null;
+                    return (
                     <View
-                      key={allergen}
+                      key={`${name}-${allergenIdx}`}
                       style={[
                         styles.allergenPill,
                         { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)" },
                       ]}
                     >
+                      {color ? (
+                        <View style={[styles.allergenDot, { backgroundColor: color }]} />
+                      ) : null}
                       <Typography variant="caption" color="textSecondary" style={{ fontSize: 10 }}>
-                        {allergen}
+                        {name}
                       </Typography>
                     </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </View>
           </View>
-        ))}
+          );
+        })}
       </View>
     </View>
   );
@@ -700,6 +716,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  allergenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   emptyCard: {
     borderRadius: 24,

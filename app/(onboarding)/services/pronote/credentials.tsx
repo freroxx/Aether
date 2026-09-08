@@ -111,10 +111,17 @@ const PronoteCredentialsForm = memo(({
             refreshToken: res.auth_token,
             additionals: {
               instanceURL: normalized,
+              url: normalized,
               username: username.trim(),
               deviceUUID: accountID,
+              uuid: accountID,
+              // Identifiants bruts : le login direct n'a pas de token rotatif,
+              // les routes data rejouent username+password via le backend.
+              password,
+              ...(ent.trim() ? { ent: ent.trim() } : {}),
               authToken: res.auth_token,
               accountType: finalAccountType,
+              account_type: finalAccountType,
             }
           },
           serviceId: Services.PRONOTE,

@@ -43,11 +43,37 @@ async function request<T>(
     headers["X-Pronote-Auth"] = options.authToken;
   }
 
-  const response = await fetch(url, {
-    method: options.method || "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const isNetworkFailure = (e: unknown): boolean => {
+    if (e instanceof TypeError) return true;
+    const name = (e as any)?.name;
+    if (name === "AbortError") return true;
+    const msg = String((e as any)?.message || e).toLowerCase();
+    return msg.includes("abort") || msg.includes("network request failed") || msg.includes("fetch failed");
+  };
+
+  const doFetchOnce = async (): Promise<Response> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(url, {
+        method: options.method || "GET",
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal as any,
+      });
+      return response;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  let response: Response;
+  try {
+    response = await doFetchOnce();
+  } catch (e) {
+    if (!isNetworkFailure(e)) throw e;
+    response = await doFetchOnce();
+  }
 
   if (!response.ok) {
     let errDetail = `HTTP ${response.status} ${response.statusText}`;
@@ -284,6 +310,48 @@ export const PronoteApiClient = {
         news_id: newsId,
         child_name: child,
       },
+    });
+  },
+
+  async getEvaluations(
+    authToken: string,
+    period?: string,
+    child?: string
+  ): Promise<{ evaluations: any[] }> {
+    return request("/evaluations", {
+      authToken,
+      params: { period, child },
+    });
+  },
+
+  async getReport(
+    authToken: string,
+    period?: string,
+    child?: string
+  ): Promise<{ report: any }> {
+    return request("/report", {
+      authToken,
+      params: { period, child },
+    });
+  },
+
+  async getTeachingStaff(
+    authToken: string,
+    child?: string
+  ): Promise<{ staff: any[] }> {
+    return request("/teaching-staff", {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async getIcalUrl(
+    authToken: string,
+    child?: string
+  ): Promise<{ url: string | null }> {
+    return request("/ical-url", {
+      authToken,
+      params: { child },
     });
   },
 

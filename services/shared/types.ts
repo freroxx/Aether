@@ -1,6 +1,7 @@
 import type { MockData } from "@/services/mock";
 import { Pronote } from "@/services/pronote";
 import { Attendance } from "@/services/shared/attendance";
+import type { TeachingStaff } from "@/services/shared/staff";
 import {
   Booking,
   BookingDay,
@@ -10,7 +11,7 @@ import {
   QRCode,
 } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
-import { Period, PeriodGrades } from "@/services/shared/grade";
+import { Period, PeriodGrades, Report, Evaluation } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
@@ -42,6 +43,9 @@ export interface SchoolServicePlugin {
   getNews?: () => Promise<News[]>;
   getGradesForPeriod?: (period: Period, kid?: Kid) => Promise<PeriodGrades>;
   getGradesPeriods?: () => Promise<Period[]>;
+  getEvaluationsForPeriod?: (period: Period, kid?: Kid) => Promise<Evaluation[]>;
+  getReportForPeriod?: (period: Period, kid?: Kid) => Promise<Report | null>;
+  getTeachingStaff?: (kid?: Kid) => Promise<TeachingStaff[]>;
   getAttendanceForPeriod?: (period: string) => Promise<Attendance>;
   getAttendancePeriods?: () => Promise<Period[]>;
   getWeeklyCanteenMenu?: (startDate: Date) => Promise<CanteenMenu[]>;
@@ -93,6 +97,9 @@ export enum Capabilities {
   CANTEEN_HISTORY,
   CANTEEN_BOOKINGS,
   CANTEEN_QRCODE,
+  EVALUATIONS,
+  REPORT,
+  TEACHING_STAFF,
 }
 
 /**

@@ -8,6 +8,7 @@ import { DatabaseProvider } from "@/database/DatabaseProvider";
 import { DEFAULT_MATERIAL_YOU_ENABLED, useSettingsStore } from '@/stores/settings';
 import { AlertProvider } from '@/ui/components/AlertProvider';
 import { useNewItemsCheck } from "@/services/local/notifications";
+import { registerBackgroundSyncAsync } from "@/services/local/backgroundSync";
 import { syncTaskRemindersFromStore } from "@/services/local/reminders";
 import { runsIOS26 } from '@/ui/utils/IsLiquidGlass';
 import { AppColors } from "@/utils/colors";
@@ -54,9 +55,14 @@ export function AppProviders({ children }: AppProvidersProps) {
   // Notifications background watchers (tâches + notes, 15 min foreground)
   useNewItemsCheck(15 * 60 * 1000, true);
 
-  // Restaure les rappels de tâches planifiés après redémarrage
+  // Restaure les rappels de tâches planifiés après redémarrage + tente le
+  // vrai background sync "aether-sync" (15 min). Sans expo-background-fetch /
+  // expo-task-manager (état actuel), l'enregistrement retourne "unavailable"
+  // (Expo Go/dev safe) et les intervalles foreground ci-dessus restent le
+  // moteur — sans jamais être supprimés.
   useEffect(() => {
     syncTaskRemindersFromStore().catch(() => {});
+    registerBackgroundSyncAsync().catch(() => {});
   }, []);
 
   return (

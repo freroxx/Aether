@@ -16,6 +16,11 @@ export async function fetchPronoteAttendance(
       const fromDate = new Date(a.from || Date.now());
       const toDate = new Date(a.to || Date.now());
       const diffMins = Math.max(0, Math.round((toDate.getTime() - fromDate.getTime()) / 60000));
+      const daysRaw = a.days;
+      const days =
+        typeof daysRaw === "number"
+          ? daysRaw
+          : Number.parseInt(String(daysRaw ?? "0"), 10);
       return {
         id: a.id,
         from: fromDate,
@@ -23,6 +28,7 @@ export async function fetchPronoteAttendance(
         justified: a.justified ?? false,
         reason: a.reason || "",
         timeMissed: diffMins || 60, // default 1 hour if same start/end
+        days: Number.isNaN(days) ? 0 : days,
         createdByAccount: accountId,
       };
     });
@@ -30,23 +36,31 @@ export async function fetchPronoteAttendance(
     const delays: Delay[] = (data.delays || []).map((d: any) => ({
       id: d.id,
       givenAt: new Date(d.date || Date.now()),
-      duration: d.duration || 0,
+      duration: typeof d.duration === "number" ? d.duration : Number(d.duration) || 0,
       justified: d.justified ?? false,
       reason: d.reason || "",
+      justification: d.justification ?? "",
       createdByAccount: accountId,
     }));
 
-    const punishments: Punishment[] = (data.punishments || []).map((p: any) => ({
-      id: p.id,
-      givenAt: new Date(p.date || Date.now()),
-      givenBy: p.giver || "",
-      exclusion: false,
-      duringLesson: false,
-      homework: { text: "", documents: [] },
-      reason: { text: p.reason || "", circumstances: "", documents: [] },
-      nature: p.nature || "",
-      duration: 0,
-    }));
+    const punishments: Punishment[] = (data.punishments || []).map((p: any) => {
+      const durationRaw = p.duration_minutes ?? p.duration ?? 0;
+      const durationMinutes =
+        typeof durationRaw === "number" ? durationRaw : Number(durationRaw) || 0;
+      return {
+        id: p.id,
+        givenAt: new Date(p.date || Date.now()),
+        givenBy: p.giver || "",
+        exclusion: Boolean(p.exclusion ?? false),
+        duringLesson: Boolean(p.during_lesson ?? false),
+        homework: { text: p.homework ?? "", documents: [] },
+        reason: { text: p.reason || "", circumstances: p.circumstances ?? "", documents: [] },
+        nature: p.nature || "",
+        duration: durationMinutes,
+        durationMinutes,
+        schedulable: Boolean(p.schedulable ?? false),
+      };
+    });
 
     return {
       absences,

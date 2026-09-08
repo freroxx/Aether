@@ -9,8 +9,8 @@ import { warn } from "@/utils/logger/logger";
 import { getDatabaseInstance, useDatabase } from "./DatabaseProvider"
 import { mapCourseToShared } from "./mappers/course";
 import Course from "./models/Timetable";
-import { getDateRangeOfWeek } from "./useHomework";
 import { safeWrite } from "./utils/safeTransaction";
+import { getWeekRange } from "@/utils/services/periods";
 
 export function getCourseRouteId(course: SharedCourse): string {
   if (course.createdByAccount.startsWith('ical_')) return course.id;
@@ -98,8 +98,8 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
             !dayCourseIds.has(dbCourse.courseId)
         );
 
-        for (const course of coursesToDelete) {
-          await course.markAsDeleted();
+        if (coursesToDelete.length > 0) {
+          await Promise.all(coursesToDelete.map(course => course.markAsDeleted()));
         }
 
         for (const item of day.courses) {
@@ -114,10 +114,8 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
             .query(Q.where('courseId', id))
             .fetch();
 
-          if (oldId !== id) {
-            for (const oldRecord of oldExistingRecords) {
-              await oldRecord.markAsDeleted();
-            }
+          if (oldId !== id && oldExistingRecords.length > 0) {
+            await Promise.all(oldExistingRecords.map(oldRecord => oldRecord.markAsDeleted()));
           }
 
           if (existingRecords.length === 0) {
@@ -180,7 +178,7 @@ export async function getCoursesFromCache(weeks: number[], year: number): Promis
     let maxEnd = new Date(-8640000000000000);
     
     for (const w of weeks) {
-      const { start, end } = getDateRangeOfWeek(w, year);
+      const { start, end } = getWeekRange(w, year);
       if (start < minStart) {minStart = start;}
       if (end > maxEnd) {maxEnd = end;}
     }

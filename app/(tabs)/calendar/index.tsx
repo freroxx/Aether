@@ -1,6 +1,6 @@
 import { useTheme } from "expo-router/react-navigation";
 import { t } from "i18next";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Platform, StyleSheet,View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -39,6 +39,7 @@ function TabOneScreen() {
 
   const {
     timetable,
+    refresh,
     manualRefreshing,
     handleRefresh,
     isLoading
@@ -93,6 +94,22 @@ function TabOneScreen() {
     );
   }, [getDateFromIndex, timetable, manualRefreshing, handleRefresh, colors, headerHeight]);
 
+  // Stable pager data: fixed 20001-day window, identity must not change per render.
+  const pagerData = useMemo(() => Array.from({ length: 20001 }), []);
+  // Stable extraData: new identity only when a dep actually changes.
+  // `revision` (hook's refresh counter) covers refetch completion; `timetable`
+  // covers filter/shape changes that don't bump the counter.
+  const listExtraData = useMemo(
+    () => ({
+      manualRefreshing,
+      headerHeight,
+      backgroundColor: colors.background,
+      timetable,
+      revision: refresh,
+    }),
+    [manualRefreshing, headerHeight, colors.background, timetable, refresh]
+  );
+
   return (
     <>
       <CalendarHeader
@@ -106,7 +123,7 @@ function TabOneScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <FlatList
           ref={flatListRef}
-          data={Array.from({ length: 20001 })}
+          data={pagerData}
           horizontal
           pagingEnabled={false}
           showsHorizontalScrollIndicator={false}
@@ -126,7 +143,7 @@ function TabOneScreen() {
           initialNumToRender={3}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews
-          extraData={{ manualRefreshing, headerHeight, colors, timetable }}
+          extraData={listExtraData}
         />
       </View>
     </>

@@ -223,6 +223,28 @@ function RootNavigatorContent() {
         />
 
         <Stack.Screen
+          name="(features)/evaluations"
+          options={{
+            headerShown: false,
+            headerTitle: t("Evaluations_Title"),
+            headerTransparent: runsIOS26,
+            headerLargeTitle: true,
+            presentation: "modal",
+          }}
+        />
+
+        <Stack.Screen
+          name="(features)/sanctions"
+          options={{
+            headerShown: false,
+            headerTitle: t("Sanctions_Title"),
+            headerTransparent: runsIOS26,
+            headerLargeTitle: true,
+            presentation: "modal",
+          }}
+        />
+
+        <Stack.Screen
           name="(features)/messages"
           options={{
             headerShown: false,

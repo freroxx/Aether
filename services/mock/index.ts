@@ -1,11 +1,12 @@
 import { Attendance } from "@/services/shared/attendance";
 import { CanteenMenu } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
-import { Period, PeriodGrades } from "@/services/shared/grade";
+import { Period, PeriodGrades, Evaluation, Report } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import { CourseDay } from "@/services/shared/timetable";
 import { Capabilities, SchoolServicePlugin } from "@/services/shared/types";
+import { TeachingStaff } from "@/services/shared/staff";
 import { Auth, Services } from "@/stores/account/types";
 
 import {
@@ -36,6 +37,9 @@ export class MockData implements SchoolServicePlugin {
     Capabilities.CHAT_READ,
     Capabilities.CHAT_REPLY,
     Capabilities.CHAT_CREATE,
+    Capabilities.EVALUATIONS,
+    Capabilities.REPORT,
+    Capabilities.TEACHING_STAFF,
   ];
   authData: Auth = {};
   session = undefined;
@@ -91,6 +95,18 @@ export class MockData implements SchoolServicePlugin {
 
   async getGradesForPeriod(period: Period): Promise<PeriodGrades> {
     return generateMockGrades(this.accountId, period);
+  }
+
+  async getEvaluationsForPeriod(_period: Period): Promise<Evaluation[]> {
+    return [];
+  }
+
+  async getReportForPeriod(_period: Period): Promise<Report | null> {
+    return null;
+  }
+
+  async getTeachingStaff(): Promise<TeachingStaff[]> {
+    return [];
   }
 
   async getAttendancePeriods(): Promise<Period[]> {

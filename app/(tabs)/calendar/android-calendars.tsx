@@ -15,6 +15,7 @@ import Button from "@/ui/new/Button";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
 import NativeSwitch from "@/ui/native/NativeSwitch";
+import { warn } from "@/utils/logger/logger";
 
 export default function AndroidCalendarsScreen() {
   const theme = useTheme();
@@ -62,7 +63,7 @@ export default function AndroidCalendarsScreen() {
         setCalendars(Array.isArray(list) ? list : []);
       }
     } catch (err) {
-      console.warn("Error loading device calendars:", err);
+      warn(`Error loading device calendars: ${String(err)}`);
       setCalendars([]);
     } finally {
       setLoading(false);
@@ -82,7 +83,7 @@ export default function AndroidCalendarsScreen() {
         setCalendars(Array.isArray(list) ? list : []);
       }
     } catch (err) {
-      console.warn("Error requesting calendar permissions:", err);
+      warn(`Error requesting calendar permissions: ${String(err)}`);
     }
   };
 

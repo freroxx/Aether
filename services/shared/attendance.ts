@@ -14,6 +14,7 @@ export interface Delay extends GenericInterface {
   reason?: string;
   justified: boolean;
   duration: number;
+  justification?: string;
 }
 
 export enum ObservationType {
@@ -40,6 +41,7 @@ export interface Absence extends GenericInterface {
   reason?: string;
   timeMissed: number;
   justified: boolean;
+  days?: number;
 }
 
 export interface Punishment {
@@ -60,4 +62,6 @@ export interface Punishment {
   };
   nature: string;
   duration: number;
+  durationMinutes?: number | null;
+  schedulable?: boolean;
 }

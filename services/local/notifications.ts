@@ -105,7 +105,17 @@ export async function areNotificationsEnabled(): Promise<boolean> {
   }
 }
 
-/** Request OS permission, persist it to the store, return granted state. */
+/** Request OS permission, persist it to the store, return granted state.
+ *
+ * Covers background delivery: on Android 13+ this prompts POST_NOTIFICATIONS
+ * (handled natively by expo-notifications) and on iOS the alert/badge/sound
+ * grant also authorizes already-scheduled local notifications to fire while
+ * backgrounded or terminated — no extra background permission exists for
+ * local notifications in this SDK. Triggers used here (TIME_INTERVAL, DATE)
+ * expose no exact-alarm option in expo-notifications@57, so they stay
+ * inexact-allowed and never require SCHEDULE_EXACT_ALARM. Never throws:
+ * denial (or any failure) resolves to `false`.
+ */
 export async function requestNotificationsPermission(): Promise<boolean> {
   try {
     await ensureTasksChannel();
@@ -146,7 +156,9 @@ export async function cancelTasksReminder(): Promise<void> {
 /**
  * (Re)schedule the repeating tasks reminder every `delayMin` minutes.
  * Cancels any existing reminder first. Body is a random FR sentence with
- * the current undone count resolved at schedule time.
+ * the current undone count resolved at schedule time (kept fresh by the
+ * daily {@link refreshTasksReminderIfStale} reschedule + cold-start
+ * {@link syncTasksReminderFromStore}).
  */
 export async function scheduleTasksReminder(delayMin: number): Promise<void> {
   try {
@@ -175,6 +187,38 @@ export async function scheduleTasksReminder(delayMin: number): Promise<void> {
         ...(Platform.OS === "android" ? { channelId: TASKS_CHANNEL_ID } : {}),
       },
     });
+    lastTasksReminderScheduleAt = Date.now();
+  } catch {
+    // best-effort
+  }
+}
+
+/** Minimum delay between two fresh-count reschedules of the repeating reminder (24 h). */
+const TASKS_REMINDER_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Last time the repeating tasks reminder was (re)scheduled with a fresh
+ * count in this session. Initialized at module load: cold starts reschedule
+ * fresh via {@link syncTasksReminderFromStore}, so the foreground poll only
+ * needs to refresh long-running sessions (daily).
+ */
+let lastTasksReminderScheduleAt: number = Date.now();
+
+/**
+ * Daily-reschedule pattern for the repeating tasks reminder.
+ * TIME_INTERVAL bodies are frozen at schedule time, so re-run
+ * {@link scheduleTasksReminder} (fresh undone count, same FR sentences) at
+ * most once per 24 h. Called from the shared {@link runNewItemsCheck} runner
+ * so foreground polls — and any future background task — stay fresh.
+ */
+export async function refreshTasksReminderIfStale(): Promise<void> {
+  try {
+    const p = useSettingsStore.getState().personalization;
+    const enabled = p.notificationsTasksEnabled ?? p.notifications?.tasksEnabled ?? false;
+    if (!enabled) return;
+    if (Date.now() - lastTasksReminderScheduleAt < TASKS_REMINDER_REFRESH_INTERVAL_MS) return;
+    const delay = p.notificationsTasksDelayMin ?? p.notifications?.tasksDelayMin ?? 120;
+    await scheduleTasksReminder(delay);
   } catch {
     // best-effort
   }
@@ -256,8 +300,14 @@ async function getCurrentTaskIds(): Promise<string[]> {
  * 15-min new-task check: diff current homework IDs against the stored
  * `lastNotifiedTaskIds`. On new IDs → immediate "Nouveaux devoirs reçus !"
  * alert + persist the fresh ID list. First run only seeds the store.
+ *
+ * Returns `true` when new items were found and notified, so the shared
+ * foreground/background runner can report NewData honestly. An empty load
+ * (offline / fetch failure) is inconclusive: the baseline is kept and
+ * `false` is returned, so a failed run can neither wipe the baseline nor
+ * fabricate a diff.
  */
-export async function checkNewTasksAndNotify(): Promise<void> {
+export async function checkNewTasksAndNotify(): Promise<boolean> {
   try {
     const state = useSettingsStore.getState();
     const prev: string[] =
@@ -265,6 +315,7 @@ export async function checkNewTasksAndNotify(): Promise<void> {
       state.personalization.notifications?.lastNotifiedTaskIds ??
       [];
     const current = await getCurrentTaskIds();
+    if (current.length === 0) return false;
     const fresh = current.filter(id => !prev.includes(id));
 
     try {
@@ -280,10 +331,10 @@ export async function checkNewTasksAndNotify(): Promise<void> {
     }
 
     // Seed on first run: no baseline to diff against.
-    if (prev.length === 0) return;
-    if (fresh.length === 0) return;
+    if (prev.length === 0) return false;
+    if (fresh.length === 0) return false;
     const granted = await areNotificationsEnabled();
-    if (!granted) return;
+    if (!granted) return false;
     await ensureTasksChannel();
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -296,8 +347,9 @@ export async function checkNewTasksAndNotify(): Promise<void> {
       },
       trigger: null,
     });
+    return true;
   } catch {
-    // best-effort
+    return false;
   }
 }
 
@@ -435,16 +487,22 @@ async function loadGrades(): Promise<GradeLike[]> {
   }
 }
 
-/** Diff grade IDs vs store, notify instantly on new notes. First run seeds. */
-export async function checkNewGradesAndNotify(): Promise<void> {
+/** Diff grade IDs vs store, notify instantly on new notes. First run seeds.
+ *
+ * Returns `true` when new grades were found and notified. An empty load is
+ * inconclusive (baseline kept, `false` returned) — see
+ * {@link checkNewTasksAndNotify}.
+ */
+export async function checkNewGradesAndNotify(): Promise<boolean> {
   try {
     const state = useSettingsStore.getState();
     const enabled = state.personalization.notificationsNotesEnabled
       ?? state.personalization.notifications?.notesEnabled ?? false;
-    if (!enabled) return;
+    if (!enabled) return false;
     const prev: string[] =
       (state.personalization as { lastNotifiedGradeIds?: string[] }).lastNotifiedGradeIds ?? [];
     const current = (await loadGrades()).map(g => g.id);
+    if (current.length === 0) return false;
     const fresh = current.filter(id => !prev.includes(id));
     try {
       state.mutateProperty("personalization", {
@@ -453,9 +511,9 @@ export async function checkNewGradesAndNotify(): Promise<void> {
     } catch {
       // best-effort
     }
-    if (prev.length === 0 || fresh.length === 0) return;
+    if (prev.length === 0 || fresh.length === 0) return false;
     const granted = await areNotificationsEnabled();
-    if (!granted) return;
+    if (!granted) return false;
     await ensureGradesChannel();
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -467,9 +525,42 @@ export async function checkNewGradesAndNotify(): Promise<void> {
       },
       trigger: null,
     });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Shared foreground/background runner for the new-items checks.
+ * Plain async function (no hooks) so the foreground interval
+ * ({@link useNewItemsCheck}) and the headless background task
+ * (`aether-sync` in `services/local/backgroundSync.ts`) run the SAME logic
+ * with no duplication. Also refreshes the repeating tasks reminder body
+ * daily ({@link refreshTasksReminderIfStale}).
+ */
+export async function runNewItemsCheck(): Promise<{
+  tasksNew: boolean;
+  gradesNew: boolean;
+  hadNew: boolean;
+}> {
+  let tasksNew = false;
+  let gradesNew = false;
+  try {
+    const p = useSettingsStore.getState().personalization;
+    const tasksOn = p.notificationsTasksEnabled ?? p.notifications?.tasksEnabled ?? false;
+    const notesOn = p.notificationsNotesEnabled ?? p.notifications?.notesEnabled ?? false;
+    if (tasksOn) tasksNew = await checkNewTasksAndNotify();
+    if (notesOn) gradesNew = await checkNewGradesAndNotify();
+  } catch {
+    // best-effort: flags stay false, background maps a throw to Failed
+  }
+  try {
+    await refreshTasksReminderIfStale();
   } catch {
     // best-effort
   }
+  return { tasksNew, gradesNew, hadNew: tasksNew || gradesNew };
 }
 
 /** Foreground poll for new tasks + grades (default 15min, Android fast path). */
@@ -481,11 +572,7 @@ export function useNewItemsCheck(intervalMs = 15 * 60 * 1000, enabled = true): v
     const poll = async () => {
       if (!mounted) return;
       try {
-        const p = useSettingsStore.getState().personalization;
-        const tasksOn = p.notificationsTasksEnabled ?? p.notifications?.tasksEnabled ?? false;
-        const notesOn = p.notificationsNotesEnabled ?? p.notifications?.notesEnabled ?? false;
-        if (tasksOn) await checkNewTasksAndNotify();
-        if (notesOn) await checkNewGradesAndNotify();
+        await runNewItemsCheck();
       } catch {
         // ignore
       }

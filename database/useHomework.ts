@@ -5,6 +5,7 @@ import { Attachment } from "@/services/shared/attachment";
 import { Homework as SharedHomework } from "@/services/shared/homework";
 import { generateId } from "@/utils/generateId";
 import { warn } from "@/utils/logger/logger";
+import { getWeekRange } from "@/utils/services/periods";
 
 import { getDatabaseInstance, useDatabase } from "./DatabaseProvider";
 import Homework from "./models/Homework";
@@ -79,7 +80,7 @@ export async function getHomeworksFromCache(
 ): Promise<SharedHomework[]> {
   try {
     const database = getDatabaseInstance();
-    const { start, end } = getDateRangeOfWeek(weekNumber);
+    const { start, end } = getWeekRange(weekNumber, new Date().getFullYear());
     const homeworks = await database
       .get<Homework>("homework")
       .query(Q.where("dueDate", Q.between(start.getTime(), end.getTime())))
@@ -95,10 +96,13 @@ export async function getHomeworksFromCache(
 }
 
 export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
+  if (!homeworks || homeworks.length === 0) {
+    return;
+  }
   const db = getDatabaseInstance();
 
   const weekNumber = getWeekNumberFromDate(homeworks[0].dueDate);
-  const { start, end } = getDateRangeOfWeek(weekNumber);
+  const { start, end } = getWeekRange(weekNumber, homeworks[0].dueDate.getFullYear());
   const dbHomeworks = await db.get<Homework>("homework")
     .query(Q.where("dueDate", Q.between(start.getTime(), end.getTime())))
     .fetch();
@@ -120,8 +124,8 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
       !homeworkIds.includes(dbHomework.homeworkId)
   );
 
-  for (const homework of homeworksToDelete) {
-    await homework.markAsDeleted();
+  if (homeworksToDelete.length > 0) {
+    await Promise.all(homeworksToDelete.map(homework => homework.markAsDeleted()));
   }
 
   for (const hw of homeworks) {
@@ -137,8 +141,8 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
       .query(Q.where("homeworkId", oldId))
       .fetch();
 
-    for (const oldRecord of oldExisting) {
-      await oldRecord.markAsDeleted();
+    if (oldExisting.length > 0) {
+      await Promise.all(oldExisting.map(oldRecord => oldRecord.markAsDeleted()));
     }
 
     if (existing.length === 0) {
@@ -230,17 +234,7 @@ export function getDateRangeOfWeek(
   weekNumber: number,
   year = new Date().getFullYear()
 ) {
-  const janFirst = new Date(year, 0, 1);
-  const daysOffset = (weekNumber - 1) * 7;
-  const weekStart = new Date(janFirst.setDate(janFirst.getDate() + daysOffset));
-  const day = weekStart.getDay();
-  const diff = weekStart.getDate() - day + (day <= 4 ? 1 : 8);
-  const start = new Date(weekStart.setDate(diff));
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
+  return getWeekRange(weekNumber, year);
 }
 
 export function parseJsonArray(s: string): unknown[] {

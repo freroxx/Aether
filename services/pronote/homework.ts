@@ -1,6 +1,7 @@
 import { PronoteApiClient } from "@/services/pronote/api-client";
-import { getDateRangeOfWeek } from "@/database/useHomework";
+import { AttachmentType } from "@/services/shared/attachment";
 import { Homework, ReturnFormat } from "@/services/shared/homework";
+import { getWeekRange } from "@/utils/services/periods";
 import { error } from "@/utils/logger/logger";
 
 export async function fetchPronoteHomeworks(
@@ -10,7 +11,7 @@ export async function fetchPronoteHomeworks(
   childName?: string
 ): Promise<Homework[]> {
   try {
-    const { start, end } = getDateRangeOfWeek(weekNumberRaw);
+    const { start, end } = getWeekRange(weekNumberRaw, new Date().getFullYear());
     const fromStr = start.toISOString().split("T")[0];
     const toStr = end.toISOString().split("T")[0];
 
@@ -23,7 +24,7 @@ export async function fetchPronoteHomeworks(
       isDone: h.done ?? false,
       returnFormat: ReturnFormat.PAPER,
       attachments: (h.files || []).map((f: any) => ({
-        type: "file",
+        type: AttachmentType.FILE,
         name: f.name,
         url: f.url,
         createdByAccount: accountId,
@@ -49,6 +50,7 @@ export async function setPronoteHomeworkAsDone(
     await PronoteApiClient.setHomeworkDone(authToken, homework.id, nextStatus, childName);
   } catch (err) {
     error(`Failed to set homework done: ${err}`, "setPronoteHomeworkAsDone");
+    throw err;
   }
 
   return {

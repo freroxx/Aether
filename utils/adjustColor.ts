@@ -1,3 +1,5 @@
+import { warn } from "@/utils/logger/logger";
+
 const cache = new Map<string, string>();
 
 export default function adjust(hex: string, percent: number) {
@@ -35,7 +37,7 @@ export default function adjust(hex: string, percent: number) {
 
   // check if result is valid HEX
   if (!/^#[0-9A-F]{6}$/i.test(result)) {
-    console.error(`Invalid HEX color: ${result}`, 'adjustColor');
+    warn(`Invalid HEX color: ${result}`);
     return hex;
   }
 

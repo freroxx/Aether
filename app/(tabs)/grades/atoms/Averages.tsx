@@ -96,10 +96,6 @@ const Averages = ({
     const accent = color || theme.colors.primary;
     const adjustedColor = adjust(accent, theme.dark ? 0.2 : -0.2);
     const papillonFont = useFont();
-    if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.log("[Averages]", { displayScale, gradesCount: grades?.length ?? 0, realAverage, inline });
-    }
     const [containerWidth, setContainerWidth] = useState(0);
     const isLargeLayout = !inline && containerWidth >= 600;
 

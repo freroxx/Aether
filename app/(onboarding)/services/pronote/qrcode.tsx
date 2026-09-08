@@ -87,6 +87,16 @@ export default function PronoteLoginWithQR() {
       const children = res.children || [];
       const selectedChild = children.length > 0 ? children[0].name : undefined;
 
+      // Le backend renvoie aussi `credentials` = payload brut {url, username, token, uuid}.
+      // On le stocke en clair (les 2 schémas de clés) : le refresh /auth/token a
+      // besoin du token BRUT, pas du blob base64 (qui serait rejeté par Pronote).
+      const rawCreds = (res.credentials ?? {}) as Record<string, any>;
+      // Note : le `jeton` du QR est à usage unique, pas un token de session :
+      // on ne le stocke jamais comme token (sinon /auth/token échoue à coup sûr).
+      const rawToken = rawCreds.token || undefined;
+      const rawUuid = rawCreds.uuid || accountID;
+      const rawUrl = rawCreds.url || decodedJSON.url;
+      const rawUsername = rawCreds.username || decodedJSON.login;
       useAccountStore.getState().addAccount({
         id: accountID,
         firstName,
@@ -106,11 +116,15 @@ export default function PronoteLoginWithQR() {
             accessToken: res.auth_token,
             refreshToken: res.auth_token,
             additionals: {
-              instanceURL: decodedJSON.url,
-              username: decodedJSON.login,
+              instanceURL: rawUrl,
+              url: rawUrl,
+              username: rawUsername,
               deviceUUID: accountID,
+              uuid: rawUuid,
+              token: rawToken,
               authToken: res.auth_token,
               accountType,
+              account_type: accountType,
             }
           },
           serviceId: Services.PRONOTE,

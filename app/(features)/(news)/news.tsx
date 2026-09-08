@@ -20,7 +20,7 @@ import { useTheme } from "expo-router/react-navigation"
 import { router } from 'expo-router'
 import { t } from 'i18next'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, View } from 'react-native'
 import { RefreshControl } from 'react-native-gesture-handler'
 import Reanimated, { LayoutAnimationConfig, useAnimatedStyle } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -168,6 +168,16 @@ const NewsView = () => {
                 <Typography variant='title' numberOfLines={2}>
                   {item.title}
                 </Typography>
+                {item.question && (
+                  <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${String(colors.primary)}1A`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                      <Papicons name='pie' size={12} color={String(colors.primary)} />
+                      <Typography variant='caption' weight='bold' style={{ color: colors.primary }}>
+                        {t('News_Type_Survey')}
+                      </Typography>
+                    </View>
+                  </View>
+                )}
                 <Typography variant='body1' color='textSecondary' numberOfLines={3}>
                   {item.content ? truncateString(cleanContent(item.content), 100) : ''}
                 </Typography>

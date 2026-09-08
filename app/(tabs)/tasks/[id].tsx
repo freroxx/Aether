@@ -9,7 +9,9 @@ import React, { useEffect, useState } from "react";
 import ModalOverhead from "@/components/ModalOverhead";
 import { getHomeworkById, updateHomeworkIsDone } from "@/database/useHomework";
 import { getManager } from "@/services/shared";
+import { AttachmentType } from "@/services/shared/attachment";
 import AnimatedPressable from "@/ui/components/AnimatedPressable";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
 import Stack from "@/ui/components/Stack";
 import { formatHTML } from "@/utils/format/html";
@@ -29,9 +31,11 @@ const Task = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const colors = theme.colors;
+  const alert = useAlert();
   const [task, setTask] = useState<Homework>();
   const [loading, setLoading] = useState(true);
   const [isDone, setIsDone] = useState(false);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,11 +65,36 @@ const Task = () => {
 
   const setAsDone = async (done: boolean) => {
     const manager = getManager();
-    if (!task) return;
-    await manager?.setHomeworkCompletion(task, done);
-
-    updateHomeworkIsDone(id, done);
+    if (!task || toggling) return;
+    const previous = isDone;
     setIsDone(done);
+    setToggling(true);
+    try {
+      await manager?.setHomeworkCompletion(task, done);
+      await updateHomeworkIsDone(id, done);
+    } catch (err) {
+      setIsDone(previous);
+      try {
+        await updateHomeworkIsDone(id, previous);
+      } catch {
+        // best-effort rollback
+      }
+      const message = String((err as Error)?.message ?? err);
+      const outOfRange =
+        message.includes("404") ||
+        message.toLowerCase().includes("introuvable") ||
+        message.toLowerCase().includes("hors p\u00e9riode");
+      alert.showAlert({
+        title: t("Task_ToggleFailed_Title"),
+        description: outOfRange ? t("Task_OutOfPeriod") : t("Task_ToggleFailed_Description"),
+        icon: "AlertTriangle",
+        color: "#D60046",
+        technical: message,
+        delay: 4000,
+      });
+    } finally {
+      setToggling(false);
+    }
   }
 
   const insets = useSafeAreaInsets();
@@ -169,31 +198,42 @@ const Task = () => {
               <List.Label>{t("Modal_Task_Attachments")}</List.Label>
             </List.SectionTitle>
 
-            {task.attachments.map(attachment => (
-              <List.Item
-                onPress={() =>
-                  WebBrowser.openBrowserAsync(attachment.url, {
-                    presentationStyle: "formSheet",
-                  })
-                }
-              >
-                <List.Leading>
-                  <Icon>
-                    <Papicons name={getAttachmentIcon(attachment)} />
-                  </Icon>
-                </List.Leading>
-                <Typography variant="title" numberOfLines={1}>
-                  {attachment.name || attachment.url}
-                </Typography>
-                <Typography
-                  variant="body1"
-                  color="textSecondary"
-                  numberOfLines={1}
+            {task.attachments.map(attachment => {
+              const rawType = (attachment as { type?: unknown }).type;
+              const isLink =
+                rawType === AttachmentType.LINK ||
+                rawType === 0 ||
+                rawType === "link" ||
+                rawType === "LINK";
+              const url = attachment.url ?? "";
+              const canOpenLink = isLink && url.length > 0;
+              return (
+                <List.Item
+                  key={`${attachment.name}-${url}`}
+                  onPress={
+                    canOpenLink
+                      ? () => WebBrowser.openBrowserAsync(url)
+                      : undefined
+                  }
                 >
-                  {attachment.url}
-                </Typography>
-              </List.Item>
-            ))}
+                  <List.Leading>
+                    <Icon>
+                      <Papicons name={getAttachmentIcon(attachment)} />
+                    </Icon>
+                  </List.Leading>
+                  <Typography variant="title" numberOfLines={1}>
+                    {attachment.name || url}
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    color="textSecondary"
+                    numberOfLines={1}
+                  >
+                    {url}
+                  </Typography>
+                </List.Item>
+              );
+            })}
           </List.Section>
         )}
       </List>

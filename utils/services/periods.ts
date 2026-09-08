@@ -44,3 +44,23 @@ export const getPeriodNumber = (name: string) => {
 
   return newName.toString()[0];
 }
+
+// Single shared week-range helper — identical math to the former
+// database/useHomework getDateRangeOfWeek. Callers must pass an explicit
+// year derived from the relevant date (no hidden default).
+export function getWeekRange(
+  weekNumber: number,
+  year: number
+): { start: Date; end: Date } {
+  const janFirst = new Date(year, 0, 1);
+  const daysOffset = (weekNumber - 1) * 7;
+  const weekStart = new Date(janFirst.setDate(janFirst.getDate() + daysOffset));
+  const day = weekStart.getDay();
+  const diff = weekStart.getDate() - day + (day <= 4 ? 1 : 8);
+  const start = new Date(weekStart.setDate(diff));
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}

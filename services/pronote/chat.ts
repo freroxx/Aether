@@ -16,7 +16,9 @@ export async function fetchPronoteChats(
       recipient: c.recipient || "",
       date: new Date(c.date || Date.now()),
       createdByAccount: accountId,
-    }));
+      unread: typeof c.unread === "number" ? c.unread : 0,
+      closed: Boolean(c.closed ?? false),
+    }) as Chat);
   } catch (err) {
     error(`Failed to fetch chats: ${err}`, "fetchPronoteChats");
     return [];

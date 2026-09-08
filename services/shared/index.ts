@@ -1,4 +1,4 @@
-import * as Network from "expo-network";
+import { hasInternet as hasInternetCached } from "@/services/shared/network";
 
 import {
   addAttendanceToDatabase,
@@ -48,7 +48,7 @@ import {
   QRCode,
 } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
-import { Period, PeriodGrades } from "@/services/shared/grade";
+import { Period, PeriodGrades, Evaluation, Report } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
@@ -75,11 +75,21 @@ const isPermanentAuthError = (e: unknown): boolean => {
     msg.includes("sessionexpired") ||
     msg.includes("accessdenied") ||
     msg.includes("accountdisabled") ||
-    msg.includes("security")
+    msg.includes("security") ||
+    msg.includes("session pronote expirée") ||
+    msg.includes("reconnectez-vous") ||
+    msg.includes("token expir") ||
+    msg.includes("révoqu") ||
+    msg.includes("revoked") ||
+    msg.includes("expired") ||
+    msg.includes("erreur d'initialisation") ||
+    msg.includes("données d'authentification incomplètes")
   );
 };
 import { Balance } from "./balance";
 import { Kid } from "./kid";
+import { getSimpleCache, setSimpleCache } from "./simple-cache";
+import { TeachingStaff } from "./staff";
 
 export class AccountManager {
   private clients: Record<string, SchoolServicePlugin> = {};
@@ -203,10 +213,12 @@ export class AccountManager {
   ): Promise<PeriodGrades> {
     return await this.fetchData(
       Capabilities.GRADES,
-      async client =>
-        client.getGradesForPeriod
-          ? await client.getGradesForPeriod(period, kid)
-          : error("Bad Implementation"),
+      async client => {
+        if (!client.getGradesForPeriod) {
+          throw new Error("Bad Implementation");
+        }
+        return await client.getGradesForPeriod(period, kid);
+      },
       {
         multiple: false,
         clientId,
@@ -228,6 +240,81 @@ export class AccountManager {
         fallback: async () => getPeriodsFromCache(),
         saveToCache: async (data: Period[]) => {
           await addPeriodsToDatabase(data);
+        },
+      }
+    );
+  }
+
+  async getEvaluationsForPeriod(
+    period: Period,
+    clientId: string,
+    kid?: Kid
+  ): Promise<Evaluation[]> {
+    const cacheKey = kid?.id
+      ? `evals:${clientId}:${period.name}:${kid.id}`
+      : `evals:${clientId}:${period.name}`;
+    return await this.fetchData(
+      Capabilities.EVALUATIONS,
+      async client => {
+        if (!client.getEvaluationsForPeriod) {
+          throw new Error("Bad Implementation");
+        }
+        return await client.getEvaluationsForPeriod(period, kid);
+      },
+      {
+        multiple: false,
+        clientId,
+        fallback: async () => (await getSimpleCache<Evaluation[]>(cacheKey)) ?? [],
+        saveToCache: async (data: Evaluation[]) => {
+          await setSimpleCache(cacheKey, data);
+        },
+      }
+    );
+  }
+
+  async getReportForPeriod(
+    period: Period,
+    clientId: string,
+    kid?: Kid
+  ): Promise<Report | null> {
+    const cacheKey = kid?.id
+      ? `report:${clientId}:${period.name}:${kid.id}`
+      : `report:${clientId}:${period.name}`;
+    return await this.fetchData(
+      Capabilities.REPORT,
+      async client => {
+        if (!client.getReportForPeriod) {
+          throw new Error("Bad Implementation");
+        }
+        return await client.getReportForPeriod(period, kid);
+      },
+      {
+        multiple: false,
+        clientId,
+        fallback: async () => await getSimpleCache<Report>(cacheKey),
+        saveToCache: async (data: Report | null) => {
+          await setSimpleCache(cacheKey, data);
+        },
+      }
+    );
+  }
+
+  async getTeachingStaff(clientId: string, kid?: Kid): Promise<TeachingStaff[]> {
+    const cacheKey = `staff:${clientId}`;
+    return await this.fetchData(
+      Capabilities.TEACHING_STAFF,
+      async client => {
+        if (!client.getTeachingStaff) {
+          throw new Error("Bad Implementation");
+        }
+        return await client.getTeachingStaff(kid);
+      },
+      {
+        multiple: false,
+        clientId,
+        fallback: async () => (await getSimpleCache<TeachingStaff[]>(cacheKey)) ?? [],
+        saveToCache: async (data: TeachingStaff[]) => {
+          await setSimpleCache(cacheKey, data);
         },
       }
     );
@@ -467,10 +554,12 @@ export class AccountManager {
   async getCanteenQRCodes(clientId: string): Promise<QRCode> {
     return await this.fetchData(
       Capabilities.CANTEEN_QRCODE,
-      async client =>
-        client.getCanteenQRCodes
-          ? await client.getCanteenQRCodes()
-          : error("getCanteenQRCodes not found"),
+      async client => {
+        if (!client.getCanteenQRCodes) {
+          throw new Error("getCanteenQRCodes not found");
+        }
+        return await client.getCanteenQRCodes();
+      },
       {
         multiple: false,
         clientId,
@@ -519,8 +608,7 @@ export class AccountManager {
   }
 
   private async hasInternet(): Promise<boolean> {
-    const networkState = await Network.getNetworkStateAsync();
-    return networkState.isInternetReachable ?? false;
+    return hasInternetCached();
   }
 
   private async fetchData<T>(
@@ -544,10 +632,10 @@ export class AccountManager {
       if (options?.clientId !== undefined) {
         const client = this.clients[options.clientId];
         if (!client) {
-          error("Client ID missing");
+          throw new Error("Client ID missing");
         }
         if (!client.capabilities.includes(capability)) {
-          error(
+          throw new Error(
             "Capability " +
               capability +
               " not supported by client " +
@@ -606,8 +694,10 @@ export class AccountManager {
       throw e;
     }
 
-    error(
-      "An error occurred while fetching data for capability: " + capability
+    throw new Error(
+      "fetchData misuse: non-multiple call for capability " +
+        capability +
+        " without clientId must specify clientId or use multiple:true"
     );
   }
 

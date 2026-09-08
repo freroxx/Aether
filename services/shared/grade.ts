@@ -31,6 +31,10 @@ export interface Grade extends GenericInterface {
   subjectId: string;
   subjectName: string;
   description: string;
+  comment?: string;
+  isBonus?: boolean;
+  isOptional?: boolean;
+  isOutOf20?: boolean;
   givenAt?: Date;
   subjectFile?: Attachment;
   correctionFile?: Attachment;
@@ -64,4 +68,42 @@ export interface Period extends GenericInterface {
   id?: string
   start: Date
   end: Date
+}
+
+export interface Acquisition {
+  name: string;
+  abbreviation: string;
+  level: string;
+  coefficient: number;
+  domain: string;
+  pillar: string;
+}
+
+export interface Evaluation extends GenericInterface {
+  id: string;
+  name: string;
+  subject: string;
+  teacher: string;
+  coefficient: number;
+  description: string;
+  date?: Date;
+  paliers: string[];
+  acquisitions: Acquisition[];
+}
+
+export interface ReportSubject {
+  name: string;
+  color?: string | null;
+  comments: string[];
+  classAverage?: number | null;
+  studentAverage?: number | null;
+  minAverage?: number | null;
+  maxAverage?: number | null;
+  coefficient?: number | null;
+  teachers: string[];
+}
+
+export interface Report extends GenericInterface {
+  comments: string[];
+  subjects: ReportSubject[];
 }

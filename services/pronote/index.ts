@@ -9,16 +9,20 @@ import {
   sendPronoteMessageInChat,
 } from "@/services/pronote/chat";
 import { fetchPronoteGradePeriods, fetchPronoteGrades } from "@/services/pronote/grades";
+import { fetchPronoteEvaluations } from "@/services/pronote/evaluations";
 import { fetchPronoteHomeworks, setPronoteHomeworkAsDone } from "@/services/pronote/homework";
 import { fetchPronoteNews, setPronoteNewsAsAcknowledged } from "@/services/pronote/news";
 import { refreshPronoteAccount } from "@/services/pronote/refresh";
+import { fetchPronoteReport } from "@/services/pronote/report";
+import { fetchPronoteTeachingStaff } from "@/services/pronote/staff";
 import { fetchPronoteCourseResources, fetchPronoteWeekTimetable } from "@/services/pronote/timetable";
 import { Attendance } from "@/services/shared/attendance";
 import { CanteenMenu } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
-import { Period, PeriodGrades } from "@/services/shared/grade";
+import { Period, PeriodGrades, Evaluation, Report } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
+import { TeachingStaff } from "@/services/shared/staff";
 import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
 import { Capabilities, SchoolServicePlugin } from "@/services/shared/types";
 import { Kid } from "@/services/shared/kid";
@@ -42,6 +46,9 @@ export class Pronote implements SchoolServicePlugin {
     Capabilities.ATTENDANCE,
     Capabilities.ATTENDANCE_PERIODS,
     Capabilities.HAVE_KIDS,
+    Capabilities.EVALUATIONS,
+    Capabilities.REPORT,
+    Capabilities.TEACHING_STAFF,
   ];
   session: any = undefined;
   tokenExpiration = 0;
@@ -54,6 +61,7 @@ export class Pronote implements SchoolServicePlugin {
     return (
       this.authData.accessToken ||
       (this.authData.additionals?.auth_token as string) ||
+      (this.authData.additionals?.authToken as string) ||
       ""
     );
   }
@@ -61,6 +69,14 @@ export class Pronote implements SchoolServicePlugin {
   private getSelectedChildName(): string | undefined {
     const account = useAccountStore.getState().accounts.find(a => a.id === this.accountId);
     return account?.selectedChild;
+  }
+
+  private resolveChildName(kid?: Kid): string | undefined {
+    if (kid) {
+      const full = `${kid.firstName ?? ""} ${kid.lastName ?? ""}`.trim();
+      if (full.length > 0) return full;
+    }
+    return this.getSelectedChildName();
   }
 
   private async checkTokenValidty(): Promise<void> {
@@ -75,9 +91,10 @@ export class Pronote implements SchoolServicePlugin {
         const refresh = await refreshPronoteAccount(this.accountId, this.authData);
         this.authData = refresh.auth;
         this.session = refresh.session;
-        if (refresh.refreshed) {
-          this.tokenExpiration = Date.now() + 5 * 60 * 1000;
-        }
+        // Token + password types share the same 5-minute validity window.
+        // Password-type accounts return refreshed:false with valid creds but must
+        // not re-refresh on every call (tokenExpiration would otherwise stay 0).
+        this.tokenExpiration = Date.now() + 5 * 60 * 1000;
       } catch (e) {
         // Échec de refresh : on propage pour laisser le manager lever AuthenticationError
         // (écran "déconnecté / Me reconnecter") plutôt qu'un token mort en silence.
@@ -94,6 +111,7 @@ export class Pronote implements SchoolServicePlugin {
     const refresh = await refreshPronoteAccount(this.accountId, credentials);
     this.authData = refresh.auth;
     this.session = refresh.session;
+    this.tokenExpiration = Date.now() + 5 * 60 * 1000;
 
     const capabilitiesSet = new Set<Capabilities>([
       Capabilities.REFRESH,
@@ -108,6 +126,9 @@ export class Pronote implements SchoolServicePlugin {
       Capabilities.CHAT_REPLY,
       Capabilities.CHAT_CREATE,
       Capabilities.HAVE_KIDS,
+      Capabilities.EVALUATIONS,
+      Capabilities.REPORT,
+      Capabilities.TEACHING_STAFF,
     ]);
 
     this.capabilities = Array.from(capabilitiesSet);
@@ -162,6 +183,34 @@ export class Pronote implements SchoolServicePlugin {
       this.getAuthToken(),
       this.accountId,
       this.getSelectedChildName()
+    );
+  }
+
+  async getEvaluationsForPeriod(period: Period, kid?: Kid): Promise<Evaluation[]> {
+    await this.checkTokenValidty();
+    return fetchPronoteEvaluations(
+      this.getAuthToken(),
+      this.accountId,
+      period,
+      this.resolveChildName(kid)
+    );
+  }
+
+  async getReportForPeriod(period: Period, kid?: Kid): Promise<Report | null> {
+    await this.checkTokenValidty();
+    return fetchPronoteReport(
+      this.getAuthToken(),
+      this.accountId,
+      period,
+      this.resolveChildName(kid)
+    );
+  }
+
+  async getTeachingStaff(kid?: Kid): Promise<TeachingStaff[]> {
+    await this.checkTokenValidty();
+    return fetchPronoteTeachingStaff(
+      this.getAuthToken(),
+      this.resolveChildName(kid)
     );
   }
 

@@ -8,6 +8,7 @@ export function mapDelaysToShared(delays: Delay[], parent: Attendance): SharedDe
     reason: delay.reason,
     justified: delay.justified,
     duration: delay.duration,
+    justification: (delay as any).justification ?? undefined,
     createdByAccount: parent.createdByAccount,
     kidName: parent.kidName
   }));
@@ -20,6 +21,8 @@ export function mapAbsencesToShared(absences: Absence[], parent: Attendance): Sh
     to: new Date(absence.to),
     reason: absence.reason,
     justified: absence.justified,
+    timeMissed: (absence as any).timeMissed ?? 0,
+    days: (absence as any).days ?? undefined,
     createdByAccount: parent.createdByAccount,
     kidName: parent.kidName
   }));
@@ -42,7 +45,9 @@ export function mapPunishmentsToShared(punishments: Punishment[]): SharedPunishm
       documents: punishment.reasonDocuments
     },
     nature: punishment.nature,
-    duration: punishment.duration
+    duration: punishment.duration,
+    durationMinutes: (punishment as any).durationMinutes ?? punishment.duration,
+    schedulable: (punishment as any).schedulable ?? false
   }));
 }
 

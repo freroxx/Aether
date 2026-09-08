@@ -71,7 +71,6 @@ export default function PronoteENTLogin() {
 
   const [deviceUUID] = useState(uuid());
   const [received, setReceived] = useState<boolean>(false);
-  console.log("WebViewScreen initialized with URL:", url, "as", accountType);
 
   const [hasShownConnectionErrorAlert, setHasShownConnectionErrorAlert] = useState(false);
 
@@ -201,7 +200,6 @@ export default function PronoteENTLogin() {
     } catch {
       return;
     }
-    console.log("Message received from WebView:", message);
 
     if (message.type === "pronote.connectionError") {
       setBrowserVisible(true);
@@ -215,20 +213,13 @@ export default function PronoteENTLogin() {
     if (received) { return; }
 
     if (message.type === "pronote.loginState") {
-      console.log("Login state message received:", message.data);
-
       if (!message.data) {
-        console.warn("No login data in message");
         return;
       }
       if (message.data.status !== 0) {
-        console.warn("Login status is not valid:", message.data.status);
         return;
       }
       setReceived(true);
-
-      console.log(message.data.login, message.data.mdp);
-      console.log("Connecting via PronoteApiClient.tokenLogin...");
       try {
         const res = await PronoteApiClient.tokenLogin(
           url,
@@ -242,7 +233,6 @@ export default function PronoteENTLogin() {
           throw new Error("Erreur lors de la connexion");
         }
 
-        console.log("Login successful, adding account to store...");
         const schoolName = res.user?.establishment || (school && school.name ? school.name : "Pronote");
         const className = res.user?.class_name || "";
         const { firstName, lastName } = GetIdentityFromPronoteUsername(res.user?.name || message.data.login);
@@ -271,10 +261,16 @@ export default function PronoteENTLogin() {
               refreshToken: res.auth_token,
               additionals: {
                 instanceURL: url,
+                url,
                 username: message.data.login,
                 deviceUUID,
+                uuid: deviceUUID,
+                // Token BRUT (mot de passe de session Pronote) : indispensable au
+                // refresh /auth/token. Le blob auth_token seul serait rejeté.
+                token: message.data.mdp,
                 authToken: res.auth_token,
                 accountType: finalAccountType,
+                account_type: finalAccountType,
               },
             },
             serviceId: Services.PRONOTE,
@@ -289,7 +285,6 @@ export default function PronoteENTLogin() {
         router.dismissAll();
         return router.replace("/(tabs)/index");
       } catch (error: any) {
-        console.error("Error during login:", error);
         Alert.alert("Erreur", error?.message || "Une erreur est survenue lors de la connexion à Pronote. Veuillez réessayer.");
       }
     }
@@ -297,7 +292,6 @@ export default function PronoteENTLogin() {
 
   const onWebviewLoadEnd = (e: WebViewNavigationEvent | WebViewErrorEvent) => {
     const { url } = e.nativeEvent;
-    console.log("WebView finished loading URL:", url);
 
     if (url === infoMobileURL) {
       setBrowserVisible(false);
@@ -316,10 +310,8 @@ export default function PronoteENTLogin() {
     }
 
     if (url === infoMobileURL) {
-      console.log("Injecting JSON script for InfoMobileURL");
       webViewRef.current?.injectJavaScript(INJECT_PRONOTE_JSON);
     } else if (url.includes("mobile.eleve.html") || url.includes("mobile.parent.html")) {
-      console.log("Injecting login state scripts for account type:", isParent ? "parent" : "eleve");
       webViewRef.current?.injectJavaScript(
         INJECT_PRONOTE_INITIAL_LOGIN_HOOK,
       );

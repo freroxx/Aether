@@ -1,6 +1,7 @@
 import React, { useRef, useMemo } from 'react';
 import Typography, { TypographyProps } from './Typography';
 import Reanimated, { LinearTransition, withDelay, withSpring, AnimateProps } from 'react-native-reanimated';
+import { warn } from '@/utils/logger/logger';
 
 interface AnimatedNumberProps extends TypographyProps {
   distance?: number; // Distance to translate the number
@@ -125,7 +126,7 @@ function AnimatedNumber({
   }
   catch (error) {
     // Keep error handling robust
-    console.error("Error in AnimatedNumber:", error);
+    warn(`AnimatedNumber fallback: ${String(error)}`);
     return <Typography {...rest}>{children}</Typography>;
   }
 }

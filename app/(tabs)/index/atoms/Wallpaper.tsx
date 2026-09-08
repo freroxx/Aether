@@ -6,7 +6,12 @@ import LinearGradient from 'react-native-linear-gradient';
 
 import { useSettingsStore } from '@/stores/settings';
 
-const Wallpaper = ({ height = 400, dim = true }) => {
+interface WallpaperProps {
+  height?: number;
+  dim?: boolean;
+}
+
+const WallpaperInner = ({ height = 400, dim = true }: WallpaperProps) => {
   try {
     const settingsStore = useSettingsStore(state => state.personalization);
     const currentWallpaper = settingsStore.wallpaper;
@@ -63,8 +68,7 @@ const Wallpaper = ({ height = 400, dim = true }) => {
         }
       </MaskedView>
     );
-  } catch (error) {
-    console.log(error);
+  } catch {
     return null;
   }
 };
@@ -91,5 +95,9 @@ const styles = StyleSheet.create({
     zIndex: 1
   }
 });
+
+// Memoized: props are stable primitives and the File.exists check runs only
+// inside the [currentWallpaper] effect, so parent re-renders skip this subtree.
+const Wallpaper = React.memo(WallpaperInner);
 
 export default Wallpaper;

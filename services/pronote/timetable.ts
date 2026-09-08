@@ -1,7 +1,7 @@
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import { AttachmentType } from "@/services/shared/attachment";
 import { Course, CourseDay, CourseResource, CourseStatus, CourseType } from "@/services/shared/timetable";
-import { getDateRangeOfWeek } from "@/database/useHomework";
+import { getWeekRange } from "@/utils/services/periods";
 import { error } from "@/utils/logger/logger";
 
 export async function fetchPronoteWeekTimetable(
@@ -13,7 +13,7 @@ export async function fetchPronoteWeekTimetable(
 ): Promise<CourseDay[]> {
   try {
     const year = date ? date.getFullYear() : new Date().getFullYear();
-    const { start, end } = getDateRangeOfWeek(weekNumberRaw, year);
+    const { start, end } = getWeekRange(weekNumberRaw, year);
     const fromStr = start.toISOString().split("T")[0];
     const toStr = end.toISOString().split("T")[0];
 

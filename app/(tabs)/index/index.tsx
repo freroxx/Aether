@@ -18,6 +18,8 @@ import { useTimetableWidgetData } from './hooks/useTimetableWidgetData';
 import { useTimetableWidgetTitle } from './hooks/useTimetableWidgetTitle';
 import HomeTimeTableWidget from './widgets/timetable';
 import GradesWidget from './widgets/Grades';
+import EvaluationsWidget from './widgets/evaluations';
+import SanctionsWidget from './widgets/sanctions';
 import LessonContentWidget from './widgets/LessonContent';
 import MaskedView from '@react-native-masked-view/masked-view';
 import LinearGradient from 'react-native-linear-gradient';
@@ -58,6 +60,8 @@ const HomeScreen = () => {
 
   const [gradesWidgetHidden, setGradesWidgetHidden] = React.useState(true);
   const [lessonContentHidden, setLessonContentHidden] = React.useState(true);
+  const [evaluationsWidgetHidden, setEvaluationsWidgetHidden] = React.useState(true);
+  const [sanctionsWidgetHidden, setSanctionsWidgetHidden] = React.useState(true);
 
   const renderTimeTable = React.useCallback(() => <HomeTimeTableWidget />, []);
   const renderGrades = React.useCallback(
@@ -66,6 +70,14 @@ const HomeScreen = () => {
   );
   const renderLessonContent = React.useCallback(
     () => <LessonContentWidget onEmptyStateChange={setLessonContentHidden} />,
+    []
+  );
+  const renderEvaluations = React.useCallback(
+    () => <EvaluationsWidget onEmptyStateChange={setEvaluationsWidgetHidden} />,
+    []
+  );
+  const renderSanctions = React.useCallback(
+    () => <SanctionsWidget onEmptyStateChange={setSanctionsWidgetHidden} />,
     []
   );
 
@@ -89,8 +101,22 @@ const HomeScreen = () => {
       redirect: "(tabs)/grades",
       hidden: gradesWidgetHidden,
       render: renderGrades
+    },
+    {
+      icon: <Papicons name={"Grades"} />,
+      title: t("Home_Evaluations_Title"),
+      redirect: "(features)/evaluations",
+      hidden: evaluationsWidgetHidden,
+      render: renderEvaluations
+    },
+    {
+      icon: <Papicons name={"AlertTriangle"} />,
+      title: t("Home_Sanctions_Title"),
+      redirect: "(features)/sanctions",
+      hidden: sanctionsWidgetHidden,
+      render: renderSanctions
     }
-  ], [renderTimeTable, renderGrades, renderLessonContent, gradesWidgetHidden, lessonContentHidden, timetableTitle]);
+  ], [renderTimeTable, renderGrades, renderLessonContent, renderEvaluations, renderSanctions, gradesWidgetHidden, lessonContentHidden, evaluationsWidgetHidden, sanctionsWidgetHidden, timetableTitle]);
 
   React.useEffect(() => {
     if (!account || welcomeModalSeen) {

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { format, isToday, isYesterday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Papicons } from "@getpapillon/papicons";
+import { t } from "i18next";
 import * as Haptics from "expo-haptics";
 
 import { Chat, Message } from "@/services/shared/chat";
@@ -145,6 +146,9 @@ export default function MessageThreadView() {
     if (!content || !chat || sending) {
       return;
     }
+    if (Boolean((chat as { closed?: unknown }).closed)) {
+      return;
+    }
 
     setSending(true);
     try {
@@ -184,6 +188,10 @@ export default function MessageThreadView() {
   }, [draft, chat, sending, isUsingMock, load, account]);
 
   const correspondent = chat?.recipient || chat?.creator || "Discussion";
+  const isClosed = Boolean((chat as { closed?: unknown } | undefined)?.closed);
+  const participants = [chat?.creator, chat?.recipient]
+    .map(p => (p ?? "").trim())
+    .filter((p, idx, arr) => p.length > 0 && arr.indexOf(p) === idx);
 
   const dayLabel = useCallback((date: Date) => {
     if (isToday(date)) return "Aujourd'hui";
@@ -276,6 +284,25 @@ export default function MessageThreadView() {
                   style={{ color: "#29947A", flex: 1 }}
                 >
                   Mode démonstration actif
+                </Typography>
+              </View>
+            )}
+
+            {participants.length > 0 && (
+              <View
+                style={[
+                  styles.participantsCard,
+                  { backgroundColor: theme.colors.card },
+                ]}
+              >
+                <Papicons name="User" size={14} opacity={0.6} />
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  numberOfLines={2}
+                  style={{ flex: 1 }}
+                >
+                  {t("Messages_Participants")} · {participants.join(" · ")}
                 </Typography>
               </View>
             )}
@@ -387,6 +414,30 @@ export default function MessageThreadView() {
           </ScrollView>
 
           {/* Bottom input bar */}
+          {isClosed ? (
+            <View
+              style={[
+                styles.closedNotice,
+                {
+                  paddingBottom: insets.bottom + (Platform.OS === "android" ? 10 : 8),
+                  backgroundColor: theme.colors.background,
+                  borderTopColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.closedPill,
+                  { backgroundColor: theme.colors.card },
+                ]}
+              >
+                <Papicons name="Info" size={16} opacity={0.6} />
+                <Typography variant="body1" color="textSecondary" align="center">
+                  {t("Messages_Closed_Notice")}
+                </Typography>
+              </View>
+            </View>
+          ) : (
           <View
             style={[
               styles.inputBarContainer,
@@ -444,6 +495,7 @@ export default function MessageThreadView() {
               )}
             </Pressable>
           </View>
+          )}
         </>
       )}
     </KeyboardAvoidingView>
@@ -553,5 +605,28 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  participantsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    marginBottom: 2,
+  },
+  closedNotice: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  closedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 });

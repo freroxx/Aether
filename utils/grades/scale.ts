@@ -48,10 +48,6 @@ function normalizeOutOf(outOf: unknown): number | null {
 export function formatDenominator(outOf: unknown, fallback = 20): string {
   const n = normalizeOutOf(outOf);
   if (n !== null) return `/${n}`;
-  if (__DEV__ && outOf !== undefined && outOf !== null) {
-    // eslint-disable-next-line no-console
-    console.log("[formatDenominator] fallback exclu:", JSON.stringify(outOf));
-  }
   const f = typeof fallback === "number" && Number.isFinite(fallback) && fallback > 0 ? fallback : 20;
   return `/${f}`;
 }
