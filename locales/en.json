@@ -608,5 +608,13 @@
   "Search_Section_News": "News",
   "Search_Section_Subjects": "Subjects",
   "Profile_Class_Label": "Class",
-  "Profile_School_Label": "School"
+  "Profile_School_Label": "School",
+  "Evaluations_Empty_Funny_1": "Looks like you're finally free.",
+  "Evaluations_Empty_Funny_2": "No evaluations in sight. Enjoy it while it lasts.",
+  "Evaluations_Empty_Funny_3": "Nothing to report. The calm before the storm.",
+  "Evaluations_Empty_Funny_4": "No skills assessed yet. Take a breather.",
+  "Sanctions_Empty_Funny_1": "What a well-behaved student!",
+  "Sanctions_Empty_Funny_2": "No sanctions. Keep it up.",
+  "Sanctions_Empty_Funny_3": "Spotless disciplinary record. Impressive.",
+  "Sanctions_Empty_Funny_4": "Nothing to report. Guardian angel approved."
 }

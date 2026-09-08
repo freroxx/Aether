@@ -49,6 +49,40 @@ export default function PronoteLoginWithQR() {
   const codeInput = React.createRef<TextInput>();
   const [QRData, setQRData] = useState<string | null>(null);
 
+  // Relance l'init post-login depuis le dialogue d'échec (compte conservé).
+  async function retryPostLoginInit(accountID: string) {
+    setLoadingModalVisible(true);
+    try {
+      const { initAccountAfterLogin } = await import("./postLogin");
+      await initAccountAfterLogin(accountID);
+      setLoadingModalVisible(false);
+      router.dismissAll();
+      router.replace("/(tabs)/index");
+    } catch (e) {
+      console.error("QR post-login retry failed:", e);
+      setLoadingModalVisible(false);
+      const { describeInitError } = await import("./postLogin");
+      Alert.alert(
+        "Synchronisation impossible",
+        "La synchronisation a encore échoué : " + describeInitError(e),
+        [
+          {
+            text: "Réessayer",
+            onPress: () => void retryPostLoginInit(accountID),
+          },
+          {
+            text: "Supprimer le compte",
+            style: "destructive",
+            onPress: () => {
+              useAccountStore.getState().removeAccount({ id: accountID } as any);
+              setQRValidationCode("");
+            },
+          },
+        ]
+      );
+    }
+  }
+
   async function loginQR() {
     setScanned(false);
     setLoadingModalVisible(true);
@@ -59,6 +93,8 @@ export default function PronoteLoginWithQR() {
     }
 
     const accountID = uuid();
+    const { getDeviceUuid } = await import("./postLogin");
+    const deviceUuid = getDeviceUuid();
 
     try {
       const decodedJSON = JSON.parse(QRData!);
@@ -71,7 +107,7 @@ export default function PronoteLoginWithQR() {
           url: decodedJSON.url,
         },
         QRValidationCode,
-        accountID,
+        deviceUuid,
         detectedAccountType
       );
 
@@ -94,7 +130,7 @@ export default function PronoteLoginWithQR() {
       // Note : le `jeton` du QR est à usage unique, pas un token de session :
       // on ne le stocke jamais comme token (sinon /auth/token échoue à coup sûr).
       const rawToken = rawCreds.token || undefined;
-      const rawUuid = rawCreds.uuid || accountID;
+      const rawUuid = rawCreds.uuid || deviceUuid;
       const rawUrl = rawCreds.url || decodedJSON.url;
       const rawUsername = rawCreds.username || decodedJSON.login;
       useAccountStore.getState().addAccount({
@@ -119,7 +155,7 @@ export default function PronoteLoginWithQR() {
               instanceURL: rawUrl,
               url: rawUrl,
               username: rawUsername,
-              deviceUUID: accountID,
+              deviceUUID: deviceUuid,
               uuid: rawUuid,
               token: rawToken,
               authToken: res.auth_token,
@@ -137,12 +173,35 @@ export default function PronoteLoginWithQR() {
       useAccountStore.getState().setLastUsedAccount(accountID);
       // Vérifie que le compte s'initialise (manager + première session) AVANT
       // de quitter l'onboarding : sinon écran blanc + app vide en silence.
+      // Le compte est conservé : en cas d'échec on propose Réessayer
+      // (transitoire) plutôt que de forcer une reconnexion complète.
       try {
-        const { initializeAccountManager } = await import("@/services/shared");
-        await initializeAccountManager(accountID);
+        const { initAccountAfterLogin } = await import("./postLogin");
+        await initAccountAfterLogin(accountID);
       } catch (e) {
         console.error("QR post-login init failed:", e);
-        throw new Error("Session créée mais synchronisation impossible. Vérifie ta connexion puis réessaie.");
+        setLoadingModalVisible(false);
+        const { describeInitError } = await import("./postLogin");
+        Alert.alert(
+          "Synchronisation impossible",
+          "Session créée, mais la première synchronisation a échoué : " +
+            describeInitError(e),
+          [
+            {
+              text: "Réessayer",
+              onPress: () => void retryPostLoginInit(accountID),
+            },
+            {
+              text: "Supprimer le compte",
+              style: "destructive",
+              onPress: () => {
+                useAccountStore.getState().removeAccount({ id: accountID } as any);
+                setQRValidationCode("");
+              },
+            },
+          ]
+        );
+        return;
       }
       setLoadingModalVisible(false);
       router.dismissAll();

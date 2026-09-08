@@ -212,15 +212,26 @@ def login_qrcode(req: QrCodeLoginRequest):
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
 
     client = None
+    last_error: Optional[str] = None
     try:
         client = ClientClass.qrcode_login(qr_dict, req.pin, req.uuid)
     except Exception as e:
+        last_error = f"{type(e).__name__}: {str(e)}"
         AltClass = pronotepy.Client if is_parent else pronotepy.ParentClient
         try:
             client = AltClass.qrcode_login(qr_dict, req.pin, req.uuid)
             is_parent = not is_parent
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Erreur QR Code / PIN: {str(e)}")
+        except Exception as e2:
+            last_error = f"{type(e2).__name__}: {str(e2)}"
+            client = None
+    if client is None:
+        # 'dataSec' manquant = handshake refusé par Pronote : PIN incorrect,
+        # QR expiré/déjà utilisé, ou protocole inattendu. Log serveur pour diag.
+        print(f"[auth/qrcode] handshake failed uuid={req.uuid} error={last_error}")
+        raise HTTPException(
+            status_code=401,
+            detail="Code PIN incorrect ou QR Code expiré ou déjà utilisé. Génère un nouveau QR Code dans Pronote puis réessaie.",
+        )
 
     if not client or not client.logged_in:
         raise HTTPException(status_code=401, detail="Code PIN ou QR Code expiré")

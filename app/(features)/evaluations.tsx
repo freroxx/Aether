@@ -2,7 +2,7 @@ import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Platform, RefreshControl, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getManager, subscribeManagerUpdate } from "@/services/shared";
@@ -22,15 +22,12 @@ import { getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectName } from "@/utils/subjects/name";
 import { getAcquisitionColor } from "@/utils/evaluations";
 
-type EvaluationsTab = "skills" | "report";
-
 const EvaluationsView: React.FC = () => {
   const theme = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
 
   const [headerHeight, setHeaderHeight] = useState(0);
-  const [tab, setTab] = useState<EvaluationsTab>("skills");
 
   const [periods, setPeriods] = useState<Period[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<Period | undefined>(undefined);
@@ -142,6 +139,16 @@ const EvaluationsView: React.FC = () => {
     return [...groups.values()];
   }, [evaluations]);
 
+  const emptyJoke = useMemo(() => {
+    const pool = [
+      t("Evaluations_Empty_Funny_1"),
+      t("Evaluations_Empty_Funny_2"),
+      t("Evaluations_Empty_Funny_3"),
+      t("Evaluations_Empty_Funny_4"),
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, []);
+
   const loading = loadingPeriods || loadingData;
 
   return (
@@ -206,82 +213,83 @@ const EvaluationsView: React.FC = () => {
             />
           }
         >
-          <List.View>
-            <View style={styles.tabsContainer}>
-              {(["skills", "report"] as EvaluationsTab[]).map((value) => {
-                const isSelected = tab === value;
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => setTab(value)}
-                    style={({ pressed }) => [
-                      styles.tab,
-                      {
-                        backgroundColor: isSelected ? colors.primary : colors.card,
-                        transform: [{ scale: pressed ? 0.96 : 1 }],
-                      },
-                    ]}
-                  >
-                    <Typography
-                      variant="title"
-                      weight="bold"
-                      align="center"
-                      style={{ color: isSelected ? "#FFFFFF" : colors.text }}
-                    >
-                      {value === "skills" ? t("Evaluations_Tab_Skills") : t("Evaluations_Tab_Report")}
-                    </Typography>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </List.View>
-
           {loadingData ? (
             <List.View>
               <View style={styles.centerContainer}>
                 <ActivityIndicator />
               </View>
             </List.View>
-          ) : tab === "skills" ? (
-            groupedEvaluations.length === 0 ? (
-              <List.Item>
-                <List.Leading>
-                  <Icon>
-                    <Papicons name="Ghost" />
+          ) : (
+            <>
+              <List.Section>
+                <List.SectionTitle>
+                  <Icon opacity={0.5} size={20}>
+                    <Papicons name="Certificate" />
                   </Icon>
-                </List.Leading>
-                <Typography variant="title">
-                  {t("Evaluations_Empty_Title")}
-                </Typography>
-                <Typography color="textSecondary">
-                  {t("Evaluations_Empty_Description")}
-                </Typography>
-              </List.Item>
-            ) : (
-              groupedEvaluations.map((group) => (
+                  <Typography variant="body1" weight="semibold" color="textSecondary" style={{ flex: 1 }}>
+                    {t("Evaluations_Tab_Skills")}
+                  </Typography>
+                  {groupedEvaluations.length > 0 && (
+                    <Typography variant="title" weight="medium" color="textSecondary">
+                      {t("Evaluations_Count", { count: evaluations.length })}
+                    </Typography>
+                  )}
+                </List.SectionTitle>
+
+                {groupedEvaluations.length === 0 && (
+                  <List.Item>
+                    <List.Leading>
+                      <Icon>
+                        <Papicons name="Ghost" />
+                      </Icon>
+                    </List.Leading>
+                    <Typography variant="title">
+                      {t("Evaluations_Empty_Title")}
+                    </Typography>
+                    <Typography color="textSecondary">
+                      {emptyJoke}
+                    </Typography>
+                  </List.Item>
+                )}
+              </List.Section>
+
+              {groupedEvaluations.map((group) => (
                 <EvaluationGroup
                   key={group.subject}
                   subject={group.subject}
                   items={group.items}
                 />
-              ))
-            )
-          ) : report === null ? (
-            <List.Item>
-              <List.Leading>
-                <Icon>
-                  <Papicons name="Ghost" />
-                </Icon>
-              </List.Leading>
-              <Typography variant="title">
-                {t("Evaluations_Report_Unpublished_Title")}
-              </Typography>
-              <Typography color="textSecondary">
-                {t("Evaluations_Report_Unpublished_Description")}
-              </Typography>
-            </List.Item>
-          ) : (
-            <ReportContent report={report} />
+              ))}
+
+              <List.Section>
+                <List.SectionTitle>
+                  <Icon opacity={0.5} size={20}>
+                    <Papicons name="FileText" />
+                  </Icon>
+                  <Typography variant="body1" weight="semibold" color="textSecondary" style={{ flex: 1 }}>
+                    {t("Evaluations_Tab_Report")}
+                  </Typography>
+                </List.SectionTitle>
+
+                {report === null && (
+                  <List.Item>
+                    <List.Leading>
+                      <Icon>
+                        <Papicons name="Ghost" />
+                      </Icon>
+                    </List.Leading>
+                    <Typography variant="title">
+                      {t("Evaluations_Report_Unpublished_Title")}
+                    </Typography>
+                    <Typography color="textSecondary">
+                      {t("Evaluations_Report_Unpublished_Description")}
+                    </Typography>
+                  </List.Item>
+                )}
+              </List.Section>
+
+              {report !== null && <ReportContent report={report} />}
+            </>
           )}
         </List>
       )}
@@ -344,7 +352,7 @@ const EvaluationItem: React.FC<{ item: Evaluation; subjectColor: string }> = ({ 
         </Typography>
       ) : null}
       {item.description && item.name ? (
-        <Typography variant="body1" color="textSecondary" numberOfLines={3}>
+        <Typography variant="body1" color="textSecondary" numberOfLines={2}>
           {item.description}
         </Typography>
       ) : null}
@@ -356,12 +364,11 @@ const EvaluationItem: React.FC<{ item: Evaluation; subjectColor: string }> = ({ 
               <View
                 key={`${acq.name}-${index}`}
                 style={[
-                  styles.pill,
-                  { backgroundColor: pillColor + "1A" },
+                  styles.badge,
+                  { backgroundColor: pillColor + "30" },
                 ]}
               >
-                <View style={[styles.pillDot, { backgroundColor: pillColor }]} />
-                <Typography variant="caption" weight="bold" style={{ color: pillColor }} numberOfLines={1}>
+                <Typography variant="title" weight="bold" style={{ color: pillColor }} numberOfLines={1}>
                   {acq.abbreviation || acq.level || acq.name}
                 </Typography>
               </View>
@@ -369,14 +376,9 @@ const EvaluationItem: React.FC<{ item: Evaluation; subjectColor: string }> = ({ 
           })}
         </View>
       )}
-      {item.acquisitions.some(a => a.name) && (
-        <Typography variant="caption" color="textSecondary" numberOfLines={2}>
-          {item.acquisitions.map(a => a.name).filter(Boolean).join(" · ")}
-        </Typography>
-      )}
       <List.Trailing>
-        <View style={[styles.coefBadge, { backgroundColor: subjectColor + "15" }]}>
-          <Typography variant="caption" weight="bold" style={{ color: subjectColor }}>
+        <View style={[styles.badge, { backgroundColor: subjectColor + "30" }]}>
+          <Typography variant="title" weight="bold" style={{ color: subjectColor }}>
             {t("Evaluations_Coefficient", { value: item.coefficient })}
           </Typography>
         </View>
@@ -384,6 +386,12 @@ const EvaluationItem: React.FC<{ item: Evaluation; subjectColor: string }> = ({ 
     </List.Item>
   );
 };
+
+const formatAverage = (value: number): string =>
+  value.toLocaleString(i18n.language, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const ReportContent: React.FC<{ report: Report }> = ({ report }) => {
   return (
@@ -410,19 +418,10 @@ const ReportContent: React.FC<{ report: Report }> = ({ report }) => {
 
       {report.subjects.map((subject, index) => {
         const subjectColor = subject.color || getSubjectColor(subject.name);
-        const averages: string[] = [];
-        if (typeof subject.studentAverage === "number") {
-          averages.push(`${t("Evaluations_Average_Student")} ${subject.studentAverage.toFixed(2)}`);
-        }
-        if (typeof subject.classAverage === "number") {
-          averages.push(`${t("Evaluations_Average_Class")} ${subject.classAverage.toFixed(2)}`);
-        }
-        if (typeof subject.minAverage === "number") {
-          averages.push(`${t("Evaluations_Average_Min")} ${subject.minAverage.toFixed(2)}`);
-        }
-        if (typeof subject.maxAverage === "number") {
-          averages.push(`${t("Evaluations_Average_Max")} ${subject.maxAverage.toFixed(2)}`);
-        }
+        const hasClass = typeof subject.classAverage === "number";
+        const hasMinMax =
+          typeof subject.minAverage === "number" &&
+          typeof subject.maxAverage === "number";
         return (
           <List.Section key={`${subject.name}-${index}`}>
             <List.SectionTitle>
@@ -430,39 +429,49 @@ const ReportContent: React.FC<{ report: Report }> = ({ report }) => {
               <Typography variant="body1" weight="semibold" color="textSecondary" style={{ flex: 1 }} numberOfLines={1}>
                 {getSubjectName(subject.name)}
               </Typography>
+              {typeof subject.coefficient === "number" && (
+                <View style={[styles.badge, styles.smallBadge, { backgroundColor: subjectColor + "30" }]}>
+                  <Typography variant="caption" weight="bold" style={{ color: subjectColor }}>
+                    {t("Evaluations_Coefficient", { value: subject.coefficient })}
+                  </Typography>
+                </View>
+              )}
               {typeof subject.studentAverage === "number" && (
                 <Typography variant="title" weight="bold" style={{ color: subjectColor }}>
-                  {subject.studentAverage.toFixed(2)}
+                  {formatAverage(subject.studentAverage)}
                 </Typography>
               )}
             </List.SectionTitle>
 
-            {averages.length > 0 && (
+            {hasClass && (
               <List.Item>
                 <Typography variant="action">
-                  {t("Evaluations_Averages")}
+                  {t("Evaluations_Average_Class")}
                 </Typography>
-                <Typography color="textSecondary" numberOfLines={2}>
-                  {averages.join(" · ")}
+                <List.Trailing>
+                  <Typography variant="title" weight="bold" color="textSecondary">
+                    {formatAverage(subject.classAverage as number)}
+                  </Typography>
+                </List.Trailing>
+              </List.Item>
+            )}
+
+            {hasMinMax && (
+              <List.Item>
+                <Typography variant="action">
+                  {t("Evaluations_Average_Min")} – {t("Evaluations_Average_Max")}
                 </Typography>
-                {typeof subject.coefficient === "number" && (
-                  <List.Trailing>
-                    <Typography variant="caption" weight="bold" color="textSecondary">
-                      {t("Evaluations_Coefficient", { value: subject.coefficient })}
-                    </Typography>
-                  </List.Trailing>
-                )}
+                <List.Trailing>
+                  <Typography variant="title" weight="bold" color="textSecondary">
+                    {formatAverage(subject.minAverage as number)} – {formatAverage(subject.maxAverage as number)}
+                  </Typography>
+                </List.Trailing>
               </List.Item>
             )}
 
             {subject.teachers.length > 0 && (
               <List.Item>
-                <List.Leading>
-                  <Icon>
-                    <Papicons name="User" />
-                  </Icon>
-                </List.Leading>
-                <Typography variant="title" numberOfLines={1}>
+                <Typography variant="action">
                   {t("Modal_Course_Teacher")}
                 </Typography>
                 <Typography color="textSecondary" numberOfLines={2}>
@@ -495,23 +504,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 32,
   },
-  tabsContainer: {
-    flexDirection: "row",
-    gap: 8,
-    width: "100%",
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 18,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
   dot: {
     width: 10,
     height: 10,
@@ -523,24 +515,18 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 8,
   },
-  pill: {
+  badge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  pillDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  coefBadge: {
     padding: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: 25,
     overflow: "hidden",
+  },
+  smallBadge: {
+    padding: 4,
+    paddingHorizontal: 10,
   },
 });
 

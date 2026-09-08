@@ -39,6 +39,10 @@ export const useHomeData = () => {
 
   const fetchEDT = useCallback(async () => {
     const manager = getManager();
+    if (!manager) {
+      warn('Manager is null, skipping timetable fetch');
+      return;
+    }
     const date = new Date();
     const weekNumber = getWeekNumberFromDate(date);
     await manager.getWeeklyTimetable(weekNumber, date);

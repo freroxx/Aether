@@ -722,10 +722,16 @@ export class AccountManager {
         ". Please review your implementation",
       "AccountManager.getServicePluginForAccount"
     );
+    throw new Error(
+      "Unsupported service: " + String(service?.serviceId)
+    );
   }
 }
 
 let globalManager: AccountManager | null = null;
+let globalManagerAccountId: string | null = null;
+let initInFlight: Promise<AccountManager> | null = null;
+let initInFlightAccountId: string | null = null;
 const managerListeners: Array<(manager: AccountManager) => void> = [];
 
 export const subscribeManagerUpdate = (
@@ -750,33 +756,56 @@ const notifyManagerListeners = (manager: AccountManager) => {
 export const initializeAccountManager = async (
   accountId?: string
 ): Promise<AccountManager> => {
-  if (!accountId) {
-    const lastUsedAccount = useAccountStore.getState().lastUsedAccount;
-    if (!lastUsedAccount) {
-      error("No account ID provided and no last used account found.");
+  // Déduplique les inits concurrents : 2 refresh simultanés brûleraient
+  // 2 fois le même token Pronote à usage unique (le 2e échoue à coup sûr).
+  if (initInFlight && initInFlightAccountId === accountId) return initInFlight;
+  initInFlightAccountId = accountId ?? null;
+  initInFlight = (async (): Promise<AccountManager> => {
+    if (!accountId) {
+      const lastUsedAccount = useAccountStore.getState().lastUsedAccount;
+      if (!lastUsedAccount) {
+        throw new Error("No account ID provided and no last used account found.");
+      }
+      accountId = lastUsedAccount;
     }
-    accountId = lastUsedAccount;
-  }
-  const account = useAccountStore
-    .getState()
-    .accounts.find(acc => acc.id === accountId);
+    const account = useAccountStore
+      .getState()
+      .accounts.find(acc => acc.id === accountId);
 
-  if (!account) {
-    error("Account not found for ID: " + accountId);
-  }
+    if (!account) {
+      throw new Error("Account not found for ID: " + accountId);
+    }
 
-  const manager = new AccountManager(account);
-  await manager.refreshAllAccounts();
-  globalManager = manager;
-  notifyManagerListeners(manager);
-  return manager;
+    const manager = new AccountManager(account);
+    await manager.refreshAllAccounts();
+    globalManager = manager;
+    globalManagerAccountId = account.id;
+    notifyManagerListeners(manager);
+    return manager;
+  })();
+  try {
+    return await initInFlight;
+  } finally {
+    initInFlight = null;
+    initInFlightAccountId = null;
+  }
 };
 
-export const getManager = (): AccountManager => {
-  if (!globalManager) {
-    warn(
-      "Account manager not initialized. Call initializeAccountManager first."
-    );
+export const getManager = (): AccountManager | null => {
+  // Le manager est scopé au compte : après un changement de compte (démo ->
+  // réel, switch, suppression), l'ancien manager (ex. mocks) ne doit jamais
+  // resservir. Les appelants ré-initialisent via initializeAccountManager.
+  const lastUsedAccount = useAccountStore.getState().lastUsedAccount;
+  if (!globalManager || globalManagerAccountId !== lastUsedAccount) {
+    if (globalManagerAccountId !== null && globalManagerAccountId !== lastUsedAccount) {
+      globalManager = null;
+      globalManagerAccountId = null;
+    } else {
+      warn(
+        "Account manager not initialized. Call initializeAccountManager first."
+      );
+    }
+    return null;
   }
   return globalManager;
 };

@@ -267,7 +267,11 @@ export default function PronoteENTLogin() {
                 uuid: deviceUUID,
                 // Token BRUT (mot de passe de session Pronote) : indispensable au
                 // refresh /auth/token. Le blob auth_token seul serait rejeté.
+                // Stocké aussi comme `password` : si le token est rejeté, le
+                // refresh bascule dessus (les routes data rejouent
+                // username+password via le backend).
                 token: message.data.mdp,
+                password: message.data.mdp,
                 authToken: res.auth_token,
                 accountType: finalAccountType,
                 account_type: finalAccountType,

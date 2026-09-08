@@ -2,7 +2,7 @@ import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, RefreshControl, View } from "react-native";
+import { Platform, RefreshControl, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatDate, formatDistanceToNowStrict } from "date-fns";
 import * as DateLocale from "date-fns/locale";
@@ -13,7 +13,6 @@ import { Period } from "@/services/shared/grade";
 import ActionMenu from "@/ui/components/ActionMenu";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import Icon from "@/ui/components/Icon";
-import Stack from "@/ui/components/Stack";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
 import List from "@/ui/new/List";
@@ -161,6 +160,16 @@ const SanctionsView: React.FC = () => {
   const loading = loadingPeriods || loadingData;
   const hasUnjustified = stats.unjustifiedAbsences + stats.unjustifiedDelays + stats.punishmentCount > 0;
 
+  const emptyJoke = useMemo(() => {
+    const pool = [
+      t("Sanctions_Empty_Funny_1"),
+      t("Sanctions_Empty_Funny_2"),
+      t("Sanctions_Empty_Funny_3"),
+      t("Sanctions_Empty_Funny_4"),
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <TabHeader
@@ -241,7 +250,7 @@ const SanctionsView: React.FC = () => {
                 {t("Sanctions_Empty_Title")}
               </Typography>
               <Typography color="textSecondary">
-                {t("Sanctions_Empty_Description")}
+                {emptyJoke}
               </Typography>
             </List.Item>
           ) : (
@@ -347,8 +356,8 @@ const PunishmentCard: React.FC<{ punishment: Punishment; dangerColor: string; da
           {punishment.nature || t("Sanctions_Punishments")}
         </Typography>
         {punishment.exclusion && (
-          <View style={{ padding: 6, paddingHorizontal: 12, backgroundColor: dangerBg, borderRadius: 25, overflow: "hidden" }}>
-            <Typography variant="caption" weight="bold" color={dangerColor}>
+          <View style={[styles.badge, { backgroundColor: dangerColor + "30" }]}>
+            <Typography variant="caption" weight="bold" style={{ color: dangerColor }}>
               {t("Sanctions_Exclusion")}
             </Typography>
           </View>
@@ -368,24 +377,17 @@ const PunishmentCard: React.FC<{ punishment: Punishment; dangerColor: string; da
           </Typography>
         ) : null}
         <List.Trailing>
-          <Stack direction="horizontal" hAlign="center" gap={8}>
-            <View style={{ padding: 6, paddingHorizontal: 12, backgroundColor: dangerBg, borderRadius: 25, overflow: "hidden" }}>
-              <Typography variant="title" color={dangerColor}>
-                {formatDuration(durationMinutes, false)}
-              </Typography>
-            </View>
-          </Stack>
+          <View style={[styles.badge, { backgroundColor: dangerColor + "30" }]}>
+            <Typography variant="title" weight="bold" style={{ color: dangerColor }}>
+              {formatDuration(durationMinutes, false)}
+            </Typography>
+          </View>
         </List.Trailing>
       </List.Item>
 
       {punishment.reason.circumstances ? (
         <List.Item>
-          <List.Leading>
-            <Icon>
-              <Papicons name="Info" />
-            </Icon>
-          </List.Leading>
-          <Typography variant="title">
+          <Typography variant="action">
             {t("Sanctions_Circumstances")}
           </Typography>
           <Typography color="textSecondary">
@@ -396,12 +398,7 @@ const PunishmentCard: React.FC<{ punishment: Punishment; dangerColor: string; da
 
       {punishment.homework.text ? (
         <List.Item>
-          <List.Leading>
-            <Icon>
-              <Papicons name="Info" />
-            </Icon>
-          </List.Leading>
-          <Typography variant="title">
+          <Typography variant="action">
             {t("Sanctions_Homework")}
           </Typography>
           <Typography color="textSecondary">
@@ -424,5 +421,16 @@ const PunishmentCard: React.FC<{ punishment: Punishment; dangerColor: string; da
     </List.Section>
   );
 };
+
+const styles = StyleSheet.create({
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 6,
+    paddingHorizontal: 12,
+    borderRadius: 25,
+    overflow: "hidden",
+  },
+});
 
 export default SanctionsView;

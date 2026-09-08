@@ -45,10 +45,21 @@ export async function refreshPronoteAccount(
   let accountType =
     ((creds.account_type ?? creds.accountType) as string | undefined) || "eleve";
 
-  // Garde-fou : un blob base64 stocké comme `token` n'est JAMAIS un token valide.
-  const looksLikeBlob = (v: unknown) =>
-    typeof v === "string" && v.length > 64 && /^[A-Za-z0-9+/=_-]+$/.test(v);
-  if (token && looksLikeBlob(token)) token = undefined;
+  // Garde-fou : le blob base64 stocké par l'app ({url, username, token|password,
+  // uuid, ...} encodé) n'est JAMAIS un token valide. Test précis : il se décode
+  // en JSON contenant nos clés. Un token brut (hex/base64 long) ne parse jamais
+  // en JSON : on ne doit surtout pas le rejeter (sinon login/refresh morts).
+  const isStoredBlob = (v: unknown): boolean => {
+    if (typeof v !== "string" || v.length <= 64) return false;
+    if (!/^[A-Za-z0-9+/=_-]+$/.test(v)) return false;
+    const inner = decodeStoredBlob(v);
+    return (
+      !!inner &&
+      typeof inner === "object" &&
+      ("url" in inner || "username" in inner || "instanceURL" in inner)
+    );
+  };
+  if (token && isStoredBlob(token)) token = undefined;
 
   // 2) Migration vieux comptes : décoder le blob stocké (accessToken ou authToken).
   if ((!token || !uuid || !url || !username) && !password) {
@@ -60,7 +71,7 @@ export async function refreshPronoteAccount(
     if (inner) {
       url = url ?? inner.url;
       username = username ?? inner.username;
-      if (!token && typeof inner.token === "string" && !looksLikeBlob(inner.token)) {
+      if (!token && typeof inner.token === "string" && !isStoredBlob(inner.token)) {
         token = inner.token;
       }
       uuid = uuid ?? inner.uuid;
@@ -71,6 +82,7 @@ export async function refreshPronoteAccount(
   // 3) Rotation via /auth/token avec le token BRUT.
   if (url && username && token && uuid) {
     let res;
+    let rotated = false;
     try {
       res = await PronoteApiClient.tokenLogin(
         String(url),
@@ -79,33 +91,41 @@ export async function refreshPronoteAccount(
         String(uuid),
         accountType as any
       );
+      rotated = true;
     } catch (e) {
-      // Session morte côté Pronote -> le manager affichera l'écran "déconnecté".
-      throw new Error(
-        "Session Pronote expirée, reconnectez-vous. (" + String(e) + ")"
-      );
+      // Token rejeté mais on a un mot de passe (cas ENT / navigateur) : on
+      // bascule dessus, les routes data rejouent username+password via le
+      // backend. Sans mot de passe, la session est vraiment morte.
+      if (!(password && url && username)) {
+        // Session morte côté Pronote -> le manager affichera l'écran "déconnecté".
+        throw new Error(
+          "Session Pronote expirée, reconnectez-vous. (" + String(e) + ")"
+        );
+      }
     }
 
-    const updatedAuth: Auth = {
-      accessToken: res.auth_token,
-      refreshToken: res.auth_token,
-      additionals: {
-        ...creds,
-        url,
-        instanceURL: url,
-        username,
-        token,
-        authToken: res.auth_token,
-        auth_token: res.auth_token,
-        uuid,
-        deviceUUID: uuid,
-        account_type: accountType,
-        accountType,
-      },
-    };
+    if (rotated) {
+      const updatedAuth: Auth = {
+        accessToken: (res as any).auth_token,
+        refreshToken: (res as any).auth_token,
+        additionals: {
+          ...creds,
+          url,
+          instanceURL: url,
+          username,
+          token,
+          authToken: (res as any).auth_token,
+          auth_token: (res as any).auth_token,
+          uuid,
+          deviceUUID: uuid,
+          account_type: accountType,
+          accountType,
+        },
+      };
 
-    useAccountStore.getState().updateServiceAuthData(accountId, updatedAuth);
-    return { auth: updatedAuth, session: { authToken: res.auth_token }, refreshed: true };
+      useAccountStore.getState().updateServiceAuthData(accountId, updatedAuth);
+      return { auth: updatedAuth, session: { authToken: (res as any).auth_token }, refreshed: true };
+    }
   }
 
   // 4) Login direct (username+password) : rien à faire pivoter, les routes data

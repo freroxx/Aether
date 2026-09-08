@@ -18,6 +18,8 @@ async function request<T>(
     body?: any;
     authToken?: string;
     params?: Record<string, string | undefined>;
+    /** Désactive le retry (identifiants à usage unique : QR jeton, token). */
+    retry?: boolean;
   } = {}
 ): Promise<T> {
   const baseUrl = getPronoteApiBaseUrl();
@@ -72,6 +74,7 @@ async function request<T>(
     response = await doFetchOnce();
   } catch (e) {
     if (!isNetworkFailure(e)) throw e;
+    if (options.retry === false) throw e;
     response = await doFetchOnce();
   }
 
@@ -110,6 +113,7 @@ export const PronoteApiClient = {
   ): Promise<PronoteLoginResult> {
     return request<PronoteLoginResult>("/auth/login", {
       method: "POST",
+      retry: false,
       body: {
         url,
         username,
@@ -128,6 +132,7 @@ export const PronoteApiClient = {
   ): Promise<PronoteLoginResult> {
     return request<PronoteLoginResult>("/auth/qrcode", {
       method: "POST",
+      retry: false,
       body: {
         qr_data: qrData,
         pin,
@@ -146,6 +151,7 @@ export const PronoteApiClient = {
   ): Promise<PronoteLoginResult> {
     return request<PronoteLoginResult>("/auth/token", {
       method: "POST",
+      retry: false,
       body: {
         url,
         username,

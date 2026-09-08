@@ -69,6 +69,8 @@ export interface Personalization {
   enabledCalendarIds?: string[];
   showWeekendsOnTimetable?: boolean;
   pronoteApiUrl?: string;
+  /** UUID stable de l'appareil pour les logins Pronote (ne change jamais). */
+  deviceUuid?: string;
   notifications?: NotificationsPrefs;
   /** Flat notifications prefs (contract): Tasks live, Notes/Messages locked. */
   notificationsTasksEnabled?: boolean;
