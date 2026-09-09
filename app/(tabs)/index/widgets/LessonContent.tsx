@@ -12,6 +12,7 @@ import Typography from "@/ui/components/Typography";
 import { getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectName } from "@/utils/subjects/name";
+import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 import { useTimetableWidgetData } from "../hooks/useTimetableWidgetData";
 
 type LessonContentWidgetProps = {
@@ -54,14 +55,14 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
         params: { id: getCourseRouteId(nextWithContent as any) },
       });
     } else {
-      onTargetChange("(tabs)/calendar");
+      onTargetChange("/(tabs)/calendar");
     }
   }, [nextWithContent, onTargetChange]);
 
   if (!nextWithContent) {
     return (
       <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
-        <Link href="(tabs)/calendar" asChild>
+        <Link href="/(tabs)/calendar" asChild>
           <Link.AppleZoom>
             <Stack gap={10} padding={[16, 14]} radius={18} card>
               <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
@@ -106,6 +107,17 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
   const subject = getSubjectName(nextWithContent.subject);
   const color = getSubjectColor(nextWithContent.subject);
   const emoji = getSubjectEmoji(nextWithContent.subject);
+  const courseDate = useMemo(() => {
+    try {
+      const d = new Date((nextWithContent as any).from);
+      const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      return `${day} · ${hh}h${mm}`;
+    } catch {
+      return "";
+    }
+  }, [nextWithContent]);
 
   return (
     <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
@@ -117,16 +129,19 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
         asChild
       >
         <Link.AppleZoom>
-          <Stack gap={10} padding={[14, 14]} radius={18} card>
+          <Stack gap={10} padding={[14, 14]} radius={18} card style={{ paddingLeft: 24 }}>
+            <View
+              style={{
+                position: "absolute",
+                left: 10,
+                top: 14,
+                bottom: 14,
+                width: 6,
+                backgroundColor: color,
+                borderRadius: 300,
+              }}
+            />
             <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
-              <View
-                style={{
-                  width: 6,
-                  alignSelf: "stretch",
-                  backgroundColor: color,
-                  borderRadius: 300,
-                }}
-              />
               <View
                 style={{
                   width: 44,
@@ -144,7 +159,7 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
                   {subject}
                 </Typography>
                 <Typography variant="body2" color="secondary" numberOfLines={1}>
-                  {t("Home_LessonContent_Title", "Contenu du prochain cours")}
+                  {courseDate || t("Home_LessonContent_Title", "Contenu du prochain cours")}
                 </Typography>
               </View>
               {fileCount > 0 && (
@@ -184,16 +199,29 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
                   </Typography>
                 )}
                 {Array.isArray(c.attachments) && c.attachments.length > 0 && (
-                  <Typography variant="caption" color="secondary" numberOfLines={1}>
-                    {c.attachments
-                      .slice(0, 2)
-                      .map((a: any) => a?.name ?? "Fichier")
-                      .join(" · ")}
-                    {c.attachments.length > 2 ? ` (+${c.attachments.length - 2})` : ""}
-                  </Typography>
+                  <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
+                    <Icon papicon opacity={0.5} size={14}>
+                      <Papicons name={getAttachmentIcon(c.attachments[0]) as any} />
+                    </Icon>
+                    <Typography variant="caption" color="secondary" style={{ flex: 1 }} numberOfLines={1}>
+                      {c.attachments
+                        .slice(0, 2)
+                        .map((a: any) => a?.name ?? "Fichier")
+                        .join(" · ")}
+                      {c.attachments.length > 2 ? ` (+${c.attachments.length - 2})` : ""}
+                    </Typography>
+                  </Stack>
                 )}
               </View>
             ))}
+            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
+              <Typography variant="caption" weight="bold" color="primary" style={{ flex: 1 }} numberOfLines={1}>
+                {t("Home_LessonContent_CTA", "Ouvrir le cours")}
+              </Typography>
+              <Icon papicon opacity={0.5} size={16}>
+                <Papicons name="ArrowRightUp" />
+              </Icon>
+            </Stack>
           </Stack>
         </Link.AppleZoom>
       </Link>

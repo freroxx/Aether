@@ -19,15 +19,20 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
   const fetchedWeeksRef = useRef<string[]>([]);
   const fetchIdRef = useRef(0);
 
-  const store = useAccountStore.getState();
-  const account = store.accounts.find(a => a.id === store.lastUsedAccount);
+  const storeAccounts = useAccountStore(s => s.accounts);
+  const lastUsedAccount = useAccountStore(s => s.lastUsedAccount);
+  const account = storeAccounts.find(a => a.id === lastUsedAccount);
   const servicesKey = (account?.services?.map((service: { id: string }) => service.id) ?? []).join(',');
   const services: string[] = useMemo(() => (servicesKey ? servicesKey.split(',') : []), [servicesKey]);
   
   const rawTimetable = useTimetable(refresh, [weekNumber - 1, weekNumber, weekNumber + 1], safeDate);
   
   const selectedChild = account?.selectedChild;
+  const accountIds = useMemo(() => new Set((storeAccounts ?? []).map((a: any) => a.id)), [storeAccounts]);
   const timetable = useMemo(() => {
+    const hasSelectedKid =
+      !!selectedChild &&
+      rawTimetable.some(d => (d.courses ?? []).some(c => (c as any)?.kidName === selectedChild));
     const seen = new Set<string>();
     return rawTimetable.map(day => ({
       ...day,
@@ -36,6 +41,7 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
         const owner = course.createdByAccount ?? "";
         const allowed =
           services.includes(owner) ||
+          accountIds.has(owner) ||
           owner.startsWith('ical_') ||
           owner === 'android_calendar' ||
           owner.startsWith('calendar_');
@@ -46,19 +52,22 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
         if ((owner === 'android_calendar' || owner.startsWith('calendar_')) && mirrorMark.includes("Aether")) {
           return false;
         }
-        // Parent : ne garder que l'enfant sélectionné.
-        const kid = (course as any)?.kidName;
-        if (typeof kid === "string" && kid.length > 0 && selectedChild && kid !== selectedChild) {
-          return false;
+        // Parent : ne filtrer que si l'enfant sélectionné existe dans les données.
+        if (hasSelectedKid) {
+          const kid = (course as any)?.kidName;
+          if (typeof kid === "string" && kid.length > 0 && kid !== selectedChild) {
+            return false;
+          }
         }
         // Clé SANS owner (+teacher) : EDT + miroir résiduel fusionnent.
-        const key = `${kid ?? ""}::${course.from?.getTime?.() ?? course.from}::${course.to?.getTime?.() ?? course.to}::${course.subject}::${course.room}::${course.teacher ?? ""}`;
+        const courseKid = (course as any)?.kidName ?? "";
+        const key = `${courseKid}::${course.from?.getTime?.() ?? course.from}::${course.to?.getTime?.() ?? course.to}::${course.subject}::${course.room}::${course.teacher ?? ""}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       })
     })).filter(day => day.courses.length > 0);
-  }, [rawTimetable, servicesKey, selectedChild]);
+  }, [rawTimetable, servicesKey, selectedChild, accountIds]);
 
   const fetchWeeklyTimetable = useCallback(async (targetWeekNumber: number, forceRefresh = false) => {
     const myId = ++fetchIdRef.current;
@@ -87,13 +96,17 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
         }
 
         const baseDate = new Date(safeDateMs);
-        const candidates = [targetWeekNumber - 1, targetWeekNumber, targetWeekNumber + 1].map(week => {
-          const targetDate = new Date(baseDate);
-          targetDate.setDate(targetDate.getDate() + (week - targetWeekNumber) * 7);
-          const year = targetDate.getFullYear();
-          const key = `${year}-${week}`;
-          return { week, targetDate, key };
-        });
+        const candidates = [targetWeekNumber - 1, targetWeekNumber, targetWeekNumber + 1]
+          .map(week => {
+            const targetDate = new Date(baseDate);
+            targetDate.setDate(targetDate.getDate() + (week - targetWeekNumber) * 7);
+            const year = targetDate.getFullYear();
+            const key = `${year}-${week}`;
+            return { week, targetDate, key };
+          })
+          // Semaines 0/54 invalides (chevauchement d'année) : on évite
+          // de requêter une mauvaise semaine qui viderait le cache.
+          .filter(c => c.week >= 1 && c.week <= 53);
 
         const toFetch = candidates.filter(c => !fetchedWeeksRef.current.includes(c.key));
 

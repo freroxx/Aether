@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createMMKV } from "react-native-mmkv";
 import { useAccountStore } from "@/stores/account";
 import { useTimetable } from "@/database/useTimetable";
@@ -74,6 +74,7 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
   const nextYearTimetable = useTimetable(undefined, nextYearWeeks, nextYearDate);
 
   const selectedChild = account?.selectedChild;
+  const accountIds = useMemo(() => new Set((accounts ?? []).map(a => a.id)), [accounts]);
   const weeklyTimetable = useMemo(() => {
     const merged = new Map<string, (typeof currentYearTimetable)[number]>();
     for (const day of (Array.isArray(currentYearTimetable) ? currentYearTimetable : []).concat(
@@ -95,25 +96,42 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
         }
       }
     }
-    return [...merged.values()]
+    const all = [...merged.values()];
+    // Ne filtre par enfant que si l'enfant sélectionné existe vraiment
+    // dans les données (sinon selectedChild stale viderait tout).
+    const hasSelectedKid =
+      !!selectedChild &&
+      all.some(d => (d.courses ?? []).some(c => (c as any)?.kidName === selectedChild));
+    return all
       .map(day => ({
         ...day,
         courses: Array.isArray(day?.courses) ? day.courses.filter(course => {
           if (!course) return false;
           const owner = course.createdByAccount ?? "";
+          // Tolère les deux schémas historiques : service.id OU account.id.
           const ok =
             services.includes(owner) ||
-            (typeof owner === "string" && owner.startsWith('ical_'));
+            accountIds.has(owner) ||
+            (typeof owner === "string" && owner.startsWith('ical_')) ||
+            owner === 'android_calendar' ||
+            (typeof owner === "string" && owner.startsWith('calendar_'));
           if (!ok) return false;
-          const kid = (course as any)?.kidName;
-          if (typeof kid === "string" && kid.length > 0 && selectedChild && kid !== selectedChild) {
+          // Miroir Aether : jamais dans le widget.
+          const mark = `${String((course as any)?.subject ?? "")} ${(course as any)?.teacher ?? ""} ${(course as any)?.room ?? ""}`;
+          if ((owner === 'android_calendar' || owner.startsWith('calendar_')) && mark.includes("Aether")) {
             return false;
+          }
+          if (hasSelectedKid) {
+            const kid = (course as any)?.kidName;
+            if (typeof kid === "string" && kid.length > 0 && kid !== selectedChild) {
+              return false;
+            }
           }
           return true;
         }) : []
       }))
       .filter(day => day.courses.length > 0);
-  }, [currentYearTimetable, nextYearTimetable, services, selectedChild]);
+  }, [currentYearTimetable, nextYearTimetable, services, selectedChild, accountIds]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -145,6 +163,7 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
         .filter((course) => course.to.getTime() > Date.now())
         .filter((course) => options.showCancelled || course.status !== CourseStatus.CANCELED)
         .sort((a, b) => a.from.getTime() - b.from.getTime());
+      hydratedCountRef.current = hydrated.length;
       setCourses(hydrated);
     } catch {
       widgetCacheStorage.remove(cacheKey);
@@ -153,9 +172,16 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
     }
   }, [cacheKey]);
 
+  const hydratedCountRef = React.useRef(0);
   useEffect(() => {
     setLoading(true);
     if (weeklyTimetable.length === 0) {
+      // La DB n'a pas encore résolu : garde le cache hydraté au lieu
+      // d'afficher un emploi du temps vide en flash.
+      if (hydratedCountRef.current > 0) {
+        setLoading(false);
+        return;
+      }
       setCourses([]);
       setLoading(false);
       return;

@@ -20,7 +20,8 @@ import HomeTimeTableWidget from './widgets/timetable';
 import GradesWidget from './widgets/Grades';
 import EvaluationsWidget from './widgets/evaluations';
 import SanctionsWidget from './widgets/sanctions';
-import LessonContentWidget from './widgets/LessonContent';
+import LessonContentWidget, { findNextCourseWithContent } from './widgets/LessonContent';
+import { getCourseRouteId } from '@/database/useTimetable';
 import SyncingCard from './widgets/SyncingCard';
 import { useSyncStore } from '@/stores/sync';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -72,13 +73,25 @@ const HomeScreen = () => {
     () => <GradesWidget onEmptyStateChange={setGradesWidgetHidden} />,
     []
   );
-  const [lessonRedirect, setLessonRedirect] = React.useState<string | { pathname: string; params: Record<string, string> }>("(tabs)/calendar");
-  const handleLessonTarget = React.useCallback((href: string | { pathname: string; params: Record<string, string> }) => {
-    setLessonRedirect(href);
-  }, []);
+  // Cible du header calculée ici même (source unique : `courses`),
+  // sans attendre l'effet enfant — pas de décalage d'un render.
+  // `undefined` tant que les cours chargent : pas de lien header hasardeux.
+  const lessonRedirect = React.useMemo(() => {
+    if (!courses || courses.length === 0) return undefined;
+    const next = findNextCourseWithContent(courses as any[]);
+    if (!next) return "/(tabs)/calendar";
+    try {
+      return {
+        pathname: "/(modals)/course/[id]",
+        params: { id: getCourseRouteId(next as any) },
+      };
+    } catch {
+      return "/(tabs)/calendar";
+    }
+  }, [courses]);
   const renderLessonContent = React.useCallback(
-    () => <LessonContentWidget onEmptyStateChange={setLessonContentHidden} onTargetChange={handleLessonTarget} />,
-    [handleLessonTarget]
+    () => <LessonContentWidget onEmptyStateChange={setLessonContentHidden} />,
+    []
   );
   const renderEvaluations = React.useCallback(
     () => <EvaluationsWidget onEmptyStateChange={setEvaluationsWidgetHidden} />,
@@ -94,8 +107,7 @@ const HomeScreen = () => {
       ? [
           {
             icon: <Papicons name={"Refresh"} />,
-            title: "Synchronisation",
-            redirect: "(tabs)/index" as const,
+            title: t("Home_Syncing_Title", "Synchronisation"),
             hidden: false,
             render: () => <SyncingCard />,
           } as HomeWidgetItem,

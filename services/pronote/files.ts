@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
-import { Platform, Share } from "react-native";
+import { Share } from "react-native";
 
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import { Attachment, AttachmentType } from "@/services/shared/attachment";
@@ -236,7 +237,42 @@ export async function openAttachment(
       lower.endsWith(".gif") ||
       lower.endsWith(".webp");
 
-    // PDF/images -> aperçu intégré d'abord (file:// géré par WebBrowser).
+    // Vérifie que le fichier existe et n'est pas vide avant d'ouvrir.
+    try {
+      const check = new File(uri);
+      if (!check.exists) {
+        throw new Error("Fichier local introuvable après téléchargement.");
+      }
+      const size = check.size ?? 0;
+      if (size <= 0) {
+        throw new Error("Fichier vide reçu du serveur.");
+      }
+      if (size > 25 * 1024 * 1024) {
+        throw new Error("Fichier trop volumineux pour être ouvert depuis l'app.");
+      }
+    } catch (guardErr) {
+      const msg = guardErr instanceof Error ? guardErr.message : String(guardErr ?? "");
+      if (/vide|volumineux|introuvable/.test(msg.toLowerCase())) throw guardErr;
+      // Stat impossible (FS exotique) : on tente quand même l'ouverture.
+    }
+
+    // Partage via FileProvider (content://) — jamais de file:// en ACTION_SEND,
+    // sinon FileUriExposedException tue l'app (incatchable en JS).
+    const canShareNative = await Sharing.isAvailableAsync().catch(() => false);
+    if (canShareNative) {
+      await Sharing.shareAsync(uri, {
+        mimeType: mime,
+        dialogTitle: filename,
+        UTI: mime.startsWith("image/")
+          ? "public.image"
+          : mime === "application/pdf"
+            ? "com.adobe.pdf"
+            : undefined,
+      });
+      return;
+    }
+
+    // Fallback sans expo-sharing : aperçu intégré pour PDF/images uniquement.
     if (previewable) {
       try {
         await WebBrowser.openBrowserAsync(uri);
@@ -244,17 +280,12 @@ export async function openAttachment(
       } catch (openErr) {
         const { error: logError } = await import("@/utils/logger/logger");
         logError(`openAttachment browser failed: ${filename} ${mime} ${uri} :: ${String(openErr)}`);
-        // fallback partage ci-dessous
       }
     }
 
+    // Dernier recours : Share RN (peut échouer sur file:// Android 7+).
     try {
-      const result = await Share.share(
-        Platform.OS === "android"
-          ? { message: filename, title: filename, url: uri }
-          : { url: uri, title: filename, message: filename }
-      );
-      // Dismiss du share-sheet = action utilisateur normale, pas une erreur.
+      const result = await Share.share({ url: uri, title: filename, message: filename });
       if ((result as any)?.action === Share.dismissedAction) return;
     } catch (shareErr) {
       const { error: logError } = await import("@/utils/logger/logger");
