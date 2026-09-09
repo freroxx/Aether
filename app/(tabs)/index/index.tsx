@@ -21,8 +21,11 @@ import GradesWidget from './widgets/Grades';
 import EvaluationsWidget from './widgets/evaluations';
 import SanctionsWidget from './widgets/sanctions';
 import LessonContentWidget from './widgets/LessonContent';
+import SyncingCard from './widgets/SyncingCard';
+import { useSyncStore } from '@/stores/sync';
 import MaskedView from '@react-native-masked-view/masked-view';
 import LinearGradient from 'react-native-linear-gradient';
+import { ErrorBoundary } from '@/ui/components/ErrorBoundary';
 import MainTabErrorBoundary from '@/ui/components/MainTabErrorBoundary';
 
 const HomeScreen = () => {
@@ -37,6 +40,7 @@ const HomeScreen = () => {
   const router = useRouter();
   const welcomeModalSeen = useSettingsStore(state => state.personalization.welcomeModalSeen);
   const mutateSettings = useSettingsStore(state => state.mutateProperty);
+  const isSyncing = useSyncStore(s => s.isSyncing);
 
   React.useEffect(() => {
     if (accounts.length === 0) {
@@ -68,9 +72,13 @@ const HomeScreen = () => {
     () => <GradesWidget onEmptyStateChange={setGradesWidgetHidden} />,
     []
   );
+  const [lessonRedirect, setLessonRedirect] = React.useState<string | { pathname: string; params: Record<string, string> }>("(tabs)/calendar");
+  const handleLessonTarget = React.useCallback((href: string | { pathname: string; params: Record<string, string> }) => {
+    setLessonRedirect(href);
+  }, []);
   const renderLessonContent = React.useCallback(
-    () => <LessonContentWidget onEmptyStateChange={setLessonContentHidden} />,
-    []
+    () => <LessonContentWidget onEmptyStateChange={setLessonContentHidden} onTargetChange={handleLessonTarget} />,
+    [handleLessonTarget]
   );
   const renderEvaluations = React.useCallback(
     () => <EvaluationsWidget onEmptyStateChange={setEvaluationsWidgetHidden} />,
@@ -82,11 +90,22 @@ const HomeScreen = () => {
   );
 
   const data: HomeWidgetItem[] = React.useMemo(() => [
+    ...(isSyncing
+      ? [
+          {
+            icon: <Papicons name={"Refresh"} />,
+            title: "Synchronisation",
+            redirect: "(tabs)/index" as const,
+            hidden: false,
+            render: () => <SyncingCard />,
+          } as HomeWidgetItem,
+        ]
+      : []),
     {
       icon: <Papicons name={"Info"} />,
       title: t("Home_Widget_LessonContent", "Contenu et ressources"),
-      redirect: "(tabs)/calendar",
-      hidden: lessonContentHidden,
+      redirect: lessonRedirect as any,
+      hidden: false,
       render: renderLessonContent
     },
     {
@@ -106,37 +125,49 @@ const HomeScreen = () => {
       icon: <Papicons name={"Grades"} />,
       title: t("Home_Evaluations_Title"),
       redirect: "(features)/evaluations",
-      hidden: evaluationsWidgetHidden,
+      hidden: false,
       render: renderEvaluations
     },
     {
       icon: <Papicons name={"AlertTriangle"} />,
       title: t("Home_Sanctions_Title"),
       redirect: "(features)/sanctions",
-      hidden: sanctionsWidgetHidden,
+      hidden: false,
       render: renderSanctions
     }
-  ], [renderTimeTable, renderGrades, renderLessonContent, renderEvaluations, renderSanctions, gradesWidgetHidden, lessonContentHidden, evaluationsWidgetHidden, sanctionsWidgetHidden, timetableTitle]);
+  ], [renderTimeTable, renderGrades, renderLessonContent, renderEvaluations, renderSanctions, gradesWidgetHidden, lessonContentHidden, evaluationsWidgetHidden, sanctionsWidgetHidden, timetableTitle, isSyncing, lessonRedirect]);
 
   React.useEffect(() => {
-    if (!account || welcomeModalSeen) {
+    if (!account || welcomeModalSeen || isSyncing) {
       return;
     }
 
     mutateSettings("personalization", { welcomeModalSeen: true });
-    router.navigate("/(modals)/welcome");
-  }, [account, mutateSettings, router, welcomeModalSeen]);
+    // Laisser la SyncingCard se résorber avant d'ouvrir le modal de bienvenue
+    const timer = setTimeout(() => {
+      router.navigate("/(modals)/welcome");
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [account, mutateSettings, router, welcomeModalSeen, isSyncing]);
 
   return (
     <>
-      <Wallpaper />
-      <HomeTopBar />
+      <ErrorBoundary fallback={null}>
+        <Wallpaper />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <HomeTopBar />
+      </ErrorBoundary>
       {focused && <StatusBar translucent animated barStyle={'light-content'} />}
       <HomeViewContainer key={"home"}>
         <FlatList
           renderItem={({ item }) => <HomeWidget item={item} />}
           keyExtractor={(item) => item.title}
-          ListHeaderComponent={<HomeHeader />}
+          ListHeaderComponent={
+            <ErrorBoundary fallback={null}>
+              <HomeHeader />
+            </ErrorBoundary>
+          }
           refreshControl={
             <RefreshControl refreshing={homeRefreshing} onRefresh={onHomeRefresh} />
           }

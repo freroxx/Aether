@@ -1,7 +1,6 @@
 import { Papicons } from '@getpapillon/papicons';
 import { useTheme } from "expo-router/react-navigation";
 import { useLocalSearchParams } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { formatDistanceStrict, formatDistanceToNow } from 'date-fns'
 import * as DateLocale from 'date-fns/locale';
 import i18n, { t } from "i18next";
@@ -11,11 +10,14 @@ import LinearGradient from "react-native-linear-gradient";
 
 import ModalOverhead from "@/components/ModalOverhead";
 import { getCourseById } from "@/database/useTimetable";
+import { openAttachment, resolvePronoteFileAuth } from "@/services/pronote/files";
 import { Course as SharedCourse } from "@/services/shared/timetable";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
+import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 import { getSubjectName } from '@/utils/subjects/name';
 import { getSubjectColor } from '@/utils/subjects/colors';
 import { getSubjectEmoji } from '@/utils/subjects/emoji';
@@ -33,6 +35,7 @@ interface SubjectInfo {
 export default function CourseModal() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  const alert = useAlert();
   const insets = useSafeAreaInsets();
   const finalHeaderHeight = Platform.select({
     android: insets.top + 32,
@@ -40,6 +43,7 @@ export default function CourseModal() {
   });
   const [course, setCourse] = useState<SharedCourse>();
   const [loading, setLoading] = useState(true);
+  const [downloadingName, setDownloadingName] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,28 +260,44 @@ export default function CourseModal() {
                     )}
                   </List.Item>
                 )}
-                {(c.attachments ?? []).map((a, j) => (
-                  <List.Item
-                    key={`${a.name}-${j}`}
-                    onPress={a.url ? () => void WebBrowser.openBrowserAsync(a.url, {
-                      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-                    }) : undefined}
-                  >
-                    <List.Leading>
-                      <Icon>
-                        <Papicons name="Link" />
-                      </Icon>
-                    </List.Leading>
-                    <Typography variant="title" numberOfLines={2}>
-                      {a.name || t("Modal_Course_File", "Fichier")}
-                    </Typography>
-                    {!!a.url && (
-                      <Typography variant="body1" color="textSecondary" numberOfLines={1}>
-                        {t("Modal_Course_Open", "Ouvrir")}
+                {(c.attachments ?? []).map((a, j) => {
+                  const key = `${a.name}-${j}`;
+                  const isDownloading = downloadingName === key;
+                  return (
+                    <List.Item
+                      key={key}
+                      onPress={() => {
+                        if (isDownloading) return;
+                        setDownloadingName(key);
+                        void openAttachment(
+                          a,
+                          resolvePronoteFileAuth(a.createdByAccount),
+                          alert
+                        ).finally(() => setDownloadingName(null));
+                      }}
+                    >
+                      <List.Leading>
+                        <Icon>
+                          <Papicons name={getAttachmentIcon(a)} />
+                        </Icon>
+                      </List.Leading>
+                      <Typography variant="title" numberOfLines={2}>
+                        {a.name || t("Modal_Course_File", "Fichier")}
                       </Typography>
-                    )}
-                  </List.Item>
-                ))}
+                      {isDownloading ? (
+                        <List.Trailing>
+                          <ActivityIndicator size={20} />
+                        </List.Trailing>
+                      ) : (
+                        !!a.url && (
+                          <Typography variant="body1" color="textSecondary" numberOfLines={1}>
+                            {t("Modal_Course_Open", "Ouvrir")}
+                          </Typography>
+                        )
+                      )}
+                    </List.Item>
+                  );
+                })}
               </React.Fragment>
             ))}
           </List.Section>

@@ -6,7 +6,7 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Linking, Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Linking, Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import Reanimated, { FadeInUp, FadeOutUp, LinearTransition } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,6 +14,7 @@ import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import Button from "@/ui/components/Button";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
 import Typography from "@/ui/components/Typography";
 import { URLToBase64 } from "@/utils/attachments/helper";
@@ -43,11 +44,15 @@ export default function PronoteLoginWithQR() {
 
   const [QRValidationCode, setQRValidationCode] = useState("");
   const [pinModalVisible, setPinModalVisible] = useState(false);
+  const alert = useAlert();
 
   const [loadingModalVisible, setLoadingModalVisible] = useState(false);
 
   const codeInput = React.createRef<TextInput>();
   const [QRData, setQRData] = useState<string | null>(null);
+  // Garde anti double-tap : le jeton QR est à usage unique, deux appels
+  // concurrents brûleraient le second avec une erreur 'dataSec' incompréhensible.
+  const loginInFlight = React.useRef(false);
 
   // Relance l'init post-login depuis le dialogue d'échec (compte conservé).
   async function retryPostLoginInit(accountID: string) {
@@ -56,39 +61,37 @@ export default function PronoteLoginWithQR() {
       const { initAccountAfterLogin } = await import("./postLogin");
       await initAccountAfterLogin(accountID);
       setLoadingModalVisible(false);
-      router.dismissAll();
-      router.replace("/(tabs)/index");
+      const { finishAuthNavigation } = await import("@/utils/navigation/finishAuth");
+      finishAuthNavigation();
     } catch (e) {
       console.error("QR post-login retry failed:", e);
       setLoadingModalVisible(false);
       const { describeInitError } = await import("./postLogin");
-      Alert.alert(
-        "Synchronisation impossible",
-        "La synchronisation a encore échoué : " + describeInitError(e),
-        [
-          {
-            text: "Réessayer",
-            onPress: () => void retryPostLoginInit(accountID),
-          },
-          {
-            text: "Supprimer le compte",
-            style: "destructive",
-            onPress: () => {
-              useAccountStore.getState().removeAccount({ id: accountID } as any);
-              setQRValidationCode("");
-            },
-          },
-        ]
-      );
+      alert.showAlert({
+        title: "Synchronisation impossible",
+        description: "La synchronisation a encore échoué : " + describeInitError(e),
+        icon: "Refresh",
+        color: "#E05D34",
+        customButton: {
+          label: "Réessayer",
+          showCancelButton: true,
+          onPress: () => void retryPostLoginInit(accountID),
+        },
+      });
     }
   }
 
   async function loginQR() {
+    if (loginInFlight.current) {
+      return;
+    }
+    loginInFlight.current = true;
     setScanned(false);
     setLoadingModalVisible(true);
 
     if (QRValidationCode === "" || QRValidationCode.length !== 4) {
       setLoadingModalVisible(false);
+      loginInFlight.current = false;
       return;
     }
 
@@ -181,38 +184,37 @@ export default function PronoteLoginWithQR() {
       } catch (e) {
         console.error("QR post-login init failed:", e);
         setLoadingModalVisible(false);
+        loginInFlight.current = false;
         const { describeInitError } = await import("./postLogin");
-        Alert.alert(
-          "Synchronisation impossible",
-          "Session créée, mais la première synchronisation a échoué : " +
+        alert.showAlert({
+          title: "Synchronisation impossible",
+          description:
+            "Session créée, mais la première synchronisation a échoué : " +
             describeInitError(e),
-          [
-            {
-              text: "Réessayer",
-              onPress: () => void retryPostLoginInit(accountID),
-            },
-            {
-              text: "Supprimer le compte",
-              style: "destructive",
-              onPress: () => {
-                useAccountStore.getState().removeAccount({ id: accountID } as any);
-                setQRValidationCode("");
-              },
-            },
-          ]
-        );
+          icon: "Refresh",
+          color: "#E05D34",
+          customButton: {
+            label: "Réessayer",
+            showCancelButton: true,
+            onPress: () => void retryPostLoginInit(accountID),
+          },
+        });
         return;
       }
       setLoadingModalVisible(false);
-      router.dismissAll();
-      router.replace("/(tabs)/index");
+      loginInFlight.current = false;
+      const { finishAuthNavigation } = await import("@/utils/navigation/finishAuth");
+      finishAuthNavigation();
     } catch (error: any) {
       console.error("QR Login Error:", error);
       setLoadingModalVisible(false);
-      Alert.alert(
-        "Erreur de connexion",
-        error?.message || "Code PIN incorrect ou QR Code expiré. Veuillez générer un nouveau QR Code."
-      );
+      loginInFlight.current = false;
+      alert.showAlert({
+        title: "Erreur de connexion",
+        description: error?.message || "Code PIN incorrect ou QR Code expiré. Veuillez générer un nouveau QR Code.",
+        icon: "QrCode",
+        color: "#E05D34",
+      });
     }
   }
 

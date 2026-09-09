@@ -18,7 +18,7 @@ export function mapCourseToShared(course: Course): SharedCourse {
     subject: course.subject,
     id: course.courseId,
     fromCache: true,
-    createdByAccount: course.createdByAccount,
+    createdByAccount: course.createdByAccount ?? "",
     type: course.type,
     from: new Date(course.from),
     to: new Date(course.to),

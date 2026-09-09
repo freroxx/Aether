@@ -36,6 +36,10 @@ const defaultPersonalization: Personalization = {
   notificationsNotesEnabled: false,
   notificationsMessagesEnabled: false,
   lastNotifiedTaskIds: [],
+  androidCalendarSyncEnabled: false,
+  enabledCalendarIds: [],
+  calendarEventMap: {},
+  calendarWarningSeen: false,
 };
 
 export const useSettingsStore = create<SettingsStorage>()(

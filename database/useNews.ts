@@ -28,7 +28,11 @@ export function useNews(refresh = 0) {
         all
           .map(mapNewsToShared)
           .filter(item => !lastUsedAccount || item.createdByAccount === lastUsedAccount)
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          .sort((a, b) => {
+            const ta = a?.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a?.createdAt).getTime();
+            const tb = b?.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b?.createdAt).getTime();
+            return (Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0);
+          })
       )
     );
 
@@ -140,7 +144,11 @@ export async function getNewsFromCache(): Promise<SharedNews[]> {
     return news
       .map(mapNewsToShared)
       .filter(item => !lastUsedAccount || item.createdByAccount === lastUsedAccount)
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      .sort((a, b) => {
+        const ta = a?.createdAt instanceof Date ? a.createdAt.getTime() : NaN;
+        const tb = b?.createdAt instanceof Date ? b.createdAt.getTime() : NaN;
+        return (Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0);
+      });
   } catch (e) {
     warn(String(e));
     return [];

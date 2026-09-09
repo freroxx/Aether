@@ -1,7 +1,7 @@
 import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import {
   areNotificationsEnabled,
@@ -10,6 +10,8 @@ import {
   requestNotificationsPermission,
 } from "@/services/local/notifications";
 import { useSettingsStore } from "@/stores/settings";
+import { useAlert } from "@/ui/components/AlertProvider";
+import ConfirmModal from "@/ui/components/ConfirmModal";
 import Icon from "@/ui/components/Icon";
 import NativeSwitch from "@/ui/native/NativeSwitch";
 import List from "@/ui/new/List";
@@ -31,6 +33,8 @@ export default function SettingsNotifications() {
 
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
   const [requesting, setRequesting] = useState(false);
+  const alert = useAlert();
+  const [showGrantModal, setShowGrantModal] = useState(false);
 
   useEffect(() => {
     areNotificationsEnabled()
@@ -44,27 +48,20 @@ export default function SettingsNotifications() {
       const granted = await requestNotificationsPermission();
       setPermissionGranted(granted);
       if (!granted) {
-        Alert.alert(
-          "Notifications refusées",
-          "Autorise les notifications dans les réglages Android pour recevoir les alertes."
-        );
+        alert.showAlert({
+          title: "Notifications refusées",
+          description: "Autorise les notifications dans les réglages Android pour recevoir les alertes.",
+          icon: "Bell",
+        });
       }
     } finally {
       setRequesting(false);
     }
-  }, []);
+  }, [alert]);
 
   const promptGrant = useCallback(() => {
-    Alert.alert(
-      "Autoriser les notifications",
-      "Permission requise pour activer les notifications.",
-      [
-        { text: "Plus tard", style: "cancel" },
-        { text: "Autoriser", onPress: () => void handleAuthorize() },
-      ],
-      { cancelable: true }
-    );
-  }, [handleAuthorize]);
+    setShowGrantModal(true);
+  }, []);
 
   const ensurePermission = useCallback(async (): Promise<boolean> => {
     if (permissionGranted === true) return true;
@@ -233,6 +230,19 @@ export default function SettingsNotifications() {
           </List.Trailing>
         </List.Item>
       </List.Section>
+      <ConfirmModal
+        visible={showGrantModal}
+        title="Autoriser les notifications"
+        description="Permission requise pour activer les notifications."
+        icon="Bell"
+        confirmLabel="Autoriser"
+        cancelLabel="Plus tard"
+        onConfirm={() => {
+          setShowGrantModal(false);
+          void handleAuthorize();
+        }}
+        onClose={() => setShowGrantModal(false)}
+      />
     </List>
   );
 }

@@ -1,7 +1,7 @@
 import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import {
   areNotificationsEnabled,
@@ -14,6 +14,8 @@ import {
   setTaskReminderEnabled,
 } from "@/services/local/reminders";
 import { useSettingsStore } from "@/stores/settings";
+import { useAlert } from "@/ui/components/AlertProvider";
+import ConfirmModal from "@/ui/components/ConfirmModal";
 import Icon from "@/ui/components/Icon";
 import NativeSwitch from "@/ui/native/NativeSwitch";
 import List from "@/ui/new/List";
@@ -41,6 +43,9 @@ function formatRemindAt(ts: number): string {
 
 export default function SettingsRappels() {
   const theme = useTheme();
+  const alert = useAlert();
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
+  const [infoReminder, setInfoReminder] = useState<{ title: string; at: string } | null>(null);
   const personalization = useSettingsStore(s => s.personalization);
   const mutateProperty = useSettingsStore(s => s.mutateProperty);
 
@@ -66,15 +71,14 @@ export default function SettingsRappels() {
     const granted = await areNotificationsEnabled().catch(() => false);
     setPermissionGranted(granted);
     if (!granted) {
-      Alert.alert(
-        "Autoriser les notifications",
-        "Active les notifications pour recevoir tes rappels.",
-        [{ text: "OK" }],
-        { cancelable: true }
-      );
+      alert.showAlert({
+        title: "Autoriser les notifications",
+        description: "Active les notifications pour recevoir tes rappels.",
+        icon: "Bell",
+      });
     }
     return granted;
-  }, []);
+  }, [alert]);
 
   const handleAutoToggle = useCallback(
     async (next: boolean) => {
@@ -101,10 +105,7 @@ export default function SettingsRappels() {
   );
 
   const handleDelete = useCallback((id: string, title: string) => {
-    Alert.alert("Supprimer le rappel ?", title, [
-      { text: "Annuler", style: "cancel" },
-      { text: "Supprimer", style: "destructive", onPress: () => void cancelTaskReminder(id) },
-    ]);
+    setPendingDelete({ id, title });
   }, []);
 
   return (
@@ -179,7 +180,7 @@ export default function SettingsRappels() {
               <List.Item
                 key={r.id}
                 onPress={() =>
-                  Alert.alert(r.title, `Rappel le ${formatRemindAt(r.remindAt)}`, [{ text: "OK" }])
+                  setInfoReminder({ title: r.title, at: `Rappel le ${formatRemindAt(r.remindAt)}` })
                 }
               >
                 <List.Leading>
@@ -219,6 +220,29 @@ export default function SettingsRappels() {
             ))
         )}
       </List.Section>
+      <ConfirmModal
+        visible={!!pendingDelete}
+        title="Supprimer le rappel ?"
+        description={pendingDelete?.title}
+        icon="Trash"
+        destructive
+        confirmLabel="Supprimer"
+        onConfirm={() => {
+          if (pendingDelete) void cancelTaskReminder(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
+      <ConfirmModal
+        visible={!!infoReminder}
+        title={infoReminder?.title ?? ""}
+        description={infoReminder?.at}
+        icon="Bell"
+        confirmLabel="OK"
+        cancelLabel="Fermer"
+        onConfirm={() => setInfoReminder(null)}
+        onClose={() => setInfoReminder(null)}
+      />
     </List>
   );
 }

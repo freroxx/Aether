@@ -2,7 +2,7 @@ import { useHeaderHeight, useRoute, useTheme } from "expo-router/react-navigatio
 import { router, useNavigation } from "expo-router";
 import React, { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, KeyboardAvoidingView, View } from "react-native";
+import { KeyboardAvoidingView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatSchoolName } from "@/utils/format/formatSchoolName";
 
@@ -10,6 +10,7 @@ import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import Stack from "@/ui/components/Stack";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Button from "@/ui/new/Button";
 import Divider from "@/ui/new/Divider";
 import List from "@/ui/new/List";
@@ -51,6 +52,7 @@ const PronoteCredentialsForm = memo(({
   const [ent, setEnt] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const alert = useAlert();
 
   const isParent = accountType === "parent";
   const canSubmit = username.trim().length > 0 && password.length > 0 && !loading;
@@ -60,7 +62,7 @@ const PronoteCredentialsForm = memo(({
     if (!baseUrl.trim()) {
       const message = "URL PRONOTE manquante. Veuillez resélectionner votre établissement.";
       setError(message);
-      Alert.alert("Erreur", message);
+      alert.showAlert({ title: "Erreur", description: message, icon: "AlertTriangle", color: "#E05D34" });
       return;
     }
     setLoading(true);
@@ -133,12 +135,19 @@ const PronoteCredentialsForm = memo(({
       });
       useAccountStore.getState().setLastUsedAccount(accountID);
 
-      router.dismissAll();
-      return router.replace("/(tabs)/index");
+      try {
+        const { initAccountAfterLogin } = await import("./postLogin");
+        initAccountAfterLogin(accountID).catch(() => {});
+      } catch {
+        // la synchro de fond sur l'accueil prendra le relais (SyncingCard)
+      }
+      const { finishAuthNavigation } = await import("@/utils/navigation/finishAuth");
+      finishAuthNavigation();
+      return;
     } catch (e: any) {
       const message = e?.message || "Identifiants incorrects. Vérifie ton identifiant et ton mot de passe.";
       setError(message);
-      Alert.alert("Erreur de connexion", message);
+      alert.showAlert({ title: "Erreur de connexion", description: message, icon: "UserCross", color: "#E05D34" });
     } finally {
       setLoading(false);
     }

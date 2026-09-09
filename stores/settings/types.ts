@@ -86,6 +86,14 @@ export interface Personalization {
   aetherCalendarId?: string;
   /** Mapping cours Aether (courseId) -> événement appareil (eventId). */
   calendarEventMap?: Record<string, string>;
+  /** Info "agenda externe en lecture seule" déjà affichée. */
+  calendarWarningSeen?: boolean;
+  /** Cible d'export unique (max 1) : compte + enfant éventuel. */
+  androidCalendarExportTarget?: { accountId: string; childName?: string } | null;
+  /** Calendriers Aether par enfant : clé `${accountId}::${childName ?? ""}` -> calendarId. */
+  aetherCalendarIdByChild?: Record<string, string>;
+  /** Mappings par enfant : clé -> (courseId -> eventId). */
+  calendarEventMapByChild?: Record<string, Record<string, string>>;
 }
 
 export interface TaskReminder {

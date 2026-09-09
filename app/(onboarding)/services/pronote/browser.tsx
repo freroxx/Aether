@@ -2,7 +2,7 @@ import { useRoute, useTheme } from "expo-router/react-navigation";
 import { router, useNavigation } from "expo-router";
 import React, { createRef, RefObject, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, KeyboardAvoidingView } from "react-native";
+import { KeyboardAvoidingView } from "react-native";
 import Reanimated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { formatSchoolName } from '@/utils/format/formatSchoolName';
 import WebView from "react-native-webview";
@@ -12,6 +12,7 @@ import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Stack from "@/ui/components/Stack";
 import Divider from "@/ui/new/Divider";
 import Typography from "@/ui/new/Typography";
@@ -71,6 +72,7 @@ export default function PronoteENTLogin() {
 
   const [deviceUUID] = useState(uuid());
   const [received, setReceived] = useState<boolean>(false);
+  const alert = useAlert();
 
   const [hasShownConnectionErrorAlert, setHasShownConnectionErrorAlert] = useState(false);
 
@@ -205,7 +207,12 @@ export default function PronoteENTLogin() {
       setBrowserVisible(true);
       if (!hasShownConnectionErrorAlert) {
         setHasShownConnectionErrorAlert(true);
-        Alert.alert("Connexion impossible", "La connexion à Pronote est impossible. Cele vient probablement de votre établissement ou d'une erreur de configuration.");
+        alert.showAlert({
+          title: "Connexion impossible",
+          description: "La connexion à Pronote est impossible. Cela vient probablement de ton établissement ou d'une erreur de configuration.",
+          icon: "WifiOff",
+          color: "#E05D34",
+        });
       }
       return;
     }
@@ -286,10 +293,22 @@ export default function PronoteENTLogin() {
         });
         useAccountStore.getState().setLastUsedAccount(deviceUUID);
 
-        router.dismissAll();
-        return router.replace("/(tabs)/index");
+        try {
+          const { initAccountAfterLogin } = await import("./postLogin");
+          initAccountAfterLogin(deviceUUID).catch(() => {});
+        } catch {
+          // synchro de fond sur l'accueil
+        }
+        const { finishAuthNavigation } = await import("@/utils/navigation/finishAuth");
+        finishAuthNavigation();
+        return;
       } catch (error: any) {
-        Alert.alert("Erreur", error?.message || "Une erreur est survenue lors de la connexion à Pronote. Veuillez réessayer.");
+        alert.showAlert({
+          title: "Erreur",
+          description: error?.message || "Une erreur est survenue lors de la connexion à Pronote. Veuillez réessayer.",
+          icon: "AlertTriangle",
+          color: "#E05D34",
+        });
       }
     }
   };

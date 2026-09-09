@@ -20,6 +20,8 @@ async function request<T>(
     params?: Record<string, string | undefined>;
     /** Désactive le retry (identifiants à usage unique : QR jeton, token). */
     retry?: boolean;
+    /** Timeout ms (défaut 20000). Téléchargements lourds : 60000. */
+    timeoutMs?: number;
   } = {}
 ): Promise<T> {
   const baseUrl = getPronoteApiBaseUrl();
@@ -55,7 +57,7 @@ async function request<T>(
 
   const doFetchOnce = async (): Promise<Response> => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 20000);
     try {
       const response = await fetch(url, {
         method: options.method || "GET",
@@ -358,6 +360,27 @@ export const PronoteApiClient = {
     return request("/ical-url", {
       authToken,
       params: { child },
+    });
+  },
+
+  async downloadFile(
+    authToken: string,
+    fileUrl: string,
+    fileName?: string,
+    child?: string
+  ): Promise<{ filename: string; mime: string; base64: string }> {
+    // Route lourde (login pronotepy + scan 120-150j + f.data, cold Vercel) :
+    // 60s, sans retry (évite un double scan backend).
+    return request("/files/download", {
+      method: "POST",
+      authToken,
+      body: {
+        file_url: fileUrl,
+        file_name: fileName,
+        child_name: child,
+      },
+      timeoutMs: 60000,
+      retry: false,
     });
   },
 

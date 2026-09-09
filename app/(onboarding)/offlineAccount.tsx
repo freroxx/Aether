@@ -30,7 +30,7 @@ export default function OfflineAccount() {
 
   const canSubmit = firstName.trim().length > 0 && lastName.trim().length > 0;
 
-  const createAccount = () => {
+  const createAccount = async () => {
     if (!canSubmit) {
       return;
     }
@@ -54,8 +54,8 @@ export default function OfflineAccount() {
     });
     store.setLastUsedAccount(id);
 
-    router.dismissAll();
-    router.replace("/(tabs)/index");
+    const { finishAuthNavigation } = await import("@/utils/navigation/finishAuth");
+    finishAuthNavigation();
   };
 
   return (

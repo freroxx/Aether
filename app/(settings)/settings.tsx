@@ -3,8 +3,8 @@ import { useTheme, useHeaderHeight } from "expo-router/react-navigation";
 import { useRouter } from "expo-router";
 import { t } from "i18next";
 import { Calendar, Palette, Sparkles, User, ShieldCheck, Bell } from "lucide-react-native";
-import React, { useCallback, useMemo } from "react";
-import { Alert, Platform, Pressable, View } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccountStore } from "@/stores/account";
@@ -19,6 +19,7 @@ import packagejson from "../../package.json";
 import { formatSchoolName } from '@/utils/format/formatSchoolName';
 import List, { ListTouchable } from '@/ui/new/List';
 import Typography from '@/ui/new/Typography';
+import ConfirmModal from '@/ui/components/ConfirmModal';
 
 export default function SettingsIndex() {
   const router = useRouter();
@@ -45,6 +46,7 @@ export default function SettingsIndex() {
     }
     router.replace("/(onboarding)/welcome");
   }, [router]);
+  const [logoutVisible, setLogoutVisible] = useState(false);
 
   const BigButtons = [
     {
@@ -125,17 +127,7 @@ export default function SettingsIndex() {
           title: t("Settings_Logout_Title"),
           description: "Déconnecter tous les comptes",
           icon: <Papicons name={"Logout"} />,
-          onPress: () => {
-            Alert.alert(
-              t("Settings_Logout_Title"),
-              t("Settings_Logout_Description"),
-              [
-                { text: t("CANCEL_BTN"), style: "cancel" },
-                { text: t("Settings_Logout_Title"), style: "destructive", onPress: logout },
-              ],
-              { cancelable: true }
-            );
-          },
+          onPress: () => setLogoutVisible(true),
         },
       ],
     },
@@ -315,6 +307,20 @@ export default function SettingsIndex() {
           ))}
         </List.Section>
       ))}
+      <ConfirmModal
+        visible={logoutVisible}
+        title={t("Settings_Logout_Title")}
+        description={t("Settings_Logout_Description")}
+        icon="Logout"
+        destructive
+        confirmLabel={t("Settings_Logout_Title")}
+        cancelLabel={t("CANCEL_BTN")}
+        onConfirm={() => {
+          setLogoutVisible(false);
+          logout();
+        }}
+        onClose={() => setLogoutVisible(false)}
+      />
     </List>
   );
 }

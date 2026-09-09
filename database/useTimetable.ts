@@ -13,14 +13,22 @@ import { safeWrite } from "./utils/safeTransaction";
 import { getWeekRange } from "@/utils/services/periods";
 
 export function getCourseRouteId(course: SharedCourse): string {
-  if (course.createdByAccount.startsWith('ical_')) return course.id;
-  return generateId(
-    course.from.toISOString() +
-      course.to.toISOString() +
-      course.subject +
-      course.teacher +
-      course.createdByAccount
-  );
+  try {
+    const owner = typeof course?.createdByAccount === "string" ? course.createdByAccount : "";
+    if (owner.startsWith('ical_') || owner === 'android_calendar' || owner.startsWith('calendar_')) {
+      return `device_${owner}_${String(course?.id ?? "")}`;
+    }
+    const from = course?.from instanceof Date ? course.from.toISOString() : new Date(course?.from).toISOString();
+    const to = course?.to instanceof Date ? course.to.toISOString() : new Date(course?.to).toISOString();
+    const kid = typeof (course as any)?.kidName === "string" ? (course as any).kidName : "";
+    return generateId(
+      from + to + (course?.subject ?? "") + (course?.teacher ?? "") + (course?.room ?? "") + kid + owner
+    );
+  } catch {
+    return generateId(
+      String(course?.id ?? "") + String(course?.subject ?? "") + String(course?.createdByAccount ?? "")
+    );
+  }
 }
 
 export async function getCourseById(id: string): Promise<SharedCourse | undefined> {
@@ -81,20 +89,23 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
           )
           .fetch();
 
+        const courseKey = (c: SharedCourseDay["courses"][number]) =>
+          `${c.createdByAccount}::${(c as any)?.kidName ?? ""}`;
         const dayCourseIds = new Set(
           day.courses.map(course => {
+            const kid = (course as any)?.kidName ?? "";
             const oldId = generateId(course.from.toISOString() + course.to.toISOString() + course.subject + course.teacher + course.room + course.createdByAccount);
-            const newId = generateId(course.from.toISOString() + course.to.toISOString() + course.subject + course.teacher + course.createdByAccount);
-            return [oldId, newId];
+            const midId = generateId(course.from.toISOString() + course.to.toISOString() + course.subject + course.teacher + course.createdByAccount);
+            const newId = getCourseRouteId(course as SharedCourse);
+            void kid;
+            return [oldId, midId, newId];
           }).flat()
         );
-        const refreshedServiceIds = new Set(
-          day.courses.map(course => course.createdByAccount)
-        );
+        const refreshedKeys = new Set(day.courses.map(courseKey));
 
         const coursesToDelete = dbCourses.filter(
           dbCourse =>
-            refreshedServiceIds.has(dbCourse.createdByAccount) &&
+            refreshedKeys.has(`${dbCourse.createdByAccount}::${(dbCourse as any)?.kidName ?? ""}`) &&
             !dayCourseIds.has(dbCourse.courseId)
         );
 
@@ -116,6 +127,11 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
 
           if (oldId !== id && oldExistingRecords.length > 0) {
             await Promise.all(oldExistingRecords.map(oldRecord => oldRecord.markAsDeleted()));
+          }
+
+          if (existingRecords.length > 1) {
+            // Doublons historiques sur le même courseId -> on ne garde que le 1er.
+            await Promise.all(existingRecords.slice(1).map(r => r.markAsDeleted()));
           }
 
           if (existingRecords.length === 0) {
@@ -189,15 +205,25 @@ export async function getCoursesFromCache(weeks: number[], year: number): Promis
       .fetch();
 
     const dayMap: Record<string, SharedCourse[]> = {};
+    const seenKeys = new Set<string>();
+    const cacheKey = (c: SharedCourse) =>
+      `${new Date(c.from).getTime()}::${new Date(c.to).getTime()}::${c.subject}::${(c as any)?.room ?? ""}`;
     for (const course of courses) {
+      const shared = mapCourseToShared(course);
+      const k = cacheKey(shared);
+      if (seenKeys.has(k)) continue;
+      seenKeys.add(k);
       const dayKey = new Date(course.from).toISOString().split("T")[0];
       dayMap[dayKey] = dayMap[dayKey] || [];
-      dayMap[dayKey].push(mapCourseToShared(course));
+      dayMap[dayKey].push(shared);
     }
 
     try {
       const icalEvents = await getICalEventsForWeek(minStart, maxEnd);
       for (const event of icalEvents) {
+        const k = cacheKey(event);
+        if (seenKeys.has(k)) continue;
+        seenKeys.add(k);
         const dayKey = new Date(event.from).toISOString().split("T")[0];
         dayMap[dayKey] = dayMap[dayKey] || [];
         dayMap[dayKey].push(event);

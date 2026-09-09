@@ -2,9 +2,10 @@ import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 
 import { useSettingsStore } from "@/stores/settings";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
@@ -16,6 +17,7 @@ const LanguagePersonalization = () => {
 
   const settingStore = useSettingsStore(state => state.personalization);
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
+  const alert = useAlert();
 
   const languages = Object.keys(resources).map(key => ({
     id: key,
@@ -28,10 +30,11 @@ const LanguagePersonalization = () => {
   const setLanguage = (lang: string) => {
     requestAnimationFrame(() => {
       if (rtlLanguages.includes(lang)) {
-        Alert.alert(
-          "Inverted layout is not supported yet",
-          "The selected language may not be displayed correctly."
-        );
+        alert.showAlert({
+          title: "Inverted layout is not supported yet",
+          description: "The selected language may not be displayed correctly.",
+          icon: "Info",
+        });
       }
 
       setTimeout(() => {

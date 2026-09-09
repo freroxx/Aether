@@ -3,7 +3,7 @@ import { useHeaderHeight, useRoute } from "expo-router/react-navigation";
 import { useNavigation } from "expo-router";
 import React, { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KeyboardAvoidingView, Platform } from "react-native";
+import { Image, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
@@ -29,6 +29,14 @@ export interface School {
   distance: number,
   url: string
 }
+
+// Établissement intégré : École Maria (connexion directe par identifiants,
+// sans recherche). L'URL dépend du type de compte (parent / élève).
+const ECOLE_MARIA_NAME = "École Maria";
+const ECOLE_MARIA_URLS = {
+  parent: "https://e212074q.index-education.net/pronote/parent.html",
+  eleve: "https://e212074q.index-education.net/pronote/eleve.html",
+} as const;
 
 const PronoteSearchHeader = memo(({
   city,
@@ -153,6 +161,28 @@ export default function PronoteLoginMethod() {
               <Icon><Papicons name="link" /></Icon>
             </List.Leading>
             <Typography variant='title'>{t("ONBOARDING_PRONOTE_LOGIN_URL")}</Typography>
+          </List.Item>
+        )}
+
+        {cities.length === 0 && !loading && (
+          <List.Item
+            animated
+            onPress={() => (navigation.navigate as (...args: any[]) => void)("credentials", {
+              url: accountType === "parent" ? ECOLE_MARIA_URLS.parent : ECOLE_MARIA_URLS.eleve,
+              school: ECOLE_MARIA_NAME,
+              accountType,
+            })}
+          >
+            <List.Leading>
+              <Image
+                source={require("@/assets/images/service_pronote.png")}
+                style={{ width: 32, height: 32, borderRadius: 8 }}
+              />
+            </List.Leading>
+            <Typography variant="title" numberOfLines={2}>{ECOLE_MARIA_NAME}</Typography>
+            <Typography variant="body" color="textSecondary" numberOfLines={1}>
+              e212074q.index-education.net
+            </Typography>
           </List.Item>
         )}
 

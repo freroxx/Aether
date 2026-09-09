@@ -38,6 +38,7 @@ export async function fetchPronoteWeekTimetable(
         customStatus: l.status || undefined,
         type: CourseType.LESSON,
         createdByAccount: accountId,
+        kidName: childName,
         content: Array.isArray(l.content) ? l.content.map((c: any): CourseResource => ({
           title: c?.title ?? undefined,
           description: c?.description ?? undefined,

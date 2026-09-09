@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo,useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { useTimetable } from '@/database/useTimetable';
 import { getManager, subscribeManagerUpdate } from "@/services/shared";
 import { useAccountStore } from '@/stores/account';
+import { useSettingsStore } from '@/stores/settings';
+import { useAlert } from '@/ui/components/AlertProvider';
 import { log, warn } from "@/utils/logger/logger";
 
 export function useTimetableData(weekNumber: number, currentDate: Date = new Date()) {
@@ -23,17 +26,39 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
   
   const rawTimetable = useTimetable(refresh, [weekNumber - 1, weekNumber, weekNumber + 1], safeDate);
   
+  const selectedChild = account?.selectedChild;
   const timetable = useMemo(() => {
+    const seen = new Set<string>();
     return rawTimetable.map(day => ({
       ...day,
-      courses: day.courses.filter(course =>
-        services.includes(course.createdByAccount) ||
-        course.createdByAccount.startsWith('ical_') ||
-        course.createdByAccount === 'android_calendar' ||
-        course.createdByAccount.startsWith('calendar_')
-      )
+      courses: day.courses.filter(course => {
+        if (!course) return false;
+        const owner = course.createdByAccount ?? "";
+        const allowed =
+          services.includes(owner) ||
+          owner.startsWith('ical_') ||
+          owner === 'android_calendar' ||
+          owner.startsWith('calendar_');
+        if (!allowed) return false;
+        // Miroir Aether : jamais affiché (marqueur "Aether ·" posé dans notes).
+        // Couvre android_calendar ET calendar_* (même créneau, vrai matière/salle).
+        const mirrorMark = `${String((course as any)?.subject ?? "")} ${(course as any)?.teacher ?? ""} ${(course as any)?.room ?? ""}`;
+        if ((owner === 'android_calendar' || owner.startsWith('calendar_')) && mirrorMark.includes("Aether")) {
+          return false;
+        }
+        // Parent : ne garder que l'enfant sélectionné.
+        const kid = (course as any)?.kidName;
+        if (typeof kid === "string" && kid.length > 0 && selectedChild && kid !== selectedChild) {
+          return false;
+        }
+        // Clé SANS owner (+teacher) : EDT + miroir résiduel fusionnent.
+        const key = `${kid ?? ""}::${course.from?.getTime?.() ?? course.from}::${course.to?.getTime?.() ?? course.to}::${course.subject}::${course.room}::${course.teacher ?? ""}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
     })).filter(day => day.courses.length > 0);
-  }, [rawTimetable, servicesKey]);
+  }, [rawTimetable, servicesKey, selectedChild]);
 
   const fetchWeeklyTimetable = useCallback(async (targetWeekNumber: number, forceRefresh = false) => {
     const myId = ++fetchIdRef.current;
@@ -74,11 +99,12 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
 
         if (toFetch.length > 0) {
           if (fetchIdRef.current !== myId) return;
-          await Promise.all(
-            toFetch.map((c) => {
-              return (manager as NonNullable<typeof manager>).getWeeklyTimetable(c.week, c.targetDate)
-            })
-          );
+          // Séquentiel (pas de Promise.all) : évite les writes concurrents
+          // qui se ressuscitent mutuellement dans addCourseDayToDatabase.
+          for (const c of toFetch) {
+            if (fetchIdRef.current !== myId) return;
+            await (manager as NonNullable<typeof manager>).getWeeklyTimetable(c.week, c.targetDate);
+          }
 
           if (fetchIdRef.current !== myId) return;
           fetchedWeeksRef.current = [
@@ -129,21 +155,38 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
   }, [weekNumber, fetchWeeklyTimetable]);
 
   // Miroir auto vers le calendrier appareil "Aether" (7 j, futurs uniquement).
-  // Déclenché à chaque refresh EDT (ouverture, focus, horaire) si activé.
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Déclenché quand l'EDT change et que l'export est activé.
+  const syncEnabled = useSettingsStore(s => s.personalization.androidCalendarSyncEnabled ?? false);
+  const { showAlert } = useAlert();
   useEffect(() => {
-    if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      const allCourses = timetable.flatMap(d => d.courses ?? []);
-      if (allCourses.length === 0) return;
-      import("@/services/local/android-calendar-sync")
-        .then(m => m.syncCoursesToDeviceCalendar(allCourses))
-        .catch(() => {});
-    }, 2000);
+    if (!syncEnabled) return;
+    if (Platform.OS !== 'android') return;
+    const allCourses = timetable.flatMap(d => d.courses ?? []);
+    if (allCourses.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const m = await import("@/services/local/android-calendar-sync");
+        if (cancelled) return;
+        await m.syncCoursesToDeviceCalendar(allCourses);
+      } catch (e) {
+        if (cancelled) return;
+        warn('Auto device calendar sync failed: ' + String(e));
+        try {
+          showAlert({
+            title: "Échec de l'export calendrier",
+            message: e instanceof Error ? e.message : "Impossible d'écrire tes cours dans le calendrier « Aether ».",
+            icon: "Calendar",
+          });
+        } catch {
+          // best-effort
+        }
+      }
+    })();
     return () => {
-      if (syncTimer.current) clearTimeout(syncTimer.current);
+      cancelled = true;
     };
-  }, [timetable]);
+  }, [timetable, syncEnabled, showAlert]);
 
   return {
     timetable,

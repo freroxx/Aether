@@ -1,9 +1,9 @@
 import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 
 import { useAccountStore } from "@/stores/account";
 import AnimatedPressable from "@/ui/components/AnimatedPressable";
@@ -13,6 +13,7 @@ import {
   NativeHeaderSide,
 } from "@/ui/components/NativeHeader";
 import Stack from "@/ui/components/Stack";
+import ConfirmModal from "@/ui/components/ConfirmModal";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
 
@@ -32,24 +33,9 @@ export default function SubjectPersonalization() {
     .filter(item => item.name && item.emoji && item.color);
 
   const resetAllSubjects = () => {
-    Alert.alert(
-      t("Settings_Subjects_Reset_Title"),
-      t("Settings_Subjects_Reset_Message"),
-      [
-        {
-          text: t("CANCEL_BTN"),
-          style: "cancel",
-        },
-        {
-          text: t("Settings_Subjects_Reset_Button"),
-          style: "destructive",
-          onPress: () => {
-            store.setSubjects({});
-          },
-        },
-      ]
-    );
+    setResetVisible(true);
   };
+  const [resetVisible, setResetVisible] = useState(false);
 
   function renderItem(emoji: string, name: string, id: string, color: string) {
     return (
@@ -149,6 +135,20 @@ export default function SubjectPersonalization() {
           </List.View>
         )}
       </List>
+      <ConfirmModal
+        visible={resetVisible}
+        title={t("Settings_Subjects_Reset_Title")}
+        description={t("Settings_Subjects_Reset_Message")}
+        icon="Trash"
+        destructive
+        confirmLabel={t("Settings_Subjects_Reset_Button")}
+        cancelLabel={t("CANCEL_BTN")}
+        onConfirm={() => {
+          store.setSubjects({});
+          setResetVisible(false);
+        }}
+        onClose={() => setResetVisible(false)}
+      />
     </>
   );
 }

@@ -16,10 +16,8 @@ type SanctionsWidgetProps = {
   onEmptyStateChange?: (isEmpty: boolean) => void;
 };
 
-/**
- * Carte "Sanctions" : absences/retards non justifiés + punitions
- * de la période en cours. Masquée s'il n'y en a aucune.
- */
+/** Carte "Vie scolaire" : absences/retards non justifiés + punitions. Vide = calme. */
+
 const SanctionsWidget = React.memo(({ onEmptyStateChange }: SanctionsWidgetProps) => {
   const manager = getManager();
 
@@ -35,6 +33,9 @@ const SanctionsWidget = React.memo(({ onEmptyStateChange }: SanctionsWidgetProps
         return;
       }
       const current = getCurrentPeriod(periods);
+      if (!current) {
+        return;
+      }
       const data = await managerToUse.getAttendanceForPeriod(current.name);
       setAttendances(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -77,11 +78,44 @@ const SanctionsWidget = React.memo(({ onEmptyStateChange }: SanctionsWidgetProps
   }
 
   useEffect(() => {
-    onEmptyStateChange?.(unjustifiedCount === 0);
-  }, [unjustifiedCount, onEmptyStateChange]);
+    onEmptyStateChange?.(false);
+  }, [onEmptyStateChange]);
 
   if (unjustifiedCount === 0) {
-    return null;
+    return (
+      <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
+        <Link href="(features)/sanctions" asChild>
+          <Link.AppleZoom>
+            <Stack gap={10} padding={[16, 14]} radius={18} card>
+              <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: "#29947A14",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Icon papicon opacity={0.85} size={24}>
+                    <Papicons name="Check" />
+                  </Icon>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Typography variant="title" weight="bold" numberOfLines={1}>
+                    {t("Home_Sanctions_Empty_Title", "Rien à signaler")}
+                  </Typography>
+                  <Typography variant="body2" color="secondary" numberOfLines={2}>
+                    {t("Home_Sanctions_Empty_Desc", "Aucune absence, retard ou punition sur la période.")}
+                  </Typography>
+                </View>
+              </Stack>
+            </Stack>
+          </Link.AppleZoom>
+        </Link>
+      </View>
+    );
   }
 
   return (
@@ -91,19 +125,34 @@ const SanctionsWidget = React.memo(({ onEmptyStateChange }: SanctionsWidgetProps
         asChild
       >
         <Link.AppleZoom>
-          <Stack gap={8} padding={[12, 12]} radius={18} card>
-            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={8}>
-              <Icon papicon opacity={0.7}>
-                <Papicons name="AlertTriangle" />
-              </Icon>
-              <Typography variant="title" weight="bold" style={{ flex: 1 }} numberOfLines={1}>
-                {unjustifiedCount === 1
-                  ? t("Home_Sanctions_Count_Singular")
-                  : t("Home_Sanctions_Count_Plural", { count: unjustifiedCount })}
-              </Typography>
+          <Stack gap={10} padding={[14, 14]} radius={18} card>
+            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "#E05D3414",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon papicon opacity={0.85} size={24}>
+                  <Papicons name="AlertTriangle" />
+                </Icon>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Typography variant="title" weight="bold" numberOfLines={1}>
+                  {unjustifiedCount === 1
+                    ? t("Home_Sanctions_Count_Singular")
+                    : t("Home_Sanctions_Count_Plural", { count: unjustifiedCount })}
+                </Typography>
+                <Typography variant="body2" color="secondary" numberOfLines={1}>
+                  {t("Home_Sanctions_Subtitle", "Vie scolaire · période en cours")}
+                </Typography>
+              </View>
             </Stack>
             <Typography variant="caption" color="primary">
-              {t("Home_Display_More")}
             </Typography>
           </Stack>
         </Link.AppleZoom>

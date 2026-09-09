@@ -2,14 +2,13 @@ import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import * as WebBrowser from "expo-web-browser";
 import { t } from "i18next";
 import React, { useEffect, useState } from "react";
 
 import ModalOverhead from "@/components/ModalOverhead";
 import { getHomeworkById, updateHomeworkIsDone } from "@/database/useHomework";
 import { getManager } from "@/services/shared";
-import { AttachmentType } from "@/services/shared/attachment";
+import { openAttachment, resolvePronoteFileAuth } from "@/services/pronote/files";
 import AnimatedPressable from "@/ui/components/AnimatedPressable";
 import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
@@ -36,6 +35,7 @@ const Task = () => {
   const [loading, setLoading] = useState(true);
   const [isDone, setIsDone] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [downloadingName, setDownloadingName] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,22 +199,21 @@ const Task = () => {
             </List.SectionTitle>
 
             {task.attachments.map(attachment => {
-              const rawType = (attachment as { type?: unknown }).type;
-              const isLink =
-                rawType === AttachmentType.LINK ||
-                rawType === 0 ||
-                rawType === "link" ||
-                rawType === "LINK";
               const url = attachment.url ?? "";
-              const canOpenLink = isLink && url.length > 0;
+              const key = `${attachment.name}-${url}`;
+              const isDownloading = downloadingName === key;
               return (
                 <List.Item
-                  key={`${attachment.name}-${url}`}
-                  onPress={
-                    canOpenLink
-                      ? () => WebBrowser.openBrowserAsync(url)
-                      : undefined
-                  }
+                  key={key}
+                  onPress={() => {
+                    if (isDownloading) return;
+                    setDownloadingName(key);
+                    void openAttachment(
+                      attachment,
+                      resolvePronoteFileAuth(attachment.createdByAccount),
+                      alert
+                    ).finally(() => setDownloadingName(null));
+                  }}
                 >
                   <List.Leading>
                     <Icon>
@@ -229,8 +228,13 @@ const Task = () => {
                     color="textSecondary"
                     numberOfLines={1}
                   >
-                    {url}
+                    {isDownloading ? "Téléchargement…" : url}
                   </Typography>
+                  {isDownloading && (
+                    <List.Trailing>
+                      <ActivityIndicator size={20} />
+                    </List.Trailing>
+                  )}
                 </List.Item>
               );
             })}

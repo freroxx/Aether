@@ -16,11 +16,24 @@ type TimetableWidgetCache = {
   courses: CachedCourse[];
 };
 
-const serializeCourse = (course: SharedCourse): CachedCourse => ({
-  ...course,
-  from: course.from.getTime(),
-  to: course.to.getTime()
-});
+const toTime = (value: unknown): number => {
+  try {
+    const t = value instanceof Date ? value.getTime() : new Date(value as any).getTime();
+    return Number.isFinite(t) ? t : NaN;
+  } catch {
+    return NaN;
+  }
+};
+const serializeCourse = (course: SharedCourse): CachedCourse | null => {
+  try {
+    const from = toTime(course?.from);
+    const to = toTime(course?.to);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+    return { ...course, from, to };
+  } catch {
+    return null;
+  }
+};
 
 const deserializeCourse = (course: CachedCourse): SharedCourse => ({
   ...course,
@@ -60,17 +73,47 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
   const currentYearTimetable = useTimetable(undefined, currentYearWeeks, now);
   const nextYearTimetable = useTimetable(undefined, nextYearWeeks, nextYearDate);
 
-  const weeklyTimetable = useMemo(() =>
-    [...currentYearTimetable, ...nextYearTimetable]
+  const selectedChild = account?.selectedChild;
+  const weeklyTimetable = useMemo(() => {
+    const merged = new Map<string, (typeof currentYearTimetable)[number]>();
+    for (const day of (Array.isArray(currentYearTimetable) ? currentYearTimetable : []).concat(
+      Array.isArray(nextYearTimetable) ? nextYearTimetable : []
+    )) {
+      if (!day?.date) continue;
+      const key = new Date(day.date).toISOString().split("T")[0];
+      const prev = merged.get(key);
+      if (!prev) {
+        merged.set(key, { ...day, courses: [...(day.courses ?? [])] });
+      } else {
+        const ids = new Set(prev.courses.map(c => `${c.createdByAccount}::${(c as any)?.kidName ?? ""}::${toTime(c.from)}::${toTime(c.to)}::${c.subject}`));
+        for (const c of day.courses ?? []) {
+          const k = `${c.createdByAccount}::${(c as any)?.kidName ?? ""}::${toTime(c.from)}::${toTime(c.to)}::${c.subject}`;
+          if (!ids.has(k)) {
+            ids.add(k);
+            prev.courses.push(c);
+          }
+        }
+      }
+    }
+    return [...merged.values()]
       .map(day => ({
         ...day,
-        courses: day.courses.filter(course =>
-        services.includes(course.createdByAccount) || course.createdByAccount.startsWith('ical_')
-      )
+        courses: Array.isArray(day?.courses) ? day.courses.filter(course => {
+          if (!course) return false;
+          const owner = course.createdByAccount ?? "";
+          const ok =
+            services.includes(owner) ||
+            (typeof owner === "string" && owner.startsWith('ical_'));
+          if (!ok) return false;
+          const kid = (course as any)?.kidName;
+          if (typeof kid === "string" && kid.length > 0 && selectedChild && kid !== selectedChild) {
+            return false;
+          }
+          return true;
+        }) : []
       }))
-      .filter(day => day.courses.length > 0),
-    [currentYearTimetable, nextYearTimetable, services]
-  );
+      .filter(day => day.courses.length > 0);
+  }, [currentYearTimetable, nextYearTimetable, services, selectedChild]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -122,22 +165,28 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
     const daysWithFutureCourses = weeklyTimetable
       .map((day) => ({
         date: day.date,
-        courses: day.courses
-          .filter((course) => course.to.getTime() > nowTimestamp)
+        courses: (Array.isArray(day?.courses) ? day.courses : [])
+          .filter((course) => !!course && toTime(course.to) > nowTimestamp)
           .filter((course) => options.showCancelled || course.status !== CourseStatus.CANCELED)
-          .sort((a, b) => a.from.getTime() - b.from.getTime())
+          .sort((a, b) => toTime(a.from) - toTime(b.from))
       }))
       .filter((day) => day.courses.length > 0)
-      .sort((a, b) => a.courses[0].from.getTime() - b.courses[0].from.getTime());
+      .sort((a, b) => toTime(a.courses[0]?.from) - toTime(b.courses[0]?.from));
 
     const nextCourses = daysWithFutureCourses[0]?.courses ?? [];
     setCourses(nextCourses);
     if (cacheKey) {
-      const payload: TimetableWidgetCache = {
-        fetchedAt: Date.now(),
-        courses: nextCourses.map(serializeCourse)
-      };
-      widgetCacheStorage.set(cacheKey, JSON.stringify(payload));
+      try {
+        const payload: TimetableWidgetCache = {
+          fetchedAt: Date.now(),
+          courses: nextCourses
+            .map(serializeCourse)
+            .filter((c): c is CachedCourse => c !== null),
+        };
+        widgetCacheStorage.set(cacheKey, JSON.stringify(payload));
+      } catch {
+        // Cache best-effort : un cours malformé ne doit jamais faire crasher l'accueil.
+      }
     }
     setLoading(false);
   }, [weeklyTimetable, now, cacheKey]);

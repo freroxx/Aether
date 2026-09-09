@@ -10,7 +10,8 @@ type MainTabErrorBoundaryProps = {
   children: React.ReactNode;
 };
 
-const MainTabErrorFallback = () => {
+const MainTabErrorFallback = ({ error, reset }: { error: Error | null; reset: () => void }) => {
+  const technical = error?.message || String(error ?? "");
   return (
     <View style={styles.container}>
       <Icon size={52} fill='white'>
@@ -20,6 +21,20 @@ const MainTabErrorFallback = () => {
       <Typography color='white' variant='h4' align='center'>Mince ! Quelque chose s'est vraiment très mal passé.</Typography>
       <Typography color='#FFFFFF99' variant='body1' align='center'>Veuillez relancer l'application. Si cela continue, contactez-nous via le support.</Typography>
 
+      {technical.length > 0 && (
+        <Typography color='#FFFFFF99' variant='caption' align='center' numberOfLines={4}>
+          {technical.slice(0, 300)}
+        </Typography>
+      )}
+
+      <Button
+        color='#FFFFFF'
+        variant='secondary'
+        fullWidth
+        onPress={reset}
+        style={{ marginTop: 16 }}
+        label={`Réessayer`}
+      />
       <Button
         color='#FFFFFF'
         variant='secondary'
@@ -27,7 +42,7 @@ const MainTabErrorFallback = () => {
         onPress={() => {
           Linking.openURL('https://docs.papillon.bzh/support')
         }}
-        style={{ marginTop: 16 }}
+        style={{ marginTop: 8 }}
         label={`Centre d'aide`}
       />
     </View>
@@ -36,7 +51,7 @@ const MainTabErrorFallback = () => {
 
 export default function MainTabErrorBoundary({ children }: MainTabErrorBoundaryProps) {
   return (
-    <ErrorBoundary fallback={<MainTabErrorFallback />}>
+    <ErrorBoundary fallback={({ error, reset }) => <MainTabErrorFallback error={error} reset={reset} />}>
       {children}
     </ErrorBoundary>
   );

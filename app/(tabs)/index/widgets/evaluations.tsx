@@ -17,10 +17,8 @@ type EvaluationsWidgetProps = {
   onEmptyStateChange?: (isEmpty: boolean) => void;
 };
 
-/**
- * Carte "Évaluations" : nombre d'évaluations de la période en cours
- * et domaine le plus fragile. Masquée s'il n'y en a aucune.
- */
+/** Carte "Évaluations" : nombre + domaine fragile. État vide calme et localisé. */
+
 const EvaluationsWidget = React.memo(({ onEmptyStateChange }: EvaluationsWidgetProps) => {
   const manager = getManager();
 
@@ -35,7 +33,10 @@ const EvaluationsWidget = React.memo(({ onEmptyStateChange }: EvaluationsWidgetP
       if (periods.length === 0) {
         return;
       }
-      const current: Period = getCurrentPeriod(periods);
+      const current = getCurrentPeriod(periods);
+      if (!current) {
+        return;
+      }
       const evals = await managerToUse.getEvaluationsForPeriod(current, current.createdByAccount);
       setEvaluations(Array.isArray(evals) ? evals : []);
     } catch (err) {
@@ -96,11 +97,33 @@ const EvaluationsWidget = React.memo(({ onEmptyStateChange }: EvaluationsWidgetP
   }, [evaluations]);
 
   useEffect(() => {
-    onEmptyStateChange?.(evaluations.length === 0);
-  }, [evaluations.length, onEmptyStateChange]);
+    onEmptyStateChange?.(false);
+  }, [onEmptyStateChange]);
 
   if (evaluations.length === 0) {
-    return null;
+    return (
+      <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
+        <Link href="(features)/evaluations" asChild>
+          <Link.AppleZoom>
+            <Stack gap={10} padding={[16, 14]} radius={18} card>
+              <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+                <Icon papicon opacity={0.45} size={26}>
+                  <Papicons name="Grades" />
+                </Icon>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Typography variant="title" weight="bold" numberOfLines={1}>
+                    {t("Home_Evaluations_Empty_Title", "Aucune évaluation")}
+                  </Typography>
+                  <Typography variant="body2" color="secondary" numberOfLines={2}>
+                    {t("Home_Evaluations_Empty_Desc", "Tes compétences apparaîtront ici dès leur publication.")}
+                  </Typography>
+                </View>
+              </Stack>
+            </Stack>
+          </Link.AppleZoom>
+        </Link>
+      </View>
+    );
   }
 
   return (
@@ -110,25 +133,39 @@ const EvaluationsWidget = React.memo(({ onEmptyStateChange }: EvaluationsWidgetP
         asChild
       >
         <Link.AppleZoom>
-          <Stack gap={8} padding={[12, 12]} radius={18} card>
-            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={8}>
-              <Icon papicon opacity={0.7}>
-                <Papicons name="Grades" />
-              </Icon>
-              <Typography variant="title" weight="bold" style={{ flex: 1 }} numberOfLines={1}>
-                {evaluations.length === 1
-                  ? t("Home_Evaluations_Count_Singular")
-                  : t("Home_Evaluations_Count_Plural", { count: evaluations.length })}
-              </Typography>
+          <Stack gap={10} padding={[14, 14]} radius={18} card>
+            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "#7C5CFF14",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon papicon opacity={0.85} size={24}>
+                  <Papicons name="Grades" />
+                </Icon>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Typography variant="title" weight="bold" numberOfLines={1}>
+                  {evaluations.length === 1
+                    ? t("Home_Evaluations_Count_Singular")
+                    : t("Home_Evaluations_Count_Plural", { count: evaluations.length })}
+                </Typography>
+                {weakestDomain ? (
+                  <Typography variant="body2" color="secondary" numberOfLines={2}>
+                    {t("Home_Evaluations_Weakest", { domain: weakestDomain })}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" color="secondary" numberOfLines={1}>
+                    {t("Home_Evaluations_Subtitle", "Suivi de tes compétences")}
+                  </Typography>
+                )}
+              </View>
             </Stack>
-            {weakestDomain ? (
-              <Typography variant="body2" color="secondary" numberOfLines={2}>
-                {t("Home_Evaluations_Weakest", { domain: weakestDomain })}
-              </Typography>
-            ) : null}
-            <Typography variant="caption" color="primary">
-              {t("Home_Display_More")}
-            </Typography>
           </Stack>
         </Link.AppleZoom>
       </Link>

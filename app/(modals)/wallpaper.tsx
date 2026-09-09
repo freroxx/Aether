@@ -1,4 +1,5 @@
 import { useSettingsStore } from "@/stores/settings";
+import { useAlert } from "@/ui/components/AlertProvider";
 import {
   NativeHeaderPressable,
   NativeHeaderSide,
@@ -9,7 +10,6 @@ import Typography from "@/ui/new/Typography";
 import { useTheme } from "expo-router/react-navigation";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   Image,
   Platform,
   Pressable,
@@ -129,6 +129,7 @@ const WallpaperModal = () => {
 
   const settingsStore = useSettingsStore(state => state.personalization);
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
+  const alert = useAlert();
   const currentWallpaper = settingsStore.wallpaper;
   const selectedId = currentWallpaper?.id;
 
@@ -201,7 +202,7 @@ const WallpaperModal = () => {
         },
       });
     } catch (err) {
-      Alert.alert("Erreur", "Impossible de charger l'image sélectionnée.");
+      alert.showAlert({ title: "Erreur", description: "Impossible de charger l'image sélectionnée.", icon: "Image", color: "#E05D34" });
     }
   };
 

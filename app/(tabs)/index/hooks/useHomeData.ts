@@ -9,6 +9,7 @@ import { ServiceUnavailableError } from '@/services/errors/ServiceUnavailableErr
 import { getManager, initializeAccountManager } from "@/services/shared";
 import { Services } from '@/stores/account/types';
 import { useSettingsStore } from '@/stores/settings';
+import { useSyncStore } from '@/stores/sync';
 import { useAlert } from '@/ui/components/AlertProvider';
 import { getCurrentPeriod } from '@/utils/grades/helper/period';
 import { log, warn } from '@/utils/logger/logger';
@@ -109,6 +110,8 @@ export const useHomeData = () => {
     }
 
     state.inFlight = (async () => {
+    const setSyncing = useSyncStore.getState().setSyncing;
+    setSyncing(true);
     try {
       // Toast "syncing" à chaque sync réelle
       alert.showAlert({
@@ -184,6 +187,8 @@ export const useHomeData = () => {
           withoutNavbar: true,
         });
       }
+    } finally {
+      useSyncStore.getState().setSyncing(false);
     }
     })();
 
@@ -191,6 +196,7 @@ export const useHomeData = () => {
       await state.inFlight;
     } finally {
       state.inFlight = null;
+      useSyncStore.getState().setSyncing(false);
     }
   }, [alert, fetchEDT, fetchGrades, settingsstore.showAlertAtLogin, lastUsedAccount, accounts, removeAccount]);
 

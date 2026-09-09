@@ -1,9 +1,10 @@
 import { useTheme } from "expo-router/react-navigation";
 import React from 'react';
-import { Alert, Image, View } from 'react-native';
+import { Image, View } from 'react-native';
 import { useTranslation } from "react-i18next";
 
 import ActivityIndicator from '@/ui/components/ActivityIndicator';
+import { useAlert } from '@/ui/components/AlertProvider';
 import { Dynamic } from '@/ui/components/Dynamic';
 import Stack from '@/ui/components/Stack';
 import Button from '@/ui/new/Button';
@@ -42,6 +43,7 @@ export default function LoginView({
 }: LoginViewProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const alert = useAlert();
 
   const [fieldValues, setFieldValues] = React.useState<{ [key: string]: string }>({});
 
@@ -65,7 +67,11 @@ export default function LoginView({
       label: t("ONBOARDING_LOGIN_HELP_ACTION"),
       variant: "secondary" as const,
       onPress: () => {
-        Alert.alert(t("ONBOARDING_LOGIN_HELP_TITLE"), t("ONBOARDING_LOGIN_HELP_DESCRIPTION"));
+        alert.showAlert({
+          title: t("ONBOARDING_LOGIN_HELP_TITLE"),
+          description: t("ONBOARDING_LOGIN_HELP_DESCRIPTION"),
+          icon: "Info",
+        });
       },
     },
     {

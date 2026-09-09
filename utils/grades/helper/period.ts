@@ -1,7 +1,7 @@
 import { Period } from "@/services/shared/grade";
 import { error, warn } from "@/utils/logger/logger";
 
-export function getCurrentPeriod(periods: Period[]): Period {
+export function getCurrentPeriod(periods: Period[]): Period | undefined {
   const now = new Date().getTime();
   const excludedNames = [
     "Bac blanc",
@@ -18,12 +18,21 @@ export function getCurrentPeriod(periods: Period[]): Period {
     "Évaluation spécifique de DNL",
   ];
 
-  periods = periods
-    .filter(period => !excludedNames.includes(period.name))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  const toTime = (value: unknown): number => {
+    try {
+      const t = value instanceof Date ? value.getTime() : new Date(value as any).getTime();
+      return Number.isFinite(t) ? t : NaN;
+    } catch {
+      return NaN;
+    }
+  };
+
+  periods = (Array.isArray(periods) ? periods : [])
+    .filter(period => !!period && !excludedNames.includes(period.name))
+    .sort((a, b) => toTime(a.start) - toTime(b.start));
 
   for (const period of periods) {
-    if (period.start.getTime() < now && period.end.getTime() > now) {
+    if (toTime(period.start) < now && toTime(period.end) > now) {
       return period;
     }
   }

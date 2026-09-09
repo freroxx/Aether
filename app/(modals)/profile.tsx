@@ -6,7 +6,6 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import OnboardingInput from "@/components/onboarding/OnboardingInput";
 import { useAccountStore } from "@/stores/account";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Avatar from "@/ui/components/Avatar";
 import Button from "@/ui/components/Button";
 import Icon from "@/ui/components/Icon";
@@ -63,12 +63,13 @@ export default function CustomProfileScreen() {
     }
   }
 
+  const alert = useAlert();
   const updateProfilePictureFromService = async () => {
-    Alert.alert(
-      t("Feature_Soon"),
-      "Cette fonctionnalité n'est pas encore disponible, mais elle le sera dans une prochaine mise à jour.",
-      [{ text: "OK" }]
-    );
+    alert.showAlert({
+      title: t("Feature_Soon"),
+      description: "Cette fonctionnalité n'est pas encore disponible, mais elle le sera dans une prochaine mise à jour.",
+      icon: "Info",
+    });
   }
 
   const { colors } = useTheme();

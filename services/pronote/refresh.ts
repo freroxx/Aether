@@ -93,18 +93,51 @@ export async function refreshPronoteAccount(
       );
       rotated = true;
     } catch (e) {
-      // Token rejeté mais on a un mot de passe (cas ENT / navigateur) : on
-      // bascule dessus, les routes data rejouent username+password via le
-      // backend. Sans mot de passe, la session est vraiment morte.
-      if (!(password && url && username)) {
+      // Le token stocké en clair peut être périmé (rotation précédente dont
+      // seul le blob a gardé le token frais) : on réessaie une fois avec le
+      // token du blob avant de déclarer la session morte.
+      const blobInner = decodeStoredBlob(
+        credentials.accessToken ||
+          (creds.auth_token as string) ||
+          (creds.authToken as string)
+      );
+      const blobToken =
+        blobInner && typeof blobInner.token === "string" ? blobInner.token : undefined;
+      if (blobToken && blobToken !== token && !isStoredBlob(blobToken)) {
+        try {
+          res = await PronoteApiClient.tokenLogin(
+            String(url),
+            String(username),
+            String(blobToken),
+            String(uuid),
+            accountType as any
+          );
+          token = blobToken;
+          rotated = true;
+        } catch {
+          // On retombe sur les voies ci-dessous (password, puis erreur).
+        }
+      }
+      if (!rotated && !(password && url && username)) {
         // Session morte côté Pronote -> le manager affichera l'écran "déconnecté".
         throw new Error(
           "Session Pronote expirée, reconnectez-vous. (" + String(e) + ")"
         );
       }
+      // Token rejeté mais on a un mot de passe (cas ENT / navigateur) : on
+      // bascule dessus, les routes data rejouent username+password via le
+      // backend. Sans mot de passe, la session est vraiment morte (jeté ci-dessus).
     }
 
     if (rotated) {
+      // Le backend fait tourner le token à chaque login : on stocke le NOUVEAU
+      // token (décodé du blob retourné) en clair, sinon la prochaine relance
+      // rejoue l'ancien token mort ("déconnecté" au redémarrage).
+      const freshInner = decodeStoredBlob((res as any).auth_token);
+      const freshToken =
+        freshInner && typeof freshInner.token === "string" && !isStoredBlob(freshInner.token)
+          ? freshInner.token
+          : token;
       const updatedAuth: Auth = {
         accessToken: (res as any).auth_token,
         refreshToken: (res as any).auth_token,
@@ -113,7 +146,7 @@ export async function refreshPronoteAccount(
           url,
           instanceURL: url,
           username,
-          token,
+          token: freshToken,
           authToken: (res as any).auth_token,
           auth_token: (res as any).auth_token,
           uuid,

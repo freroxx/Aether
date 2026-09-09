@@ -8,12 +8,13 @@ import { Papicons } from "@getpapillon/papicons";
 import { useRouter, useTheme } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Image, Platform, TouchableOpacity, View } from "react-native";
+import { Image, Platform, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker"
 import { Dynamic } from "@/ui/components/Dynamic";
 import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
+import ConfirmModal from "@/ui/components/ConfirmModal";
 import { Stack as ExpoStack } from 'expo-router';
 import { AppColors } from "@/utils/colors";
 import { FadeInRight, FadeOutLeft } from "react-native-reanimated";
@@ -32,6 +33,7 @@ const WelcomeModal: React.FC = () => {
   const account = accounts.find((a) => a.id === lastUsedAccount);
 
   const [step, setStep] = useState<"photo" | "color">("photo");
+  const [skipVisible, setSkipVisible] = useState(false);
 
   useEffect(() => {
     if (!account) {
@@ -54,23 +56,7 @@ const WelcomeModal: React.FC = () => {
   };
 
   const ignoreSetup = () => {
-    Alert.alert(
-      t("Welcome_Setup_Skip_Title"),
-      t("Welcome_Setup_Skip_Description"),
-      [
-        {
-          text: t("CANCEL_BTN"),
-          style: "cancel"
-        },
-        {
-          text: t("Welcome_Setup_Skip_Action"),
-          style: "destructive",
-          onPress: () => {
-      router.dismissAll();
-          }
-        }
-      ]
-    );
+    setSkipVisible(true);
   };
 
   const hasAPhotoBeenAdded = profilePictureUrl !== null;
@@ -217,6 +203,20 @@ const WelcomeModal: React.FC = () => {
           </Dynamic>
         )}
       </View>
+      <ConfirmModal
+        visible={skipVisible}
+        title={t("Welcome_Setup_Skip_Title")}
+        description={t("Welcome_Setup_Skip_Description")}
+        icon="Logout"
+        destructive
+        confirmLabel={t("Welcome_Setup_Skip_Action")}
+        cancelLabel={t("CANCEL_BTN")}
+        onConfirm={() => {
+          setSkipVisible(false);
+          router.dismissAll();
+        }}
+        onClose={() => setSkipVisible(false)}
+      />
     </View>
   );
 };

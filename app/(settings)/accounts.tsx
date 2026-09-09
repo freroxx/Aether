@@ -1,8 +1,8 @@
 import { Papicons } from "@getpapillon/papicons";
 import { MenuView, NativeActionEvent } from "@react-native-menu/menu";
 import { router } from "expo-router";
-import React from "react";
-import { Alert, Image, ScrollView } from "react-native";
+import React, { useState } from "react";
+import { Image, ScrollView } from "react-native";
 
 import { removeBalanceFromDatabase } from "@/database/useBalance";
 import { getManager } from "@/services/shared";
@@ -16,6 +16,7 @@ import { getInitials } from "@/utils/chats/initials";
 import { formatSchoolName } from "@/utils/format/formatSchoolName";
 import { getServiceLogo, getServiceName } from "@/utils/services/helper";
 import ActionMenu from "@/ui/components/ActionMenu";
+import ConfirmModal from "@/ui/components/ConfirmModal";
 
 export default function AccountsView() {
   const accounts = useAccountStore(state => state.accounts);
@@ -25,45 +26,15 @@ export default function AccountsView() {
 
   const services = account?.services;
 
+  const [pendingAccount, setPendingAccount] = useState<(typeof accounts)[number] | null>(null);
+  const [pendingService, setPendingService] = useState<{ id: string; name: string } | null>(null);
+
   const askDeleteAccount = (targetAccount: (typeof accounts)[number]) => {
-    Alert.alert(
-      "Supprimer le compte",
-      `${targetAccount.firstName} ${targetAccount.lastName}`,
-      [
-        {
-          text: "Annuler",
-          style: "cancel",
-        },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: () => {
-            store.removeAccount(targetAccount);
-          },
-        },
-      ]
-    );
+    setPendingAccount(targetAccount);
   };
 
   const askDeleteService = (serviceId: string, serviceName: string) => {
-    Alert.alert(serviceName, "Supprimer ce service ?", [
-      {
-        text: "Annuler",
-        style: "cancel",
-      },
-      {
-        text: "Supprimer",
-        style: "destructive",
-        onPress: () => {
-          store.removeServiceFromAccount(serviceId);
-          removeBalanceFromDatabase(serviceId);
-          const manager = getManager();
-          if (manager) {
-            manager.removeService(serviceId);
-          }
-        },
-      },
-    ]);
+    setPendingService({ id: serviceId, name: serviceName });
   };
 
   return (
@@ -221,6 +192,37 @@ export default function AccountsView() {
           </Typography>
         </List.Item>
       </List.Section>
+      <ConfirmModal
+        visible={!!pendingAccount}
+        title="Supprimer le compte"
+        description={pendingAccount ? `${pendingAccount.firstName} ${pendingAccount.lastName}` : undefined}
+        icon="User"
+        destructive
+        confirmLabel="Supprimer"
+        onConfirm={() => {
+          if (pendingAccount) store.removeAccount(pendingAccount);
+          setPendingAccount(null);
+        }}
+        onClose={() => setPendingAccount(null)}
+      />
+      <ConfirmModal
+        visible={!!pendingService}
+        title={pendingService?.name ?? ""}
+        description="Supprimer ce service ?"
+        icon="Trash"
+        destructive
+        confirmLabel="Supprimer"
+        onConfirm={() => {
+          if (pendingService) {
+            store.removeServiceFromAccount(pendingService.id);
+            removeBalanceFromDatabase(pendingService.id);
+            const manager = getManager();
+            if (manager) manager.removeService(pendingService.id);
+          }
+          setPendingService(null);
+        }}
+        onClose={() => setPendingService(null)}
+      />
     </List>
   );
 }

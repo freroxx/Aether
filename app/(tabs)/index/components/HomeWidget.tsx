@@ -13,7 +13,7 @@ import { ListTouchable } from '@/ui/new/List';
 export interface HomeWidgetItem {
   icon: React.ReactNode;
   title: string;
-  redirect?: string;
+  redirect?: any;
   onPress?: () => void;
   buttonLabel?: string;
   render?: () => React.ReactNode;

@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import mimetypes
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timedelta
 
@@ -77,6 +78,11 @@ class NewsReadRequest(BaseModel):
 
 class SetChildRequest(BaseModel):
     child_name: str
+
+class FileDownloadRequest(BaseModel):
+    file_url: Optional[str] = None
+    file_name: Optional[str] = None
+    child_name: Optional[str] = None
 
 # ----------------- Helper Functions -----------------
 
@@ -1049,3 +1055,202 @@ def get_ical_url(
     except Exception:
         url = None
     return {"url": url}
+
+@app.post("/files/download")
+def download_file(
+    req: FileDownloadRequest,
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Télécharge un fichier Pronote (devoir ou contenu de cours) et le renvoie en base64.
+
+    L'authentification est portée par le header X-Pronote-Auth (blob base64 JSON
+    contenant url/username/token ou password/uuid/ent/account_type). Le body ne
+    porte que file_url / file_name (+ child_name pour les comptes parents).
+
+    Les URLs Pronote sont sessionnées et expirent : on recherche donc d'abord la
+    pièce jointe correspondante (par nom, puis par URL) dans les devoirs et les
+    contenus de cours afin d'obtenir une URL fraîche via une session authentifiée,
+    avec fallback sur un GET authentifié direct de file_url.
+    """
+    client = init_client(auth, child_name=req.child_name)
+    try:
+        active_child = getattr(client, "selected_child", None) or getattr(client, "child", None)
+        print(f"[files/download] child requested={req.child_name!r} active={active_child!r} file={(req.file_name or '').strip()!r}")
+    except Exception:
+        pass
+
+    target_url = (req.file_url or "").strip()
+    target_name = (req.file_name or "").strip()
+    if not target_url and not target_name:
+        raise HTTPException(status_code=400, detail="file_url ou file_name requis")
+
+    found_bytes: Optional[bytes] = None
+    found_name = target_name or "fichier"
+
+    import unicodedata
+    from urllib.parse import urlsplit, parse_qsl, urlunsplit
+
+    def _norm_name(s: str) -> str:
+        s = (s or "").strip()
+        s = unicodedata.normalize("NFD", s)
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+        return " ".join(s.lower().split())
+
+    def _norm_url(u: str) -> str:
+        try:
+            p = urlsplit((u or "").strip())
+            q = [(k, v) for (k, v) in parse_qsl(p.query) if not k.lower().startswith(("sess", "token", "id"))]
+            return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path.rstrip("/"), "&".join(f"{k}={v}" for k, v in q), ""))
+        except Exception:
+            return (u or "").strip()
+
+    norm_target_name = _norm_name(target_name)
+    norm_target_url = _norm_url(target_url)
+    # 3e passage : candidats par nom seul (URL sessionnée expirée).
+    name_only_candidates = []
+
+    def _try_consume_attachment(f, name_only: bool = False) -> bool:
+        nonlocal found_bytes, found_name
+        try:
+            fname = str(getattr(f, "name", "") or "")
+            furl = str(getattr(f, "url", "") or "")
+        except Exception:
+            return False
+        if name_only:
+            if not (norm_target_name and fname and _norm_name(fname) == norm_target_name):
+                return False
+        else:
+            name_match = bool(target_name and fname and _norm_name(fname) == norm_target_name)
+            url_match = bool(target_url and furl and _norm_url(furl) == norm_target_url)
+            if not (name_match or url_match):
+                if norm_target_name and fname and _norm_name(fname) == norm_target_name:
+                    name_only_candidates.append(f)
+                return False
+        if getattr(f, "type", 1) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Ce document est un lien externe, ouvrez-le dans le navigateur."
+            )
+        try:
+            data = f.data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Échec du téléchargement du fichier Pronote: {str(e)}"
+            )
+        if not data:
+            return False
+        found_bytes = bytes(data)
+        if fname:
+            found_name = fname
+        return True
+
+    today = date.today()
+
+    # 1) Recherche dans les devoirs (fenêtre large pour couvrir les pièces jointes expirées).
+    if found_bytes is None:
+        try:
+            hw_list = client.homework(today - timedelta(days=60), today + timedelta(days=90))
+            for h in (hw_list or []):
+                try:
+                    files = getattr(h, "files", None) or []
+                except Exception:
+                    continue
+                for f in files:
+                    if _try_consume_attachment(f):
+                        break
+                if found_bytes is not None:
+                    break
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    # 2) Recherche dans les contenus de cours (cahier de textes).
+    if found_bytes is None:
+        try:
+            lessons = client.lessons(today - timedelta(days=60), today + timedelta(days=60))
+            for lesson in (lessons or []):
+                try:
+                    contents = getattr(lesson, "content", None) or []
+                except Exception:
+                    continue
+                for c in contents:
+                    try:
+                        files = getattr(c, "files", None) or []
+                    except Exception:
+                        continue
+                    for f in files:
+                        if _try_consume_attachment(f):
+                            break
+                    if found_bytes is not None:
+                        break
+                if found_bytes is not None:
+                    break
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    # 2b) 3e passage : nom seul (URL sessionnée expirée / renommage query).
+    if found_bytes is None and name_only_candidates:
+        for f in name_only_candidates:
+            try:
+                if _try_consume_attachment(f, name_only=True):
+                    break
+            except HTTPException:
+                raise
+            except Exception:
+                continue
+
+    # 3) Fallback : GET authentifié direct de file_url avec les cookies de session.
+    if found_bytes is None:
+        if not target_url:
+            detail = "Fichier introuvable ou session Pronote expirée."
+            if req.child_name:
+                detail += f" (enfant : {req.child_name})"
+            raise HTTPException(status_code=404, detail=detail)
+        try:
+            sess = getattr(getattr(client, "communication", None), "session", None)
+            if sess is None:
+                raise HTTPException(status_code=500, detail="Session Pronote indisponible.")
+            resp = sess.get(target_url, timeout=20)
+            if getattr(resp, "status_code", 500) != 200:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Fichier introuvable ou session Pronote expirée. Rouvrez la liste pour rafraîchir."
+                )
+            content = getattr(resp, "content", None)
+            if not content:
+                raise HTTPException(status_code=404, detail="Fichier vide ou introuvable.")
+            found_bytes = bytes(content)
+            if target_name:
+                found_name = target_name
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Échec du téléchargement du fichier: {str(e)}"
+            )
+
+    if not found_bytes:
+        detail = "Fichier introuvable ou session Pronote expirée. Rouvrez la liste pour rafraîchir."
+        if req.child_name:
+            detail += f" (enfant : {req.child_name})"
+        raise HTTPException(status_code=404, detail=detail)
+
+    if len(found_bytes) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux pour être prévisualisé.")
+
+    mime, _ = mimetypes.guess_type(found_name)
+    if not mime:
+        mime = "application/octet-stream"
+
+    return {
+        "filename": found_name,
+        "mime": mime,
+        "base64": base64.b64encode(found_bytes).decode("ascii"),
+    }

@@ -2,11 +2,12 @@ import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { Github, ShieldCheck } from "lucide-react-native";
 import React, { useState } from "react";
-import { Alert, Linking, StyleSheet, View } from "react-native";
+import { Linking, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import packageJson from "@/package.json";
 import { useSettingsStore } from "@/stores/settings";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Avatar from "@/ui/components/Avatar";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
@@ -20,6 +21,7 @@ export default function SettingsAbout() {
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
 
   const [tapCount, setTapCount] = useState(0);
+  const alert = useAlert();
 
   const handleVersionTap = () => {
     setTapCount(prev => prev + 1);
@@ -27,10 +29,10 @@ export default function SettingsAbout() {
     if (tapCount + 1 >= 7) {
       setTapCount(0);
       if (settingsStore.showDevMode) {
-        Alert.alert("Mode développeur", "Mode développeur désactivé.");
+        alert.showAlert({ title: "Mode développeur", description: "Mode développeur désactivé.", icon: "Code" });
         mutateProperty("personalization", { showDevMode: false });
       } else {
-        Alert.alert("Mode développeur", "Mode développeur activé ! Un nouvel onglet est apparu dans les réglages.");
+        alert.showAlert({ title: "Mode développeur", description: "Mode développeur activé ! Un nouvel onglet est apparu dans les réglages.", icon: "Code" });
         mutateProperty("personalization", { showDevMode: true });
       }
     }

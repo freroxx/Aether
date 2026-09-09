@@ -23,12 +23,20 @@ export async function fetchPronoteHomeworks(
       dueDate: new Date(h.date),
       isDone: h.done ?? false,
       returnFormat: ReturnFormat.PAPER,
-      attachments: (h.files || []).map((f: any) => ({
-        type: AttachmentType.FILE,
-        name: f.name,
-        url: f.url,
-        createdByAccount: accountId,
-      })),
+      attachments: (h.files || []).map((f: any) => {
+        const url: string = String(f?.url ?? "");
+        const isExternalLink =
+          f?.type === 0 ||
+          f?.type === "link" ||
+          f?.type === "LINK" ||
+          (/^https?:\/\//i.test(url) && !/index-education\.net/i.test(url));
+        return {
+          type: isExternalLink ? AttachmentType.LINK : AttachmentType.FILE,
+          name: f.name,
+          url: f.url,
+          createdByAccount: accountId,
+        };
+      }),
       evaluation: false,
       custom: false,
       createdByAccount: accountId,

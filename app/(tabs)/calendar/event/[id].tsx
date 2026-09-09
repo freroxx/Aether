@@ -4,7 +4,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { MoreVertical } from "lucide-react-native";
 import { useEffect, useLayoutEffect, useState } from "react";
 import React, { Fragment } from "react";
-import { Alert, Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { formatDistanceStrict, formatDistanceToNow } from "date-fns";
 import * as DateLocale from "date-fns/locale";
 import i18n, { t } from "i18next";
@@ -15,14 +15,17 @@ import ModalOverhead from "@/components/ModalOverhead";
 import { useDatabase } from "@/database/DatabaseProvider";
 import { getCourseById } from "@/database/useTimetable";
 import { useEventById } from "@/database/useEventsById";
-import { AttachmentType } from "@/services/shared/attachment";
+import { openAttachment, resolvePronoteFileAuth } from "@/services/pronote/files";
 import { Course as SharedCourse, CourseStatus } from "@/services/shared/timetable";
 import ActionMenu from "@/ui/components/ActionMenu";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
+import ConfirmModal from "@/ui/components/ConfirmModal";
 import Icon from "@/ui/components/Icon";
 import { NativeHeaderPressable, NativeHeaderSide } from "@/ui/components/NativeHeader";
+import { useAlert } from "@/ui/components/AlertProvider";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
+import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 import { getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectName } from "@/utils/subjects/name";
@@ -39,6 +42,9 @@ export default function EventDetailsScreen() {
 
   const eventId = Array.isArray(id) ? id[0] : id;
   const event = useEventById(eventId);
+  const alert = useAlert();
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [course, setCourse] = useState<SharedCourse | null>(null);
   const [courseChecked, setCourseChecked] = useState(false);
@@ -89,38 +95,32 @@ export default function EventDetailsScreen() {
   }, [headerTitle, navigation]);
 
   const handleDelete = (): void => {
-    Alert.alert(
-      t("Event_DeleteEvent"),
-      t("Event_Confirm_DeleteEvent"),
-      [
-        {
-          text: t("Context_Cancel"),
-          style: "cancel",
-        },
-        {
-          text: t("Event_DeleteEvent"),
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              try {
-                await database.write(async () => {
-                  const eventToDelete = await database.get("events").find(eventId as string);
-                  await eventToDelete.destroyPermanently();
-                });
-                router.back();
-              } catch (err) {
-                warn(`Error deleting event: ${String(err)}`);
-                Alert.alert(
-                  "Erreur",
-                  "Une erreur est survenue lors de la suppression de l’événement.",
-                  [{ text: "OK" }]
-                );
-              }
-            })();
-          },
-        },
-      ]
-    );
+    setDeleteVisible(true);
+  };
+
+  const confirmDelete = (): void => {
+    void (async () => {
+      setDeleting(true);
+      try {
+        await database.write(async () => {
+          const eventToDelete = await database.get("events").find(eventId as string);
+          await eventToDelete.destroyPermanently();
+        });
+        setDeleteVisible(false);
+        router.back();
+      } catch (err) {
+        warn(`Error deleting event: ${String(err)}`);
+        setDeleteVisible(false);
+        alert.showAlert({
+          title: "Erreur",
+          description: "Une erreur est survenue lors de la suppression de l'événement.",
+          icon: "AlertTriangle",
+          color: "#E05D34",
+        });
+      } finally {
+        setDeleting(false);
+      }
+    })();
   };
 
   if (!courseChecked) {
@@ -314,12 +314,26 @@ export default function EventDetailsScreen() {
           </List.Item>
         </List.Section>
       </List>
+      <ConfirmModal
+        visible={deleteVisible}
+        title={t("Event_DeleteEvent")}
+        description={t("Event_Confirm_DeleteEvent")}
+        icon="Trash"
+        destructive
+        confirmLabel={t("Event_DeleteEvent")}
+        cancelLabel={t("Context_Cancel")}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => !deleting && setDeleteVisible(false)}
+      />
     </>
   );
 }
 
 const CourseSheet: React.FC<{ course: SharedCourse; topInset: number }> = ({ course, topInset }) => {
   const { colors } = useTheme();
+  const alert = useAlert();
+  const [downloadingName, setDownloadingName] = useState<string | null>(null);
   const subjectColor = getSubjectColor(course.subject);
   const subjectEmoji = getSubjectEmoji(course.subject);
   const startTime = Math.floor(course.from.getTime() / 1000);
@@ -517,18 +531,42 @@ const CourseSheet: React.FC<{ course: SharedCourse; topInset: number }> = ({ cou
                     )}
                   </List.Item>
                 )}
-                {(item.attachments ?? []).map((attachment, attachmentIndex) => (
-                  <List.Item key={`${attachment.name}-${attachmentIndex}`}>
-                    <List.Leading>
-                      <Icon>
-                        <Papicons name={attachment.type === AttachmentType.LINK ? "Link" : "Info"} />
-                      </Icon>
-                    </List.Leading>
-                    <Typography variant="title" numberOfLines={2}>
-                      {attachment.name}
-                    </Typography>
-                  </List.Item>
-                ))}
+                {(item.attachments ?? []).map((attachment, attachmentIndex) => {
+                  const key = `${attachment.name}-${attachmentIndex}`;
+                  const isDownloading = downloadingName === key;
+                  return (
+                    <List.Item
+                      key={key}
+                      onPress={() => {
+                        if (isDownloading) return;
+                        setDownloadingName(key);
+                        void openAttachment(
+                          attachment,
+                          resolvePronoteFileAuth(attachment.createdByAccount),
+                          alert
+                        ).finally(() => setDownloadingName(null));
+                      }}
+                    >
+                      <List.Leading>
+                        <Icon>
+                          <Papicons name={getAttachmentIcon(attachment)} />
+                        </Icon>
+                      </List.Leading>
+                      <Typography variant="title" numberOfLines={2}>
+                        {attachment.name}
+                      </Typography>
+                      {isDownloading ? (
+                        <List.Trailing>
+                          <ActivityIndicator size={20} />
+                        </List.Trailing>
+                      ) : (
+                        <Typography variant="body1" color="textSecondary" numberOfLines={1}>
+                          {attachment.url ? "Ouvrir" : "Indisponible"}
+                        </Typography>
+                      )}
+                    </List.Item>
+                  );
+                })}
               </Fragment>
             ))}
           </List.Section>
