@@ -11,5 +11,14 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 39,
+      steps: [
+        addColumns({
+          table: "homework",
+          columns: [{ name: "pronoteId", type: "string", isOptional: true }],
+        }),
+      ],
+    },
   ],
 });

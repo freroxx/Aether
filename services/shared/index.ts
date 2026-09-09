@@ -110,35 +110,40 @@ export class AccountManager {
 
     let refreshedAtLeastOne = false;
 
-    for (const service of this.account.services) {
-      try {
-        log("Trying to refresh " + service.id);
-        const plugin = this.getServicePluginForAccount(service);
+    // Parallèle (pas séquentiel) : le switch compte/enfant ne doit pas
+    // payer N handshakes Pronote en série.
+    const results = await Promise.all(
+      this.account.services.map(async (service) => {
+        try {
+          log("Trying to refresh " + service.id);
+          const plugin = this.getServicePluginForAccount(service);
 
-        if (!hasInternet && plugin.requiresInternet !== false) {
-          warn(`Skipping network service ${service.id} while offline.`);
-          continue;
-        }
+          if (!hasInternet && plugin.requiresInternet !== false) {
+            warn(`Skipping network service ${service.id} while offline.`);
+            return;
+          }
 
-        if (plugin?.capabilities.includes(Capabilities.REFRESH)) {
-          this.clients[service.id] = await plugin.refreshAccount(service.auth);
-          refreshedAtLeastOne = true;
-          log("Successfully refreshed " + service.id);
-        } else {
-          this.clients[service.id] = plugin;
-          log(
-            "Plugin for " +
-              service.id +
-              " doesn't support refresh but is available for other capabilities"
-          );
+          if (plugin?.capabilities.includes(Capabilities.REFRESH)) {
+            this.clients[service.id] = await plugin.refreshAccount(service.auth);
+            refreshedAtLeastOne = true;
+            log("Successfully refreshed " + service.id);
+          } else {
+            this.clients[service.id] = plugin;
+            log(
+              "Plugin for " +
+                service.id +
+                " doesn't support refresh but is available for other capabilities"
+            );
+          }
+        } catch (e) {
+          if (isPermanentAuthError(e)) {
+            throw new AuthenticationError(String(e), service);
+          }
+          throw new ServiceUnavailableError(String(e), service);
         }
-      } catch (e) {
-        if (isPermanentAuthError(e)) {
-          throw new AuthenticationError(String(e), service);
-        }
-        throw new ServiceUnavailableError(String(e), service);
-      }
-    }
+      })
+    );
+    void results;
 
     log(
       "Finished refreshing process for all services, services refreshed: " +
@@ -222,7 +227,7 @@ export class AccountManager {
       {
         multiple: false,
         clientId,
-        fallback: async () => getGradePeriodsFromCache(period.name),
+        fallback: async () => getGradePeriodsFromCache(period.name, clientId),
         saveToCache: async (data: PeriodGrades) => {
           await addPeriodGradesToDatabase(data, period.name);
         },

@@ -8,8 +8,13 @@ from datetime import datetime, date, timedelta
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pronotepy
+import hashlib
+import logging
 
+logger = logging.getLogger("aether")
+
+# NOTE: `pronotepy` (lourd, wheel Rust via cryptography) est importé en lazy
+# dans init_client / endpoints d'auth pour réduire le cold start Vercel.
 # Optional Upstash Redis import
 try:
     from upstash_redis import Redis
@@ -19,6 +24,56 @@ try:
 except Exception:
     redis_client = None
 
+
+def _cache_key(prefix: str, auth: Dict[str, Any], *parts: Any) -> str:
+    """Clé de cache stable (jamais de token/mot de passe dedans)."""
+    raw = "|".join([
+        prefix,
+        str(auth.get("url", "")),
+        str(auth.get("username", "")),
+        str(auth.get("uuid", "")),
+        str(auth.get("account_type", "eleve")),
+        *[str(p) for p in parts],
+    ])
+    return "aether:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def cache_get(key: str) -> Optional[Any]:
+    if redis_client is None:
+        return None
+    try:
+        val = redis_client.get(key)
+        if val is None:
+            return None
+        return json.loads(val) if isinstance(val, str) else val
+    except Exception as e:
+        logger.warning(f"redis get failed: {e}")
+        return None
+
+
+def cache_set(key: str, value: Any, ttl_s: int) -> None:
+    if redis_client is None:
+        return
+    try:
+        redis_client.set(key, json.dumps(value, default=str), ex=ttl_s)
+    except Exception as e:
+        logger.warning(f"redis set failed: {e}")
+
+
+def parse_ymd(value: str, label: str) -> date:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except Exception:
+        raise HTTPException(status_code=422, detail=f"Date invalide pour {label} (attendu YYYY-MM-DD)")
+
+
+def clamp_window(start_d: date, end_d: date, max_days: int = 62) -> tuple:
+    if end_d < start_d:
+        raise HTTPException(status_code=422, detail="to_date antérieur à from_date")
+    if (end_d - start_d).days > max_days:
+        raise HTTPException(status_code=422, detail=f"Fenêtre trop large (max {max_days} jours)")
+    return start_d, end_d
+
 app = FastAPI(
     title="Aether Pronotepy API",
     version="1.0.0",
@@ -26,10 +81,13 @@ app = FastAPI(
 )
 
 cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
+# allow_credentials=True est incompatible avec "*" (rejet navigateur) :
+# credentials seulement si origines explicites.
+_use_credentials = cors_origins != ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins if cors_origins != ["*"] else ["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins if _use_credentials else ["*"],
+    allow_credentials=_use_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -60,6 +118,7 @@ class HomeworkDoneRequest(BaseModel):
     homework_id: str
     done: bool
     child_name: Optional[str] = None
+    due_date: Optional[str] = None  # indice YYYY-MM-DD pour recherche ±7j d'abord
 
 class SendMessageRequest(BaseModel):
     chat_id: str
@@ -83,6 +142,7 @@ class FileDownloadRequest(BaseModel):
     file_url: Optional[str] = None
     file_name: Optional[str] = None
     child_name: Optional[str] = None
+    due_date: Optional[str] = None  # indice YYYY-MM-DD : scan ±7j d'abord
 
 # ----------------- Helper Functions -----------------
 
@@ -96,7 +156,19 @@ def get_session_header(x_pronote_auth: Optional[str] = Header(None)) -> Dict[str
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Header X-Pronote-Auth invalide: {str(e)}")
 
+def _classify_pronote_error(e: Exception) -> HTTPException:
+    """401 auth réelle / 429 throttling / 504 timeout — jamais de 401 générique."""
+    msg = str(e)
+    low = msg.lower()
+    if any(k in low for k in ("429", "too many", "trop de requ", "rate limit", "rate-limit", "ratelimit")):
+        return HTTPException(status_code=429, detail=f"Pronote surchargé, réessayez dans un instant: {msg}")
+    if any(k in low for k in ("timeout", "timed out", "délai", "connectionerror", "connection error", "max retries", "temporarily", "temporaire", "503", "502", "504", "bad gateway", "service unavailable")):
+        return HTTPException(status_code=504, detail=f"Établissement injoignable pour le moment: {msg}")
+    return HTTPException(status_code=401, detail=f"Erreur d'initialisation Pronote: {msg}")
+
+
 def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
+    import pronotepy  # lazy : cold start
     account_type = auth.get("account_type", "eleve").lower()
     is_parent = account_type == "parent"
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
@@ -134,7 +206,7 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Erreur d'initialisation Pronote: {str(e)}")
+        raise _classify_pronote_error(e)
 
 # ----------------- Endpoints -----------------
 
@@ -149,6 +221,7 @@ def read_root():
 
 @app.post("/auth/login")
 def login_direct(req: DirectLoginRequest):
+    import pronotepy  # lazy : cold start
     req_url = req.url.lower()
     is_parent = ("parent" in req_url) or (req.account_type.lower() == "parent")
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
@@ -208,6 +281,7 @@ def login_direct(req: DirectLoginRequest):
 
 @app.post("/auth/qrcode")
 def login_qrcode(req: QrCodeLoginRequest):
+    import pronotepy  # lazy : cold start
     try:
         qr_dict = req.qr_data if isinstance(req.qr_data, dict) else json.loads(req.qr_data)
     except Exception as e:
@@ -233,7 +307,7 @@ def login_qrcode(req: QrCodeLoginRequest):
     if client is None:
         # 'dataSec' manquant = handshake refusé par Pronote : PIN incorrect,
         # QR expiré/déjà utilisé, ou protocole inattendu. Log serveur pour diag.
-        print(f"[auth/qrcode] handshake failed uuid={req.uuid} error={last_error}")
+        logger.warning(f"[auth/qrcode] handshake failed uuid={req.uuid} error={last_error}")
         raise HTTPException(
             status_code=401,
             detail="Code PIN incorrect ou QR Code expiré ou déjà utilisé. Génère un nouveau QR Code dans Pronote puis réessaie.",
@@ -274,6 +348,7 @@ def login_qrcode(req: QrCodeLoginRequest):
 
 @app.post("/auth/token")
 def login_token(req: TokenLoginRequest):
+    import pronotepy  # lazy : cold start
     req_url = req.url.lower()
     is_parent = ("parent" in req_url) or (req.account_type.lower() == "parent")
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
@@ -338,9 +413,12 @@ def get_timetable(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    start_d, end_d = clamp_window(parse_ymd(from_date, "from_date"), parse_ymd(to_date, "to_date"))
+    key = _cache_key("timetable", auth, from_date, to_date, child)
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
     client = init_client(auth, child_name=child)
-    start_d = datetime.strptime(from_date, "%Y-%m-%d").date()
-    end_d = datetime.strptime(to_date, "%Y-%m-%d").date()
 
     lessons = client.lessons(start_d, end_d)
     result = []
@@ -402,7 +480,9 @@ def get_timetable(
             "content": lesson_contents,
         })
 
-    return {"lessons": result}
+    payload = {"lessons": result}
+    cache_set(key, payload, 60)
+    return payload
 
 @app.get("/grades")
 def get_grades(
@@ -410,6 +490,9 @@ def get_grades(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    hit = cache_get(_cache_key("grades", auth, period, child))
+    if hit is not None:
+        return hit
     client = init_client(auth, child_name=child)
     periods = client.periods
 
@@ -471,17 +554,23 @@ def get_grades(
         "subjects": subject_averages,
     }
 
-    return {
+    payload = {
         "period": target_period.name,
         "grades": grades_list,
         "averages": period_averages
     }
+    cache_set(_cache_key("grades", auth, period, child), payload, 300)
+    return payload
 
 @app.get("/grades/periods")
 def get_grade_periods(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    key = _cache_key("grade_periods", auth, child)
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
     client = init_client(auth, child_name=child)
     result = []
     for p in client.periods:
@@ -491,7 +580,9 @@ def get_grade_periods(
             "start": p.start.isoformat() if hasattr(p, "start") and p.start else None,
             "end": p.end.isoformat() if hasattr(p, "end") and p.end else None,
         })
-    return {"periods": result}
+    payload = {"periods": result}
+    cache_set(key, payload, 300)
+    return payload
 
 @app.get("/homework")
 def get_homework(
@@ -500,9 +591,12 @@ def get_homework(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    start_d, end_d = clamp_window(parse_ymd(from_date, "from_date"), parse_ymd(to_date, "to_date"))
+    key = _cache_key("homework", auth, from_date, to_date, child)
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
     client = init_client(auth, child_name=child)
-    start_d = datetime.strptime(from_date, "%Y-%m-%d").date()
-    end_d = datetime.strptime(to_date, "%Y-%m-%d").date()
 
     hw_list = client.homework(start_d, end_d)
     result = []
@@ -522,7 +616,9 @@ def get_homework(
             "files": files,
         })
 
-    return {"homework": result}
+    payload = {"homework": result}
+    cache_set(key, payload, 60)
+    return payload
 
 @app.post("/homework/done")
 def set_homework_done(
@@ -530,10 +626,33 @@ def set_homework_done(
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
     client = init_client(auth, child_name=req.child_name)
-    # Search homework in a 30-day window around today
+    wanted = str(req.homework_id)
+
+    def _scan(start_d, end_d):
+        try:
+            return client.homework(start_d, end_d)
+        except Exception:
+            return []
+
+    # Indice due_date d'abord (±7j), puis fenêtres élargies.
+    windows = []
+    if req.due_date:
+        try:
+            anchor = parse_ymd(req.due_date, "due_date")
+            windows.append((anchor - timedelta(days=7), anchor + timedelta(days=7)))
+        except HTTPException:
+            pass
     today = date.today()
-    hw_list = client.homework(today - timedelta(days=15), today + timedelta(days=30))
-    target = next((h for h in hw_list if getattr(h, "id", None) == req.homework_id), None)
+    windows += [
+        (today - timedelta(days=15), today + timedelta(days=30)),
+        (today - timedelta(days=60), today + timedelta(days=90)),
+    ]
+    target = None
+    for start_d, end_d in windows:
+        hw_list = _scan(start_d, end_d)
+        target = next((h for h in hw_list if str(getattr(h, "id", None)) == wanted), None)
+        if target:
+            break
 
     if not target:
         raise HTTPException(status_code=404, detail="Devoir introuvable")
@@ -546,6 +665,10 @@ def get_attendance(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    akey = _cache_key("attendance", auth, child)
+    ahit = cache_get(akey)
+    if ahit is not None:
+        return ahit
     client = init_client(auth, child_name=child)
     absences = []
     delays = []
@@ -645,17 +768,23 @@ def get_attendance(
                     "schedulable": bool(getattr(pun, "schedulable", False)),
                 })
 
-    return {
+    apayload = {
         "absences": absences,
         "delays": delays,
         "punishments": punishments
     }
+    cache_set(akey, apayload, 300)
+    return apayload
 
 @app.get("/news")
 def get_news(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    nkey = _cache_key("news", auth, child)
+    nhit = cache_get(nkey)
+    if nhit is not None:
+        return nhit
     client = init_client(auth, child_name=child)
     news_list = []
     if hasattr(client, "information_and_surveys"):
@@ -670,7 +799,9 @@ def get_news(
                 "date": start_d.isoformat() if start_d else None,
                 "acknowledged": getattr(item, "read", True),
             })
-    return {"news": news_list}
+    npayload = {"news": news_list}
+    cache_set(nkey, npayload, 120)
+    return npayload
 
 @app.post("/news/read")
 def mark_news_as_read(
@@ -863,6 +994,10 @@ def get_evaluations(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    ekey = _cache_key("evaluations", auth, period, child)
+    ehit = cache_get(ekey)
+    if ehit is not None:
+        return ehit
     client = init_client(auth, child_name=child)
     periods = getattr(client, "periods", []) or []
 
@@ -929,7 +1064,9 @@ def get_evaluations(
             "acquisitions": acquisitions,
         })
 
-    return {"evaluations": result}
+    epayload = {"evaluations": result}
+    cache_set(_cache_key("evaluations", auth, period, child), epayload, 300)
+    return epayload
 
 @app.get("/report")
 def get_report(
@@ -937,6 +1074,10 @@ def get_report(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    rkey = _cache_key("report", auth, period, child)
+    rhit = cache_get(rkey)
+    if rhit is not None:
+        return rhit
     client = init_client(auth, child_name=child)
     periods = getattr(client, "periods", []) or []
 
@@ -990,7 +1131,9 @@ def get_report(
         except Exception:
             top_comments = []
 
-    return {"report": {"comments": top_comments, "subjects": subjects}}
+    rpayload = {"report": {"comments": top_comments, "subjects": subjects}}
+    cache_set(rkey, rpayload, 300)
+    return rpayload
 
 @app.get("/teaching-staff")
 def get_teaching_staff(
@@ -1075,7 +1218,7 @@ def download_file(
     client = init_client(auth, child_name=req.child_name)
     try:
         active_child = getattr(client, "selected_child", None) or getattr(client, "child", None)
-        print(f"[files/download] child requested={req.child_name!r} active={active_child!r} file={(req.file_name or '').strip()!r}")
+        logger.info(f"[files/download] child requested={req.child_name!r} active={active_child!r} file={(req.file_name or '').strip()!r}")
     except Exception:
         pass
 
@@ -1149,29 +1292,71 @@ def download_file(
 
     today = date.today()
 
-    # 1) Recherche dans les devoirs (fenêtre large pour couvrir les pièces jointes expirées).
-    if found_bytes is None:
+    def _scan_homework(start_d, end_d) -> bool:
         try:
-            hw_list = client.homework(today - timedelta(days=60), today + timedelta(days=90))
-            for h in (hw_list or []):
+            hw_list = client.homework(start_d, end_d)
+        except HTTPException:
+            raise
+        except Exception:
+            return False
+        for h in (hw_list or []):
+            try:
+                files = getattr(h, "files", None) or []
+            except Exception:
+                continue
+            for f in files:
+                if _try_consume_attachment(f):
+                    return True
+            if found_bytes is not None:
+                return True
+        return found_bytes is not None
+
+    def _scan_lessons(start_d, end_d) -> bool:
+        try:
+            lessons = client.lessons(start_d, end_d)
+        except HTTPException:
+            raise
+        except Exception:
+            return False
+        for lesson in (lessons or []):
+            try:
+                contents = getattr(lesson, "content", None) or []
+            except Exception:
+                continue
+            for c in contents:
                 try:
-                    files = getattr(h, "files", None) or []
+                    files = getattr(c, "files", None) or []
                 except Exception:
                     continue
                 for f in files:
                     if _try_consume_attachment(f):
-                        break
+                        return True
                 if found_bytes is not None:
-                    break
+                    return True
+            if found_bytes is not None:
+                return True
+        return found_bytes is not None
+
+    # 0) Indice due_date/given_at d'abord (±7j) : évite le scan 150j systématique.
+    if found_bytes is None and req.due_date:
+        try:
+            anchor = parse_ymd(req.due_date, "due_date")
+            _scan_homework(anchor - timedelta(days=7), anchor + timedelta(days=7))
+            if found_bytes is None:
+                _scan_lessons(anchor - timedelta(days=7), anchor + timedelta(days=7))
         except HTTPException:
             raise
         except Exception:
             pass
 
+    # 1) Recherche dans les devoirs (fenêtre large pour couvrir les pièces jointes expirées).
+    if found_bytes is None:
+        _scan_homework(today - timedelta(days=60), today + timedelta(days=90))
+
     # 2) Recherche dans les contenus de cours (cahier de textes).
     if found_bytes is None:
         try:
-            lessons = client.lessons(today - timedelta(days=60), today + timedelta(days=60))
+            _scan_lessons(today - timedelta(days=60), today + timedelta(days=60))
             for lesson in (lessons or []):
                 try:
                     contents = getattr(lesson, "content", None) or []
@@ -1242,8 +1427,10 @@ def download_file(
             detail += f" (enfant : {req.child_name})"
         raise HTTPException(status_code=404, detail=detail)
 
-    if len(found_bytes) > 25 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Fichier trop volumineux pour être prévisualisé.")
+    # Vercel plafonne les réponses ~4.5Mo : au-delà, base64 exploserait (502
+    # plateforme). 413 explicite plutôt qu'un timeout opaque.
+    if len(found_bytes) > 4 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux pour être ouvert depuis l'app (max 4 Mo).")
 
     mime, _ = mimetypes.guess_type(found_name)
     if not mime:

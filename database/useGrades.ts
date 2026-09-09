@@ -122,9 +122,18 @@ export async function addPeriodGradesToDatabase(item: SharedPeriodGrades, period
   }, 10000, 'addPeriodGradesToDatabase');
 }
 
-export async function getGradePeriodsFromCache(period: string): Promise<SharedPeriodGrades> {
+export async function getGradePeriodsFromCache(period: string, createdByAccount?: string): Promise<SharedPeriodGrades> {
   try {
     const database = getDatabaseInstance();
+    // L'écriture est scopée par compte (period+account) : essayer d'abord
+    // la clé scopée pour éviter les collisions inter-comptes, puis le legacy.
+    if (createdByAccount) {
+      const scoped = await database
+        .get<PeriodGrades>('periodgrades')
+        .query(Q.where('id', generateId(period + createdByAccount)))
+        .fetch();
+      if (scoped[0]) return mapPeriodGradesToShared(scoped[0]);
+    }
     const id = generateId(period)
     const periodgrades = await database
       .get<PeriodGrades>('periodgrades')

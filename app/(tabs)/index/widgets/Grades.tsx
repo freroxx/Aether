@@ -7,6 +7,8 @@ import { getCurrentPeriod } from "@/utils/grades/helper/period";
 import { error } from "@/utils/logger/logger";
 import Averages from "../../grades/atoms/Averages";
 import { useSettingsStore } from "@/stores/settings";
+import { useAccountStore } from "@/stores/account";
+import { useSyncStore } from "@/stores/sync";
 import { getGradeDisplayScale } from "@/utils/grades/scale";
 
 const PERIODS_TTL_MS = 5 * 60 * 1000;
@@ -51,6 +53,10 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
     const [serviceAverage, setServiceAverage] = useState<number | undefined>(undefined);
     const [loaded, setLoaded] = useState(false);
     const displayScale = getGradeDisplayScale(useSettingsStore(state => state.personalization.gradesDisplayScale));
+    // Clés de cache scopées (compte + enfant + epoch switch) : fini les notes de l'autre enfant.
+    const selectedChild = useAccountStore(s => s.accounts.find(a => a.id === s.lastUsedAccount)?.selectedChild);
+    const accountEpoch = useSyncStore(s => s.accountEpoch);
+    const cacheScope = `${selectedChild ?? ""}::${accountEpoch}`;
 
     const grades = useMemo(
       () =>
@@ -81,7 +87,8 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
         }
 
         const accountId = managerToUse.getAccount().id;
-        const cache = periodsCache.get(accountId);
+        const scopedAccountId = `${accountId}::${cacheScope}`;
+        const cache = periodsCache.get(scopedAccountId);
 
         if (cache && Date.now() - cache.fetchedAt < PERIODS_TTL_MS) {
           if (cache.value) {
@@ -103,7 +110,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
           return getCurrentPeriod(result);
         })();
 
-        periodsCache.set(accountId, {
+        periodsCache.set(scopedAccountId, {
           fetchedAt: cache?.fetchedAt ?? 0,
           value: cache?.value,
           inFlight,
@@ -111,7 +118,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
 
         try {
           const nextPeriod = await inFlight;
-          periodsCache.set(accountId, {
+          periodsCache.set(scopedAccountId, {
             fetchedAt: Date.now(),
             value: nextPeriod,
           });
@@ -119,11 +126,11 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
             setCurrentPeriod(nextPeriod);
           }
         } catch (err) {
-          periodsCache.delete(accountId);
+          periodsCache.delete(scopedAccountId);
           error(`Failed to fetch periods: ${err}`);
         }
       },
-      [period, manager],
+      [period, manager, cacheScope],
     );
 
     useEffect(() => {
@@ -140,7 +147,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
           return;
         }
 
-        const periodKey = `${periodToFetch.createdByAccount}:${periodToFetch.name}`;
+        const periodKey = `${periodToFetch.createdByAccount}:${periodToFetch.name}:${cacheScope}`;
         const cache = gradesCache.get(periodKey);
 
         if (cache && Date.now() - cache.fetchedAt < GRADES_TTL_MS) {
@@ -204,6 +211,16 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
         setCurrentPeriod(period);
       }
     }, [period]);
+
+    // Switch compte/enfant : vide l'UI tout de suite (skeleton), pas de stale.
+    useEffect(() => {
+      if (period) return;
+      setSubjects([]);
+      setServiceAverage(undefined);
+      setCurrentPeriod(undefined);
+      setLoaded(false);
+      fetchPeriods();
+    }, [cacheScope]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (grades.length === 0) {
       // Placeholder stable pendant le chargement (évite le pop-in/out de la carte)

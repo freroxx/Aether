@@ -18,6 +18,8 @@ export async function fetchPronoteHomeworks(
     const data = await PronoteApiClient.getHomework(authToken, fromStr, toStr, childName);
     return (data.homework || []).map((h: any) => ({
       id: h.id,
+      pronoteId: h.id,
+      kidName: childName,
       subject: h.subject || "Matière",
       content: h.description || "",
       dueDate: new Date(h.date),
@@ -54,8 +56,17 @@ export async function setPronoteHomeworkAsDone(
   childName?: string
 ): Promise<Homework> {
   const nextStatus = status !== undefined ? status : !homework.isDone;
+  // Vrai id Pronote si connu (sinon le backend cherche ±60j), + due_date en indice.
+  const realId = (homework as { pronoteId?: unknown }).pronoteId ?? homework.id;
+  let dueDateStr: string | undefined;
   try {
-    await PronoteApiClient.setHomeworkDone(authToken, homework.id, nextStatus, childName);
+    const d = homework.dueDate instanceof Date ? homework.dueDate : new Date(homework.dueDate as any);
+    if (!isNaN(d.getTime())) dueDateStr = d.toISOString().split("T")[0];
+  } catch {
+    dueDateStr = undefined;
+  }
+  try {
+    await PronoteApiClient.setHomeworkDone(authToken, String(realId), nextStatus, childName, dueDateStr);
   } catch (err) {
     error(`Failed to set homework done: ${err}`, "setPronoteHomeworkAsDone");
     throw err;

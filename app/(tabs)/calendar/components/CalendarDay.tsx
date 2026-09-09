@@ -28,14 +28,19 @@ function areCoursesEquivalent(a: SharedCourse[], b: SharedCourse[]) {
   if (a.length !== b.length) return false;
 
   for (let i = 0; i < a.length; i++) {
-    const left = a[i];
-    const right = b[i];
+    const left = a[i] as any;
+    const right = b[i] as any;
     if (
       left.id !== right.id ||
       left.from?.getTime?.() !== right.from?.getTime?.() ||
       left.to?.getTime?.() !== right.to?.getTime?.() ||
       left.status !== right.status ||
-      left.customStatus !== right.customStatus
+      left.customStatus !== right.customStatus ||
+      left.subject !== right.subject ||
+      left.teacher !== right.teacher ||
+      left.room !== right.room ||
+      left.kidName !== right.kidName ||
+      left.createdByAccount !== right.createdByAccount
     ) {
       return false;
     }
@@ -64,16 +69,21 @@ export const CalendarDay = React.memo(({ dayDate, courses, isRefreshing, onRefre
   const dayEvents = useMemo(() => {
     const cache = eventCache.current;
     const next: { [id: string]: any } = {};
+    const cacheKeyOf = (ev: any) =>
+      `${ev.createdByAccount ?? ""}::${ev.kidName ?? ""}::${ev.id}::${ev.from?.getTime?.() ?? ""}`;
     const result = (courses ?? []).map(ev => {
-      if (cache[ev.id] && shallowEqual(ev, cache[ev.id])) {
-        next[ev.id] = cache[ev.id];
-        return cache[ev.id];
+      const key = cacheKeyOf(ev);
+      if (cache[key] && shallowEqual(ev, cache[key])) {
+        next[key] = cache[key];
+        return cache[key];
       }
-      next[ev.id] = ev;
+      next[key] = ev;
       return ev;
     });
     eventCache.current = next;
-    return result;
+    return [...result].sort(
+      (a, b) => (a.from?.getTime?.() ?? 0) - (b.from?.getTime?.() ?? 0)
+    );
   }, [courses]);
 
   const threshold = 30;

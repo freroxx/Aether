@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { t } from 'i18next';
 import { useAccountStore } from "@/stores/account";
+import { useSyncStore } from "@/stores/sync";
 import { getManager, subscribeManagerUpdate } from "@/services/shared";
 import { Homework } from "@/services/shared/homework";
 import { useHomeworkForWeek, updateHomeworkIsDone } from "@/database/useHomework";
@@ -13,8 +14,10 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [homework, setHomework] = useState<Record<string, Homework>>({});
 
-  const store = useAccountStore.getState();
-  const account = store.accounts.find(acc => acc.id === store.lastUsedAccount);
+  const hwAccounts = useAccountStore(s => s.accounts);
+  const hwLastUsed = useAccountStore(s => s.lastUsedAccount);
+  const hwEpoch = useSyncStore(s => s.accountEpoch);
+  const account = hwAccounts.find(acc => acc.id === hwLastUsed);
   type Service = { id: string };
   const services = useMemo(() => account?.services?.map((s: Service) => s.id) ?? [], [account]);
   const manager = getManager();
@@ -52,6 +55,16 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
     return () => unsubscribe();
   }, [selectedWeek, fetchHomeworks]);
 
+  // Switch compte/enfant : vide + refetch (pas de devoirs de l'autre enfant).
+  const hwEpochRef = React.useRef(hwEpoch);
+  useEffect(() => {
+    if (hwEpoch === hwEpochRef.current) return;
+    hwEpochRef.current = hwEpoch;
+    setHomework({});
+    setRefreshTrigger(p => p + 1);
+    fetchHomeworks(getManager() ?? undefined);
+  }, [hwEpoch, fetchHomeworks]);
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await fetchHomeworks();
@@ -66,8 +79,15 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
         item.createdByAccount +
         new Date(item.dueDate).toDateString()
       );
+      // Vrai id Pronote si connu (sinon le backend cherche ±60j + due_date).
+      const serverItem = { ...item, id: item.pronoteId ?? item.id };
 
-      // Optimistic update with rollback on failure.
+      // DB d'abord (await, chemin unique), puis mémoire optimiste.
+      try {
+        await updateHomeworkIsDone(id, done);
+      } catch {
+        // best-effort : le rollback ci-dessous couvre l'échec réseau aussi
+      }
       setHomework(prev => ({
         ...prev,
         [id]: {
@@ -76,11 +96,10 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
         }
       }));
       setRefreshTrigger(prev => prev + 1);
-      updateHomeworkIsDone(id, done).catch(() => {});
 
       try {
         const manager = getManager();
-        await manager.setHomeworkCompletion(item, done)
+        await manager.setHomeworkCompletion(serverItem, done)
 
         if (done) {
           notificationAsync(NotificationFeedbackType.Success);
@@ -121,7 +140,11 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
             technical: message
           });
 
-        updateHomeworkIsDone(id, !done).catch(() => {});
+        try {
+          await updateHomeworkIsDone(id, !done);
+        } catch {
+          // best-effort
+        }
         setRefreshTrigger(prev => prev + 1);
         setHomework(prev => ({
           ...prev,

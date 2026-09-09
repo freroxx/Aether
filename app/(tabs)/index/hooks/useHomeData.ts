@@ -44,9 +44,17 @@ export const useHomeData = () => {
       warn('Manager is null, skipping timetable fetch');
       return;
     }
+    // Préfetch semaine courante ±1 (comme le calendrier) : le widget
+    // d'accueil lit la DB, jamais le réseau directement.
     const date = new Date();
     const weekNumber = getWeekNumberFromDate(date);
+    const prev = new Date(date);
+    prev.setDate(prev.getDate() - 7);
+    const next = new Date(date);
+    next.setDate(next.getDate() + 7);
+    await manager.getWeeklyTimetable(weekNumber - 1, prev).catch(() => {});
     await manager.getWeeklyTimetable(weekNumber, date);
+    await manager.getWeeklyTimetable(weekNumber + 1, next).catch(() => {});
   }, []);
 
   const fetchGrades = useCallback(async () => {
@@ -203,6 +211,15 @@ export const useHomeData = () => {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Switch compte/enfant : sync forcée (bypass TTL 5min), pas de stale.
+  const accountEpoch = useSyncStore(s => s.accountEpoch);
+  const firstEpochRef = useRef(accountEpoch);
+  useEffect(() => {
+    if (accountEpoch === firstEpochRef.current) return;
+    firstEpochRef.current = accountEpoch;
+    initialize(true);
+  }, [accountEpoch, initialize]);
 
   // Live sync: foreground + hourly (Android only, no iOS bg)
   const appStateRef = useRef(AppState.currentState);

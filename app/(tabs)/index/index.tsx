@@ -77,7 +77,7 @@ const HomeScreen = () => {
   // sans attendre l'effet enfant — pas de décalage d'un render.
   // `undefined` tant que les cours chargent : pas de lien header hasardeux.
   const lessonRedirect = React.useMemo(() => {
-    if (!courses || courses.length === 0) return undefined;
+    if (!courses || courses.length === 0) return "/(tabs)/calendar";
     const next = findNextCourseWithContent(courses as any[]);
     if (!next) return "/(tabs)/calendar";
     try {

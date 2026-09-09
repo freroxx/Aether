@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createMMKV } from "react-native-mmkv";
 import { useAccountStore } from "@/stores/account";
+import { useSyncStore } from "@/stores/sync";
 import { useTimetable } from "@/database/useTimetable";
 import { Course as SharedCourse, CourseStatus } from "@/services/shared/timetable";
 
@@ -47,9 +48,10 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
   const accounts = useAccountStore((state) => state.accounts);
   const lastUsedAccount = useAccountStore((state) => state.lastUsedAccount);
   const account = accounts.find((a) => a.id === lastUsedAccount);
+  const accountEpoch = useSyncStore(s => s.accountEpoch);
   const cacheKey = useMemo(
-    () => (account?.id ? `widget:timetable:${account.id}` : undefined),
-    [account?.id]
+    () => (account?.id ? `widget:timetable:${account.id}:${account?.selectedChild ?? ""}:${accountEpoch}` : undefined),
+    [account?.id, account?.selectedChild, accountEpoch]
   );
 
   const services = useMemo(() =>

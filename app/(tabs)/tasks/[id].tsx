@@ -69,8 +69,10 @@ const Task = () => {
     const previous = isDone;
     setIsDone(done);
     setToggling(true);
+    // Vrai id Pronote si connu (lignes cache historiques n'ont que le route id).
+    const serverTask = { ...task, id: task.pronoteId ?? task.id };
     try {
-      await manager?.setHomeworkCompletion(task, done);
+      await manager?.setHomeworkCompletion(serverTask, done);
       await updateHomeworkIsDone(id, done);
     } catch (err) {
       setIsDone(previous);

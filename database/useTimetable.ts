@@ -204,16 +204,19 @@ export async function getCoursesFromCache(weeks: number[], year: number): Promis
       .query(Q.where('from', Q.between(minStart.getTime(), maxEnd.getTime())))
       .fetch();
 
+    const localDayKey = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const dayMap: Record<string, SharedCourse[]> = {};
     const seenKeys = new Set<string>();
+    // Clé canonique partout (DB + hooks) : sans owner, avec teacher + kid.
     const cacheKey = (c: SharedCourse) =>
-      `${new Date(c.from).getTime()}::${new Date(c.to).getTime()}::${c.subject}::${(c as any)?.room ?? ""}`;
+      `${new Date(c.from).getTime()}::${new Date(c.to).getTime()}::${c.subject}::${(c as any)?.room ?? ""}::${(c as any)?.teacher ?? ""}::${(c as any)?.kidName ?? ""}`;
     for (const course of courses) {
       const shared = mapCourseToShared(course);
       const k = cacheKey(shared);
       if (seenKeys.has(k)) continue;
       seenKeys.add(k);
-      const dayKey = new Date(course.from).toISOString().split("T")[0];
+      const dayKey = localDayKey(new Date(course.from));
       dayMap[dayKey] = dayMap[dayKey] || [];
       dayMap[dayKey].push(shared);
     }
@@ -224,7 +227,7 @@ export async function getCoursesFromCache(weeks: number[], year: number): Promis
         const k = cacheKey(event);
         if (seenKeys.has(k)) continue;
         seenKeys.add(k);
-        const dayKey = new Date(event.from).toISOString().split("T")[0];
+        const dayKey = localDayKey(new Date(event.from));
         dayMap[dayKey] = dayMap[dayKey] || [];
         dayMap[dayKey].push(event);
       }
@@ -235,11 +238,13 @@ export async function getCoursesFromCache(weeks: number[], year: number): Promis
     for (const day in dayMap) {
       dayMap[day].sort((a, b) => a.from.getTime() - b.from.getTime());
     }
-		
-    return Object.entries(dayMap).map(([day, courses]) => ({
-      date: new Date(day),
-      courses
-    }));
+
+    return Object.entries(dayMap)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([day, courses]) => ({
+        date: new Date(day + "T00:00:00"),
+        courses
+      }));
   } catch (e) {
     warn(String(e));
     return [];

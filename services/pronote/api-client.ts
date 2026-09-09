@@ -11,6 +11,24 @@ export function getPronoteApiBaseUrl(): string {
   return DEFAULT_PRONOTE_API_URL.replace(/\/+$/, "");
 }
 
+export class PronoteHttpError extends Error {
+  status: number;
+  detail: string;
+  constructor(status: number, detail: string) {
+    // Message compatible avec l'ancien format ("HTTP 401 ..."/detail brut)
+    // pour les callers qui font du substring-match.
+    super(detail.includes(`HTTP ${status}`) ? detail : `HTTP ${status}: ${detail}`);
+    this.name = "PronoteHttpError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+/** GET en vol coalescés par endpoint+params (switch de semaine rapide, double mount). */
+const inFlightGets = new Map<string, Promise<any>>();
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 async function request<T>(
   endpoint: string,
   options: {
@@ -71,25 +89,66 @@ async function request<T>(
     }
   };
 
-  let response: Response;
-  try {
-    response = await doFetchOnce();
-  } catch (e) {
-    if (!isNetworkFailure(e)) throw e;
-    if (options.retry === false) throw e;
-    response = await doFetchOnce();
+  const isGet = !options.method || options.method.toUpperCase() === "GET";
+  const dedupKey = isGet ? `${options.method ?? "GET"} ${url}` : null;
+  if (dedupKey && inFlightGets.has(dedupKey)) {
+    return inFlightGets.get(dedupKey) as Promise<T>;
   }
 
-  if (!response.ok) {
-    let errDetail = `HTTP ${response.status} ${response.statusText}`;
+  const exec = (async (): Promise<T> => {
+    const retriable = (e: unknown, status?: number): boolean => {
+      if (options.retry === false) return false;
+      if (status !== undefined) return status === 502 || status === 503 || status === 504;
+      return isNetworkFailure(e);
+    };
+
+    let attempt = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      let response: Response;
+      try {
+        response = await doFetchOnce();
+      } catch (e) {
+        if (retriable(e) && attempt < 2) {
+          attempt += 1;
+          await sleep(500 * 2 ** (attempt - 1) + Math.random() * 250);
+          continue;
+        }
+        throw e;
+      }
+
+      if (!response.ok) {
+        let errDetail = `HTTP ${response.status} ${response.statusText}`;
+        try {
+          const errJson = await response.json();
+          if (errJson.detail) errDetail = errJson.detail;
+        } catch {}
+        // Préserve le statut (vs substring-match) ; retry backoff sur 502/503/504.
+        if (retriable(null, response.status) && attempt < 2) {
+          attempt += 1;
+          const retryAfter = Number(response.headers?.get?.("Retry-After") ?? 0);
+          await sleep(
+            (Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500 * 2 ** (attempt - 1)) +
+              Math.random() * 250
+          );
+          continue;
+        }
+        throw new PronoteHttpError(response.status, errDetail);
+      }
+
+      return response.json();
+    }
+  })();
+
+  if (dedupKey) {
+    inFlightGets.set(dedupKey, exec);
     try {
-      const errJson = await response.json();
-      if (errJson.detail) errDetail = errJson.detail;
-    } catch {}
-    throw new Error(errDetail);
+      return await exec;
+    } finally {
+      if (inFlightGets.get(dedupKey) === exec) inFlightGets.delete(dedupKey);
+    }
   }
-
-  return response.json();
+  return exec;
 }
 
 export interface PronoteLoginResult {
@@ -214,15 +273,18 @@ export const PronoteApiClient = {
     authToken: string,
     homeworkId: string,
     done: boolean,
-    child?: string
+    child?: string,
+    dueDate?: string
   ): Promise<{ success: boolean; done: boolean }> {
     return request("/homework/done", {
       method: "POST",
       authToken,
+      retry: false, // mutation : jamais rejouée en double
       body: {
         homework_id: homeworkId,
         done,
         child_name: child,
+        due_date: dueDate,
       },
     });
   },

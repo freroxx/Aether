@@ -10,6 +10,7 @@ import { Pressable } from 'react-native';
 import { initializeAccountManager } from '@/services/shared';
 import { useAccountStore } from '@/stores/account';
 import { useSettingsStore } from '@/stores/settings';
+import { useSyncStore } from '@/stores/sync';
 import Avatar from '@/ui/components/Avatar';
 import Stack from '@/ui/components/Stack';
 import Typography from '@/ui/components/Typography';
@@ -95,8 +96,10 @@ const UserProfile = ({ subtitle, onPress }: { subtitle?: string, onPress?: () =>
               if (nativeEvent.event.startsWith("child:")) {
                 const childName = nativeEvent.event.replace("child:", "");
                 const store = useAccountStore.getState();
-                if (currentAccount) {
+                if (currentAccount && childName !== currentAccount.selectedChild) {
                   store.setSelectedChild(currentAccount.id, childName);
+                  // Vide l'UI tout de suite (skeleton), le réseau suit en fond.
+                  useSyncStore.getState().bumpAccountEpoch();
                   await initializeAccountManager();
                 }
                 return;
@@ -115,8 +118,11 @@ const UserProfile = ({ subtitle, onPress }: { subtitle?: string, onPress?: () =>
                 disabledTabsByAccount: nextDisabledTabsByAccount,
                 disabledTabs: disabledTabsForAccount,
               });
+              if (nativeEvent.event === currentAccountId) return;
               store.setLastUsedAccount(nativeEvent.event);
-              await initializeAccountManager();
+              // Vide l'UI tout de suite (skeleton), le réseau suit en fond.
+              useSyncStore.getState().bumpAccountEpoch();
+              await initializeAccountManager(nativeEvent.event);
             }}
             actions={[
               ...(ChildrenMenuItems.length > 0 ? [

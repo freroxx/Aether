@@ -11,9 +11,16 @@ import { getDatabaseInstance, useDatabase } from "./DatabaseProvider";
 import Homework from "./models/Homework";
 import { safeWrite } from "./utils/safeTransaction";
 
+function realPronoteId(raw: unknown): string | undefined {
+  const s = typeof raw === "string" ? raw : raw == null ? "" : String(raw);
+  if (!s || s.startsWith("id-")) return undefined;
+  return s;
+}
+
 function mapHomeworkToShared(homework: Homework): SharedHomework {
   return {
     id: homework.homeworkId,
+    pronoteId: realPronoteId((homework as { pronoteId?: unknown }).pronoteId),
     subject: homework.subject,
     content: homework.content,
     dueDate: new Date(homework.dueDate),
@@ -53,7 +60,12 @@ export async function getHomeworkById(id: string): Promise<SharedHomework | unde
     const freshHomeworks = await manager?.getHomeworks(
       getWeekNumberFromDate(cachedHomework.dueDate)
     );
-    return freshHomeworks?.find(homework => getHomeworkRouteId(homework) === id) ?? cachedHomework;
+    return freshHomeworks?.find(homework => getHomeworkRouteId(homework) === id)
+      ?? freshHomeworks?.find(homework => {
+        const pid = (homework as { pronoteId?: unknown }).pronoteId;
+        return typeof pid === "string" && pid.length > 0 && (pid === id || pid === cachedHomework.pronoteId);
+      })
+      ?? cachedHomework;
   } catch (error) {
     warn(`Unable to refresh homework ${id}: ${String(error)}`);
     return cachedHomework;
@@ -153,6 +165,7 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
             const homework = record as Homework;
             Object.assign(homework, {
               homeworkId: id,
+              pronoteId: realPronoteId((hw as { pronoteId?: unknown }).pronoteId ?? (hw as { id?: unknown }).id) ?? "",
               subject: hw.subject,
               content: hw.content,
               dueDate: hw.dueDate.getTime(),
@@ -177,7 +190,9 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
         async () => {
           await recordToUpdate.update((record: Model) => {
             const homework = record as Homework;
+            const freshPronoteId = realPronoteId((hw as { pronoteId?: unknown }).pronoteId ?? (hw as { id?: unknown }).id);
             Object.assign(homework, {
+              ...(freshPronoteId ? { pronoteId: freshPronoteId } : {}),
               subject: hw.subject,
               content: hw.content,
               dueDate: hw.dueDate.getTime(),

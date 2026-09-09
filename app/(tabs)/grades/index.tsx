@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getManager, subscribeManagerUpdate } from '@/services/shared';
 import { GradeScore, Period, Subject } from "@/services/shared/grade";
 import { useSettingsStore } from "@/stores/settings";
+import { useSyncStore } from "@/stores/sync";
 import ChipButton from '@/ui/components/ChipButton';
 import { Dynamic } from '@/ui/components/Dynamic';
 import { ErrorBoundary } from '@/ui/components/ErrorBoundary';
@@ -147,6 +148,24 @@ const GradesView: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Switch compte/enfant : reset périodes/notes (pas de données de l'autre).
+  const gradesEpoch = useSyncStore(s => s.accountEpoch);
+  const gradesEpochRef = useRef(gradesEpoch);
+  useEffect(() => {
+    if (gradesEpoch === gradesEpochRef.current) return;
+    gradesEpochRef.current = gradesEpoch;
+    hasAppliedSavedPeriod.current = false;
+    setCurrentPeriod(undefined);
+    setPeriods([]);
+    setSubjects([]);
+    setFeatures(null);
+    setServiceAverage(null);
+    setServiceRank(null);
+    setPeriodsLoading(true);
+    setGradesLoading(true);
+    fetchPeriods(getManager() ?? undefined);
+  }, [gradesEpoch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Obtention des notes
   const [subjects, setSubjects] = useState<Subject[]>([]);

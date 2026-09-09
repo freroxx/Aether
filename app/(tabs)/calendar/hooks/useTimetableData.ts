@@ -5,6 +5,7 @@ import { useTimetable } from '@/database/useTimetable';
 import { getManager, subscribeManagerUpdate } from "@/services/shared";
 import { useAccountStore } from '@/stores/account';
 import { useSettingsStore } from '@/stores/settings';
+import { useSyncStore } from '@/stores/sync';
 import { useAlert } from '@/ui/components/AlertProvider';
 import { log, warn } from "@/utils/logger/logger";
 
@@ -142,6 +143,19 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
   useEffect(() => {
     fetchWeeklyTimetable(weekNumber);
   }, [weekNumber, fetchWeeklyTimetable]);
+
+  // Switch compte/enfant : oublie les semaines déjà fetchées (clés sans
+  // compte) et refetch — sinon toFetch vide et DB mélangée.
+  const accountEpochCal = useSyncStore(s => s.accountEpoch);
+  const epochRefCal = useRef(accountEpochCal);
+  useEffect(() => {
+    if (accountEpochCal === epochRefCal.current) return;
+    epochRefCal.current = accountEpochCal;
+    fetchedWeeksRef.current = [];
+    setFetchedWeeks([]);
+    setRefresh(prev => prev + 1);
+    fetchWeeklyTimetable(weekNumber, true);
+  }, [accountEpochCal, weekNumber, fetchWeeklyTimetable]);
 
   useEffect(() => {
     const unsubscribe = subscribeManagerUpdate((updatedManager) => {

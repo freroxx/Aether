@@ -24,7 +24,8 @@ import { warn } from "@/utils/logger/logger";
 function isAetherCalendar(cal: DeviceCalendarInfo, aetherId?: string): boolean {
   if (!cal) return false;
   if (aetherId && String(cal.id) === String(aetherId)) return true;
-  return cal.title === AETHER_CALENDAR_TITLE;
+  // Couvre aussi les calendriers par enfant ("Aether – Léa").
+  return typeof cal.title === "string" && cal.title.startsWith(AETHER_CALENDAR_TITLE);
 }
 
 export default function AndroidCalendarsScreen() {

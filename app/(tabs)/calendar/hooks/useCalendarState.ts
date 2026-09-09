@@ -110,14 +110,19 @@ export function useCalendarState() {
     }
   }, [weekNumber, showWeekends]);
 
-  // Sync FlatList with date
+  // Sync FlatList with date — même règle week-end que handleDateChange
+  // (snap Sam/Dim -> Lun, pas de +1 ad hoc sur dimanche).
   useEffect(() => {
     const newIndex = getIndexFromDate(date);
-    let newWeekNumber = getWeekNumberFromDate(date);
-
-    if (date.getDay() === 0) {
-      newWeekNumber += 1;
+    const snapped = new Date(date);
+    if (!showWeekends) {
+      if (snapped.getDay() === 6) {
+        snapped.setDate(snapped.getDate() + 2);
+      } else if (snapped.getDay() === 0) {
+        snapped.setDate(snapped.getDate() + 1);
+      }
     }
+    const newWeekNumber = getWeekNumberFromDate(snapped);
 
     if (newIndex !== currentIndex) {
       setCurrentIndex(newIndex);
@@ -136,7 +141,7 @@ export function useCalendarState() {
     if (newWeekNumber !== weekNumber) {
       setWeekNumber(newWeekNumber);
     }
-  }, [date, getIndexFromDate, currentIndex, weekNumber]);
+  }, [date, getIndexFromDate, currentIndex, weekNumber, showWeekends]);
 
   const onMomentumScrollEnd = useCallback((e: any) => {
     const newIndex = Math.round(e.nativeEvent.contentOffset.x / windowWidth);

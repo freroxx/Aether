@@ -26,6 +26,8 @@ export interface Homework extends GenericInterface{
   custom: boolean;
   progress?: number;
 	ref?: unknown;
+  /** Vrai id Pronote (absent pour les lignes cache historiques). */
+  pronoteId?: string;
 }
 
 export enum ReturnFormat {
