@@ -115,9 +115,11 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
           if (fetchIdRef.current !== myId) return;
           // Séquentiel (pas de Promise.all) : évite les writes concurrents
           // qui se ressuscitent mutuellement dans addCourseDayToDatabase.
+          // Enfant snapshoté avant la boucle : pas de mélange si switch entre 2 semaines.
+          const fetchKid = selectedChild;
           for (const c of toFetch) {
             if (fetchIdRef.current !== myId) return;
-            await (manager as NonNullable<typeof manager>).getWeeklyTimetable(c.week, c.targetDate);
+            await (manager as NonNullable<typeof manager>).getWeeklyTimetable(c.week, c.targetDate, fetchKid);
           }
 
           if (fetchIdRef.current !== myId) return;

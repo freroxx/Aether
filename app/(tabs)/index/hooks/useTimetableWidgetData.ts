@@ -63,11 +63,11 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
 
   const currentYear = now.getFullYear();
   const currentYearWeeks = useMemo(
-    () => Array.from({ length: 54 }, (_, index) => index + 1),
+    () => Array.from({ length: 53 }, (_, index) => index + 1),
     []
   );
   const nextYearWeeks = useMemo(
-    () => Array.from({ length: 54 }, (_, index) => index + 1),
+    () => Array.from({ length: 53 }, (_, index) => index + 1),
     []
   );
   const nextYearDate = useMemo(() => new Date(currentYear + 1, 0, 1), [currentYear]);

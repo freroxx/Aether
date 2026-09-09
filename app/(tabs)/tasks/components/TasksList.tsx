@@ -4,10 +4,10 @@ import Reanimated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Homework } from "@/services/shared/homework";
+import { getHomeworkRouteId } from "@/database/useHomework";
 import List from "@/ui/new/List";
 import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import useResizable from "@/ui/utils/Resizable";
-import { generateId } from "@/utils/generateId";
 
 import DateHeader from "../atoms/DateHeader";
 import EmptyState from "../atoms/EmptyState";
@@ -53,13 +53,13 @@ const TasksList: React.FC<TasksListProps> = ({
 
   const renderTask = useCallback(
     (item: Homework, index: number) => {
-      // Generate the same ID used to store homeworks in the homework object
-      const generatedId = generateId(
-        item.subject +
-          item.content +
-          item.createdByAccount +
-          new Date(item.dueDate).toDateString()
-      );
+      // Même id de route (scopé enfant) que le cache et le hook.
+      let generatedId: string;
+      try {
+        generatedId = getHomeworkRouteId(item);
+      } catch {
+        generatedId = `${item.subject}${item.content}${item.createdByAccount}${new Date(item.dueDate).toDateString()}`;
+      }
       const inFresh = homework[generatedId];
       const source = inFresh ?? item;
       const fromCache = !inFresh;
@@ -85,13 +85,17 @@ const TasksList: React.FC<TasksListProps> = ({
   );
 
   const taskKeyExtractor = useCallback((item: Homework) => {
-    return (
-      "hw:" +
-      item.subject +
-      item.content +
-      item.createdByAccount +
-      new Date(item.dueDate).toDateString()
-    );
+    try {
+      return "hw:" + getHomeworkRouteId(item);
+    } catch {
+      return (
+        "hw:" +
+        item.subject +
+        item.content +
+        item.createdByAccount +
+        new Date(item.dueDate).toDateString()
+      );
+    }
   }, []);
 
   const visibleSections = useMemo(

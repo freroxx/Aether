@@ -28,6 +28,7 @@ export const useHomeData = () => {
   const settingsstore = useSettingsStore(state => state.personalization);
   const lastUsedAccount = useAccountStore(state => state.lastUsedAccount);
   const accounts = useAccountStore(state => state.accounts);
+  const homeChild = useAccountStore(s => s.accounts.find(a => a.id === s.lastUsedAccount)?.selectedChild);
   const removeAccount = useAccountStore(state => state.removeAccount);
   const cancelledRef = useRef(false);
 
@@ -52,10 +53,10 @@ export const useHomeData = () => {
     prev.setDate(prev.getDate() - 7);
     const next = new Date(date);
     next.setDate(next.getDate() + 7);
-    await manager.getWeeklyTimetable(weekNumber - 1, prev).catch(() => {});
-    await manager.getWeeklyTimetable(weekNumber, date);
-    await manager.getWeeklyTimetable(weekNumber + 1, next).catch(() => {});
-  }, []);
+    await manager.getWeeklyTimetable(weekNumber - 1, prev, homeChild).catch(() => {});
+    await manager.getWeeklyTimetable(weekNumber, date, homeChild);
+    await manager.getWeeklyTimetable(weekNumber + 1, next, homeChild).catch(() => {});
+  }, [homeChild]);
 
   const fetchGrades = useCallback(async () => {
     const manager = getManager();

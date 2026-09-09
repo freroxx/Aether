@@ -36,12 +36,27 @@ function mapHomeworkToShared(homework: Homework): SharedHomework {
 }
 
 export function getHomeworkRouteId(homework: SharedHomework): string {
+  // Scopé par enfant (kid) : deux enfants avec le même devoir ne se
+  // collisionnent plus. Voir routeIdsLegacy() pour la migration.
   return generateId(
+    homework.subject +
+      homework.content +
+      homework.createdByAccount +
+      homework.dueDate.toDateString() +
+      ((homework as { kidName?: unknown }).kidName ?? "")
+  );
+}
+
+/** Anciens ids (sans kid) pour la migration transparente des lignes existantes. */
+export function getHomeworkRouteIdsLegacy(homework: SharedHomework): string[] {
+  const noKid = generateId(
     homework.subject +
       homework.content +
       homework.createdByAccount +
       homework.dueDate.toDateString()
   );
+  const legacy = generateId(homework.subject + homework.content + homework.createdByAccount);
+  return [noKid, legacy];
 }
 
 export async function getHomeworkById(id: string): Promise<SharedHomework | undefined> {
@@ -72,35 +87,55 @@ export async function getHomeworkById(id: string): Promise<SharedHomework | unde
   }
 }
 
-export function useHomeworkForWeek(weekNumber: number, refresh = 0) {
+export function useHomeworkForWeek(
+  weekNumber: number,
+  refresh = 0,
+  scope?: { createdByAccount?: string; kidName?: string }
+) {
   const database = useDatabase();
   const [homeworks, setHomeworks] = useState<SharedHomework[]>([]);
+  const scopeKey = `${scope?.createdByAccount ?? ""}::${scope?.kidName ?? ""}`;
 
   useEffect(() => {
     const fetchHomeworks = async () => {
-      const homeworksFetched = await getHomeworksFromCache(weekNumber);
+      const homeworksFetched = await getHomeworksFromCache(weekNumber, scope);
       setHomeworks(homeworksFetched);
     };
     fetchHomeworks();
-  }, [weekNumber, refresh, database]);
+  }, [weekNumber, refresh, database, scopeKey]);
 
   return homeworks;
 }
 
 export async function getHomeworksFromCache(
-  weekNumber: number
+  weekNumber: number,
+  scope?: { createdByAccount?: string; kidName?: string }
 ): Promise<SharedHomework[]> {
   try {
     const database = getDatabaseInstance();
     const { start, end } = getWeekRange(weekNumber, new Date().getFullYear());
+    const conditions: any[] = [Q.where("dueDate", Q.between(start.getTime(), end.getTime()))];
+    if (scope?.createdByAccount) {
+      conditions.push(Q.where("createdByAccount", scope.createdByAccount));
+    }
     const homeworks = await database
       .get<Homework>("homework")
-      .query(Q.where("dueDate", Q.between(start.getTime(), end.getTime())))
+      .query(...conditions)
       .fetch();
 
-    return homeworks
-      .map(mapHomeworkToShared)
-      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+    let shared = homeworks.map(mapHomeworkToShared);
+    // Filtre enfant gardé : seulement si le kid demandé existe dans les
+    // lignes (sinon selectedChild stale viderait tout).
+    if (scope?.kidName) {
+      const hasKid = shared.some(h => (h as { kidName?: unknown }).kidName === scope.kidName);
+      if (hasKid) {
+        shared = shared.filter(h => {
+          const kid = (h as { kidName?: unknown }).kidName;
+          return typeof kid !== "string" || kid.length === 0 || kid === scope.kidName;
+        });
+      }
+    }
+    return shared.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
   } catch (e) {
     warn(String(e));
     return [];
@@ -120,19 +155,16 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
     .fetch();
 
   const homeworkIds: string[] = [];
-  const refreshedServiceIds = new Set(
-    homeworks.map(homework => homework.createdByAccount)
+  const refreshedKeys = new Set(
+    homeworks.map(hw => `${hw.createdByAccount}::${(hw as { kidName?: unknown }).kidName ?? ""}`)
   );
   for (const hw of homeworks) {
-    const oldId = generateId(hw.subject + hw.content + hw.createdByAccount);
-    const id = getHomeworkRouteId(hw);
-
-    homeworkIds.push(oldId, id);
+    homeworkIds.push(getHomeworkRouteId(hw), ...getHomeworkRouteIdsLegacy(hw));
   }
 
   const homeworksToDelete = dbHomeworks.filter(
     dbHomework =>
-      refreshedServiceIds.has(dbHomework.createdByAccount) &&
+      refreshedKeys.has(`${dbHomework.createdByAccount}::${(dbHomework as unknown as { kidName?: unknown }).kidName ?? ""}`) &&
       !homeworkIds.includes(dbHomework.homeworkId)
   );
 
@@ -141,20 +173,17 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
   }
 
   for (const hw of homeworks) {
-    const oldId = generateId(hw.subject + hw.content + hw.createdByAccount);
     const id = getHomeworkRouteId(hw);
+    const legacyIds = getHomeworkRouteIdsLegacy(hw);
 
     const existing = await db
       .get("homework")
-      .query(Q.where("homeworkId", id))
-      .fetch();
-    const oldExisting = await db
-      .get("homework")
-      .query(Q.where("homeworkId", oldId))
+      .query(Q.where("homeworkId", Q.oneOf([id, ...legacyIds])))
       .fetch();
 
-    if (oldExisting.length > 0) {
-      await Promise.all(oldExisting.map(oldRecord => oldRecord.markAsDeleted()));
+    if (existing.length > 1) {
+      // Doublons inter-enfants historiques : on ne garde que le 1er.
+      await Promise.all(existing.slice(1).map(dup => dup.markAsDeleted()));
     }
 
     if (existing.length === 0) {
@@ -193,6 +222,7 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
             const freshPronoteId = realPronoteId((hw as { pronoteId?: unknown }).pronoteId ?? (hw as { id?: unknown }).id);
             Object.assign(homework, {
               ...(freshPronoteId ? { pronoteId: freshPronoteId } : {}),
+              homeworkId: id,
               subject: hw.subject,
               content: hw.content,
               dueDate: hw.dueDate.getTime(),

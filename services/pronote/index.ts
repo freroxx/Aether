@@ -243,14 +243,17 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async getWeeklyTimetable(weekNumber: number, date: Date): Promise<CourseDay[]> {
+  async getWeeklyTimetable(weekNumber: number, date: Date, childName?: string): Promise<CourseDay[]> {
     await this.checkTokenValidty();
+    // Enfant snapshoté à l'appel (jamais relu en live) : un switch mid-loop
+    // ne mélange plus les tags kidName entre les semaines.
+    const kid = childName !== undefined ? childName : this.getSelectedChildName();
     return fetchPronoteWeekTimetable(
       this.getAuthToken(),
       this.accountId,
       weekNumber,
       date,
-      this.getSelectedChildName()
+      kid
     );
   }
 

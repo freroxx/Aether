@@ -16,7 +16,6 @@ import { useAlert } from "@/ui/components/AlertProvider";
 import Stack from "@/ui/components/Stack";
 import Divider from "@/ui/new/Divider";
 import Typography from "@/ui/new/Typography";
-import { URLToBase64 } from "@/utils/attachments/helper";
 import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
 import uuid from "@/utils/uuid/uuid";
 

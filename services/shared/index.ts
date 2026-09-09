@@ -66,7 +66,24 @@ import { ServiceUnavailableError } from "../errors/ServiceUnavailableError";
 
 const isPermanentAuthError = (e: unknown): boolean => {
   if (!e) return false;
+  // PronoteHttpError porte le statut : 429/5xx = transitoire, jamais un logout.
+  const status = (e as any)?.status;
+  if (status === 429 || (typeof status === "number" && status >= 500 && status <= 599)) {
+    return false;
+  }
   const msg = String((e as any)?.message || e).toLowerCase();
+  // Marqueurs transitoires (throttling/timeout backend classés 429/504) :
+  // ne déconnectent pas, même si le libellé évoque une session.
+  if (
+    msg.includes("429") ||
+    msg.includes("504") ||
+    msg.includes("surcharge") ||
+    msg.includes("injoignable pour le moment") ||
+    msg.includes("réessayez dans un instant") ||
+    msg.includes("serveur lent ou injoignable")
+  ) {
+    return false;
+  }
   return (
     msg.includes("401") ||
     msg.includes("badcredentials") ||
@@ -436,18 +453,18 @@ export class AccountManager {
     );
   }
 
-  async getWeeklyTimetable(weekNumber: number, date: Date): Promise<CourseDay[]> {
+  async getWeeklyTimetable(weekNumber: number, date: Date, kidName?: string): Promise<CourseDay[]> {
     return await this.fetchData(
       Capabilities.TIMETABLE,
       async client =>
         client.getWeeklyTimetable
-          ? await client.getWeeklyTimetable(weekNumber, date)
+          ? await client.getWeeklyTimetable(weekNumber, date, kidName)
           : [],
       {
         multiple: true,
         fallback: async () => getCoursesFromCache([weekNumber], date.getFullYear()),
         saveToCache: async (data: CourseDay[]) => {
-          addCourseDayToDatabase(data);
+          await addCourseDayToDatabase(data);
         },
       }
     );

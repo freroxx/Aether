@@ -4,7 +4,7 @@ import { useAccountStore } from "@/stores/account";
 import { useSyncStore } from "@/stores/sync";
 import { getManager, subscribeManagerUpdate } from "@/services/shared";
 import { Homework } from "@/services/shared/homework";
-import { useHomeworkForWeek, updateHomeworkIsDone } from "@/database/useHomework";
+import { useHomeworkForWeek, updateHomeworkIsDone, getHomeworkRouteId } from "@/database/useHomework";
 import { generateId } from "@/utils/generateId";
 import { error } from '@/utils/logger/logger';
 import { notificationAsync, NotificationFeedbackType } from "expo-haptics";
@@ -20,10 +20,30 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
   const account = hwAccounts.find(acc => acc.id === hwLastUsed);
   type Service = { id: string };
   const services = useMemo(() => account?.services?.map((s: Service) => s.id) ?? [], [account]);
+  const selectedKid = account?.selectedChild;
+  const serviceAccountIds = useMemo(
+    () => new Set([...services, ...hwAccounts.map(a => a.id)]),
+    [services, hwAccounts]
+  );
   const manager = getManager();
 
-  const homeworksFromCache = useHomeworkForWeek(selectedWeek, refreshTrigger)
-    .filter(h => services.includes(h.createdByAccount));
+  const homeworksFromCache = useHomeworkForWeek(selectedWeek, refreshTrigger, {
+    createdByAccount: undefined,
+    kidName: selectedKid,
+  }).filter(h => {
+    if (!serviceAccountIds.has(h.createdByAccount)) return false;
+    // Filtre enfant gardé : seulement si le kid demandé existe dans les lignes.
+    return true;
+  });
+  const visibleHomeworksFromCache = useMemo(() => {
+    if (!selectedKid) return homeworksFromCache;
+    const hasKid = homeworksFromCache.some(h => (h as { kidName?: unknown }).kidName === selectedKid);
+    if (!hasKid) return homeworksFromCache;
+    return homeworksFromCache.filter(h => {
+      const kid = (h as { kidName?: unknown }).kidName;
+      return typeof kid !== "string" || kid.length === 0 || kid === selectedKid;
+    });
+  }, [homeworksFromCache, selectedKid]);
 
   const fetchHomeworks = useCallback(
     async (managerToUse = manager) => {
@@ -73,12 +93,18 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
 
   const setAsDone = useCallback(
     async (item: Homework, done: boolean) => {
-      const id = generateId(
-        item.subject +
-        item.content +
-        item.createdByAccount +
-        new Date(item.dueDate).toDateString()
-      );
+      // Id de route scopé par enfant (même fonction que le cache/liste).
+      let id: string;
+      try {
+        id = getHomeworkRouteId(item);
+      } catch {
+        id = generateId(
+          item.subject +
+          item.content +
+          item.createdByAccount +
+          new Date(item.dueDate).toDateString()
+        );
+      }
       // Vrai id Pronote si connu (sinon le backend cherche ±60j + due_date).
       const serverItem = { ...item, id: item.pronoteId ?? item.id };
 
@@ -160,7 +186,7 @@ export const useHomeworkData = (selectedWeek: number, alert: any) => {
 
   return {
     homework,
-    homeworksFromCache,
+    homeworksFromCache: visibleHomeworksFromCache,
     isRefreshing,
     handleRefresh,
     setAsDone,

@@ -117,9 +117,16 @@ export default {
       [
         "expo-splash-screen",
         {
-          backgroundColor: "#4338CA",
-          image: "./assets/images/logotype.png",
-          imageWidth: 240,
+          // Fond teal nuit (même famille que le primaire #29947A) : pas de
+          // flash indigo->blanc, pas d'éblouissement en mode sombre.
+          // Icône carrée centrée (mask-safe Android 12+, pas de crop).
+          backgroundColor: "#06231F",
+          image: "./assets/images/icon.png",
+          imageWidth: 200,
+          darkMode: {
+            backgroundColor: "#06231F",
+            image: "./assets/images/icon.png",
+          },
         },
       ],
       [

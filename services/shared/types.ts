@@ -54,7 +54,7 @@ export interface SchoolServicePlugin {
   getChatMessages?: (chat: Chat) => Promise<Message[]>;
   getRecipientsAvailableForNewChat?: () => Promise<Recipient[]>;
   getCourseResources?: (course: Course) => Promise<CourseResource[]>;
-  getWeeklyTimetable?: (weekNumber: number, date: Date) => Promise<CourseDay[]>;
+  getWeeklyTimetable?: (weekNumber: number, date: Date, kidName?: string) => Promise<CourseDay[]>;
   sendMessageInChat?: (chat: Chat, content: string) => Promise<void>;
   setNewsAsAcknowledged?: (news: News) => Promise<News>;
   setHomeworkCompletion?: (

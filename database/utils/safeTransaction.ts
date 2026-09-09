@@ -2,6 +2,11 @@ import { Database } from '@nozbe/watermelondb';
 
 import { error,info } from '@/utils/logger/logger';
 
+// File d'attente globale des écritures : deux saveToCache concurrents
+// (ex. semaines w-1/w+1) ne peuvent plus s'entrelacer en read-delete-create
+// et ressusciter des lignes supprimées par l'autre.
+let writeQueue: Promise<unknown> = Promise.resolve();
+
 export async function safeWrite<T>(
   database: Database,
   operation: () => Promise<T>,
@@ -14,12 +19,16 @@ export async function safeWrite<T>(
     }, timeoutMs);
   });
 
-  try {
-    const result = await Promise.race([
+  const run = writeQueue.then(() =>
+    Promise.race([
       database.write(operation),
       timeoutPromise
-    ]);
-    return result;
+    ])
+  );
+  // La file ne doit jamais rester bloquée sur un rejet.
+  writeQueue = run.catch(() => {});
+  try {
+    return await run;
   } catch (err) {
     error(`🍉 Failed safe write operation "${operationName}":`, String(err));
     throw err;

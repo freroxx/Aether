@@ -203,9 +203,16 @@ export const useAccountStore = create<AccountsStorage>()(
         set({
           accounts: get().accounts.map(account => {
             if (account.id === accountId) {
+              // Normalisé (trim + espaces) : le backend matche en normalisé,
+              // les filtres front en strict — une variante d'espacement
+              // vidait sinon tout l'emploi du temps de l'enfant.
+              const clean = childName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+              const match = (account.children ?? []).find(
+                c => c.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase() === clean.toLowerCase()
+              );
               return {
                 ...account,
-                selectedChild: childName,
+                selectedChild: match ? match.name : childName.trim().replace(/\s+/g, " "),
               };
             }
             return account;

@@ -543,7 +543,8 @@ const CourseSheet: React.FC<{ course: SharedCourse; topInset: number }> = ({ cou
                         void openAttachment(
                           attachment,
                           resolvePronoteFileAuth(attachment.createdByAccount),
-                          alert
+                          alert,
+                          course?.from
                         ).finally(() => setDownloadingName(null));
                       }}
                     >

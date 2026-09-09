@@ -429,10 +429,12 @@ export const PronoteApiClient = {
     authToken: string,
     fileUrl: string,
     fileName?: string,
-    child?: string
+    child?: string,
+    dueDate?: string
   ): Promise<{ filename: string; mime: string; base64: string }> {
-    // Route lourde (login pronotepy + scan 120-150j + f.data, cold Vercel) :
-    // 60s, sans retry (évite un double scan backend).
+    // Route lourde (login pronotepy + scan + f.data, cold Vercel) :
+    // 60s, sans retry (évite un double scan backend). due_date restreint
+    // le scan backend à ±7j au lieu de 150j systématiques.
     return request("/files/download", {
       method: "POST",
       authToken,
@@ -440,6 +442,7 @@ export const PronoteApiClient = {
         file_url: fileUrl,
         file_name: fileName,
         child_name: child,
+        due_date: dueDate,
       },
       timeoutMs: 60000,
       retry: false,

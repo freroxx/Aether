@@ -135,7 +135,8 @@ function showFileError(
  */
 export async function downloadAttachment(
   attachment: Attachment,
-  serviceAuth?: ServiceFileAuth | null
+  serviceAuth?: ServiceFileAuth | null,
+  dueDate?: Date | string
 ): Promise<{ uri: string; filename: string; mime: string }> {
   const url = (attachment.url ?? "").trim();
   const name = (attachment.name ?? "").trim() || "fichier";
@@ -146,11 +147,21 @@ export async function downloadAttachment(
     throw new Error("Session Pronote expirée, reconnectez-vous.");
   }
 
+  // Indice de date : le backend scanne ±7j d'abord au lieu de 150j systématiques.
+  let dueDateStr: string | undefined;
+  try {
+    const d = dueDate instanceof Date ? dueDate : dueDate ? new Date(dueDate) : undefined;
+    if (d && !isNaN(d.getTime())) dueDateStr = d.toISOString().split("T")[0];
+  } catch {
+    dueDateStr = undefined;
+  }
+
   const data = await PronoteApiClient.downloadFile(
     serviceAuth.authToken,
     url,
     name,
-    serviceAuth.childName
+    serviceAuth.childName,
+    dueDateStr
   );
   if (!data?.base64) {
     throw new Error("Fichier vide reçu du serveur.");
@@ -183,7 +194,8 @@ export async function downloadAttachment(
 export async function openAttachment(
   attachment: Attachment,
   serviceAuth?: ServiceFileAuth | null,
-  alert?: AlertLike
+  alert?: AlertLike,
+  dueDate?: Date | string
 ): Promise<void> {
   const url = (attachment.url ?? "").trim();
   const name = (attachment.name ?? "").trim() || "document";
@@ -224,7 +236,7 @@ export async function openAttachment(
       // best-effort
     }
 
-    const { uri, filename, mime } = await downloadAttachment(attachment, auth);
+    const { uri, filename, mime } = await downloadAttachment(attachment, auth, dueDate);
 
     const lower = filename.toLowerCase();
     const previewable =

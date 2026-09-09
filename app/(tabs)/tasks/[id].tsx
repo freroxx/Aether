@@ -213,7 +213,8 @@ const Task = () => {
                     void openAttachment(
                       attachment,
                       resolvePronoteFileAuth(attachment.createdByAccount),
-                      alert
+                      alert,
+                      task?.dueDate
                     ).finally(() => setDownloadingName(null));
                   }}
                 >

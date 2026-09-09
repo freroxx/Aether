@@ -193,12 +193,29 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
             raise HTTPException(status_code=401, detail="Données d'authentification incomplètes")
 
         if is_parent and child_name and hasattr(client, "set_child"):
+            import unicodedata
+
+            def _norm_child(s: Any) -> str:
+                s = unicodedata.normalize("NFD", str(s or ""))
+                s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+                return " ".join(s.lower().split())
+
+            wanted = _norm_child(child_name)
+            candidates = []
             if hasattr(client, "children") and client.children:
-                target_child = next((c for c in client.children if getattr(c, "name", "").lower() == child_name.lower()), None)
+                candidates = [getattr(c, "name", "") for c in client.children]
+                target_child = next(
+                    (c for c in client.children if _norm_child(getattr(c, "name", "")) == wanted),
+                    None,
+                )
                 if target_child:
                     client.set_child(target_child)
+                    logger.info(f"[init_client] child requested={child_name!r} matched={getattr(target_child, 'name', '')!r}")
                 else:
-                    client.set_child(child_name)
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Enfant « {child_name} » introuvable sur ce compte parent (enfants : {', '.join(candidates) or 'aucun'}). Rouvre la liste des enfants.",
+                    )
             else:
                 client.set_child(child_name)
 
@@ -1357,23 +1374,6 @@ def download_file(
     if found_bytes is None:
         try:
             _scan_lessons(today - timedelta(days=60), today + timedelta(days=60))
-            for lesson in (lessons or []):
-                try:
-                    contents = getattr(lesson, "content", None) or []
-                except Exception:
-                    continue
-                for c in contents:
-                    try:
-                        files = getattr(c, "files", None) or []
-                    except Exception:
-                        continue
-                    for f in files:
-                        if _try_consume_attachment(f):
-                            break
-                    if found_bytes is not None:
-                        break
-                if found_bytes is not None:
-                    break
         except HTTPException:
             raise
         except Exception:

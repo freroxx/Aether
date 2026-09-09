@@ -17,7 +17,6 @@ import Button from "@/ui/components/Button";
 import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
 import Typography from "@/ui/components/Typography";
-import { URLToBase64 } from "@/utils/attachments/helper";
 import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
 import uuid from "@/utils/uuid/uuid";
 

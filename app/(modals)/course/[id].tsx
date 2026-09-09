@@ -272,7 +272,8 @@ export default function CourseModal() {
                         void openAttachment(
                           a,
                           resolvePronoteFileAuth(a.createdByAccount),
-                          alert
+                          alert,
+                          course?.from
                         ).finally(() => setDownloadingName(null));
                       }}
                     >
