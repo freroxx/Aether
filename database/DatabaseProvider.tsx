@@ -29,11 +29,6 @@ export const useDatabase = () => useContext(DatabaseContext);
 
 export async function ClearDatabaseForAccount(accountId: string) {
   const db = getDatabaseInstance();
-  const destroy = async (records: Model[]) => {
-    for (const record of records) {
-      await record.destroyPermanently();
-    }
-  };
   const tablesWithAccount = [
     "homework",
     "news",
@@ -49,50 +44,72 @@ export async function ClearDatabaseForAccount(accountId: string) {
     "canteentransactions",
   ];
 
-  await safeWrite(db, async () => {
-    const attendanceRecords = await db.get<Attendance>("attendance")
-      .query(Q.where("createdByAccount", accountId))
-      .fetch();
-    for (const attendance of attendanceRecords) {
-      await destroy([
-        ...(await attendance.delays.fetch()),
-        ...(await attendance.absences.fetch()),
-        ...(await attendance.observations.fetch()),
-        ...(await attendance.punishments.fetch()),
-      ]);
-    }
-
-    const periodGradeRecords = await db.get<PeriodGrades>("periodgrades")
-      .query(Q.where("createdByAccount", accountId))
-      .fetch();
-    for (const periodGrade of periodGradeRecords) {
-      const subjects = await db.get<Subject>("subjects")
-        .query(Q.where("periodGradeId", periodGrade.id))
-        .fetch();
-      for (const subject of subjects) {
-        const grades = await db.get<Grade>("grades")
-          .query(Q.where("subjectId", subject.id))
-          .fetch();
-        await destroy(grades);
-      }
-      await destroy(subjects);
-    }
-
-    for (const table of tablesWithAccount) {
+  // Collect first (reads outside the writer to keep writers short), then
+  // batch-delete in chunks of 50 with a single write per chunk via
+  // prepareDestroyPermanently + db.batch. This avoids N sequential writer
+  // round-trips (one per record) and reduces SQLite lock contention.
+  const toDestroyByKey = new Map<string, Model>();
+  const pushAll = (records: Model[]) => {
+    for (const r of records) {
       try {
-        const collection = db.get(table);
-        const records = await collection
-          .query(Q.where("createdByAccount", accountId))
-          .fetch();
-
-        if (records.length > 0) {
-          await destroy(records);
-        }
-      } catch (err) {
-        error(String(err))
+        toDestroyByKey.set(`${r.table}:${r.id}`, r);
+      } catch {
+        // best-effort dedupe
       }
     }
-  }, 10000, 'ClearDatabaseForAccount');
+  };
+
+  const attendanceRecords = await db.get<Attendance>("attendance")
+    .query(Q.where("createdByAccount", accountId))
+    .fetch();
+  for (const attendance of attendanceRecords) {
+    pushAll([
+      ...(await attendance.delays.fetch()),
+      ...(await attendance.absences.fetch()),
+      ...(await attendance.observations.fetch()),
+      ...(await attendance.punishments.fetch()),
+    ]);
+  }
+
+  const periodGradeRecords = await db.get<PeriodGrades>("periodgrades")
+    .query(Q.where("createdByAccount", accountId))
+    .fetch();
+  for (const periodGrade of periodGradeRecords) {
+    const subjects = await db.get<Subject>("subjects")
+      .query(Q.where("periodGradeId", periodGrade.id))
+      .fetch();
+    for (const subject of subjects) {
+      const grades = await db.get<Grade>("grades")
+        .query(Q.where("subjectId", subject.id))
+        .fetch();
+      pushAll(grades);
+    }
+    pushAll(subjects);
+  }
+
+  for (const table of tablesWithAccount) {
+    try {
+      const collection = db.get(table);
+      const records = await collection
+        .query(Q.where("createdByAccount", accountId))
+        .fetch();
+
+      if (records.length > 0) {
+        pushAll(records);
+      }
+    } catch (err) {
+      error(String(err))
+    }
+  }
+
+  const allToDestroy = [...toDestroyByKey.values()];
+  for (let i = 0; i < allToDestroy.length; i += 50) {
+    const chunk = allToDestroy.slice(i, i + 50);
+    if (chunk.length === 0) continue;
+    await safeWrite(db, async () => {
+      await db.batch(...chunk.map(record => record.prepareDestroyPermanently()));
+    }, 10000, 'ClearDatabaseForAccount_batch');
+  }
 }
 
 export async function removeAllDuplicates() {

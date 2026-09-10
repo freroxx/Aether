@@ -51,7 +51,7 @@ export interface Personalization {
   fontFamily?: AppFontFamily;
   gradesDisplayScale?: "20" | "10" | "5" | "percentage";
   colorSelected?: Colors;
-  theme?: "light" | "dark" | "auto";
+  theme?: "light" | "dark" | "auto" | "amoled";
   useMaterialYou?: boolean;
   iOSBottomAccessoryEnabled?: boolean;
   showTabBarLabels?: boolean;

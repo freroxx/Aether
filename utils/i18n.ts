@@ -1,5 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import { getLocales } from "expo-localization";
 
 import af from "@/locales/af.json";
 import ar from "@/locales/ar.json";
@@ -87,8 +88,17 @@ const languageDetector = {
   type: "languageDetector",
   async: true,
   detect: (cb: (lang: string) => void) => {
-    // Aether defaults to French; the user can switch in Settings → Language.
-    cb("fr");
+    try {
+      // Phase 6 quick win: use device locale instead of hardcoded "fr".
+      // NOTE: static imports kept for now; full lazy-load later.
+      // TODO(i18n): locales/en.json still has French leftovers (e.g. line 534
+      // "Chargement de...") — bulk translate later via Crowdin, no bulk edit in Phase 6.
+      const code = getLocales()[0]?.languageCode ?? "fr";
+      cb(code || "fr");
+    } catch {
+      // Aether defaults to French; the user can switch in Settings → Language.
+      cb("fr");
+    }
   },
 };
 

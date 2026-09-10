@@ -17,16 +17,11 @@ import { LogBox } from 'react-native';
 global.Buffer = Buffer;
 
 LogBox.ignoreLogs([
+  // TODO: fix require cycles instead of hiding them.
   "Require cycle:",
   "i18next is made possible by our own product, Locize",
   'Route "./',
   "Linking found multiple possible URI schemes in your Expo config.",
-  "[Layout children]: No route named",
-  "Found screens with the same name nested inside one another.",
-  "Account manager not initialized. Call initializeAccountManager first.",
-  "Manager is null, skipping timetable fetch",
-  "Installing bindings...",
-  "Successfully installed!",
 ]);
 
 export default function RootLayout() {

@@ -288,7 +288,7 @@ export class AccountManager {
         clientId,
         fallback: async () => (await getSimpleCache<Evaluation[]>(cacheKey)) ?? [],
         saveToCache: async (data: Evaluation[]) => {
-          await setSimpleCache(cacheKey, data);
+          await setSimpleCache(cacheKey, data, 300000);
         },
       }
     );
@@ -315,7 +315,7 @@ export class AccountManager {
         clientId,
         fallback: async () => await getSimpleCache<Report>(cacheKey),
         saveToCache: async (data: Report | null) => {
-          await setSimpleCache(cacheKey, data);
+          await setSimpleCache(cacheKey, data, 300000);
         },
       }
     );
@@ -336,7 +336,7 @@ export class AccountManager {
         clientId,
         fallback: async () => (await getSimpleCache<TeachingStaff[]>(cacheKey)) ?? [],
         saveToCache: async (data: TeachingStaff[]) => {
-          await setSimpleCache(cacheKey, data);
+          await setSimpleCache(cacheKey, data, 300000);
         },
       }
     );

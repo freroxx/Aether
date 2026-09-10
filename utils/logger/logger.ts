@@ -19,6 +19,11 @@ function getMessage(type: number, date: string, from: string, message: string): 
 }
 
 function obtainFunctionName(from?: string): string {
+  // Perf: `new Error().stack` is expensive — only compute it in dev.
+  // In prod, fall back to the explicit `from` label (or "APP").
+  if (!__DEV__) {
+    return from ?? "APP";
+  }
   const stack = new Error().stack?.split("\n") ?? [];
 
   const relevant = stack.find((line, index) => 
@@ -47,7 +52,9 @@ function log(message: string, from?: string): void {
   const functionName = obtainFunctionName(from)
   const entry = getMessage(0, date, functionName, message);
   saveLog(date, message, LogType.LOG, functionName);
-  console.log(entry);
+  if (__DEV__) {
+    console.log(entry);
+  }
 }
 
 function error(message: string, from?: string): Error {
@@ -71,7 +78,9 @@ function info(message: string, from?: string): void {
   const functionName = obtainFunctionName(from)
   const entry = getMessage(3, date, functionName, message);
   saveLog(date, message, LogType.INFO, functionName);
-  console.info(entry);
+  if (__DEV__) {
+    console.info(entry);
+  }
 }
 
 export { error, info, log, warn };

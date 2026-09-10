@@ -35,7 +35,13 @@ export async function hasInternet(): Promise<boolean> {
       return value;
     }
   } catch {}
-  return true;
+  // Offline-first: when the OS can't tell us, assume offline so callers
+  // prefer cache/fallback instead of firing doomed network requests.
+  return false;
+}
+
+export function getCachedNetworkState(): boolean | null {
+  return cached;
 }
 
 export function __resetNetworkCacheForTests(): void {

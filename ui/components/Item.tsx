@@ -47,6 +47,9 @@ interface ListProps extends PressableProps {
   contentContainerStyle?: PressableProps["style"];
   isLast?: boolean;
   disablePadding?: boolean;
+  accessible?: boolean;
+  accessibilityRole?: PressableProps["accessibilityRole"];
+  accessibilityLabel?: string;
 }
 
 const DEFAULT_CONTAINER_STYLE = Object.freeze({
@@ -77,6 +80,12 @@ function areEqual(prev: ListProps, next: ListProps) {
   if (prev.onPressOut !== next.onPressOut) { return false; }
   if (prev.style !== next.style) { return false; }
   if (prev.contentContainerStyle !== next.contentContainerStyle) { return false; }
+  // Phase 6 a11y quick win: include a11y props in memo comparison (no visual change).
+  if (prev.accessible !== next.accessible) { return false; }
+  if (prev.accessibilityRole !== next.accessibilityRole) { return false; }
+  if (prev.accessibilityLabel !== next.accessibilityLabel) { return false; }
+  if (prev.accessibilityLabel !== next.accessibilityLabel) { return false; }
+  if (prev.accessibilityRole !== next.accessibilityRole) { return false; }
 
   // Children comparison last (most expensive)
   return prev.children === next.children;
@@ -92,6 +101,9 @@ const ItemComponent = React.forwardRef<typeof Pressable, ListProps>(function Ite
     onPressOut,
     isLast = false,
     disablePadding = false,
+    accessible = true,
+    accessibilityRole,
+    accessibilityLabel,
     ...rest
   },
   ref
@@ -231,6 +243,9 @@ const ItemComponent = React.forwardRef<typeof Pressable, ListProps>(function Ite
           style={containerStyle}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
+          accessible={accessible}
+          accessibilityRole={accessibilityRole}
+          accessibilityLabel={accessibilityLabel}
         />
       </Reanimated.View>
     );
@@ -251,6 +266,9 @@ const ItemComponent = React.forwardRef<typeof Pressable, ListProps>(function Ite
           style={containerStyle}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
+          accessible={accessible}
+          accessibilityRole={accessibilityRole}
+          accessibilityLabel={accessibilityLabel}
         >
           {sortedChildren.leading}
           {sortedChildren.others && (

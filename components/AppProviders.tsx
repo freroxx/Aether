@@ -12,7 +12,7 @@ import { registerBackgroundSyncAsync } from "@/services/local/backgroundSync";
 import { syncTaskRemindersFromStore } from "@/services/local/reminders";
 import { runsIOS26 } from '@/ui/utils/IsLiquidGlass';
 import { AppColors } from "@/utils/colors";
-import { createDarkTheme, createDefaultTheme } from '@/utils/theme/Theme';
+import { createAmoledTheme, createDarkTheme, createDefaultTheme } from '@/utils/theme/Theme';
 
 interface AppProvidersProps {
   children: React.ReactNode;
@@ -33,14 +33,21 @@ export function AppProviders({ children }: AppProvidersProps) {
   const theme = useMemo(() => {
     const defaultTheme = createDefaultTheme(useMaterialYou, color.mainColor);
     const darkTheme = createDarkTheme(useMaterialYou, color.mainColor);
+    const amoledTheme = createAmoledTheme(useMaterialYou, color.mainColor);
+    if (selectedTheme === 'amoled') {
+      return amoledTheme;
+    }
     const newScheme = selectedTheme === 'auto' ? (colorScheme === 'dark' ? darkTheme : defaultTheme) : (selectedTheme === 'dark' ? darkTheme : defaultTheme);
     return newScheme;
   }, [colorScheme, color, selectedTheme, useMaterialYou]);
 
   // Memoize background color to prevent string recreation
   const backgroundColor = useMemo(() => {
+    if (selectedTheme === 'amoled' || selectedTheme === 'dark') {
+      return '#000000';
+    }
     return colorScheme === 'dark' ? '#000000' : '#F5F5F5';
-  }, [colorScheme]);
+  }, [colorScheme, selectedTheme]);
 
   // Combined effect for system UI updates to reduce effect overhead
   useEffect(() => {

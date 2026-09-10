@@ -5,6 +5,8 @@ import {
 import { Platform } from "react-native";
 import { getDynamicColorScheme } from "react-native-dynamic-theme";
 
+const FALLBACK_SEED = "#29947A";
+
 const FALLBACK_COLORS = {
   light: {
     primary: "#29947A",
@@ -27,34 +29,45 @@ const FALLBACK_COLORS = {
 const isMaterialYouAvailable =
   Platform.OS === "android" && typeof Platform.Version === "number" && Platform.Version >= 31;
 
-function getThemeColors(useMaterialYou: boolean) {
+function resolveSeed(primaryColor?: string): string {
+  if (primaryColor && primaryColor !== FALLBACK_SEED) {
+    return primaryColor;
+  }
+  return FALLBACK_SEED;
+}
+
+function getThemeColors(useMaterialYou: boolean, primaryColor?: string) {
   if (useMaterialYou && isMaterialYouAvailable) {
-    const scheme = getDynamicColorScheme('#29947A');
-    return {
-      light: {
-        primary: scheme.light.primary,
-        tint: scheme.light.primary,
-        background: scheme.light.surfaceContainer,
-        text: scheme.light.onBackground,
-        card: scheme.light.surfaceDim,
-        item: scheme.light.surfaceContainerLowest,
-      },
-      dark: {
-        primary: scheme.dark.primaryContainer,
-        tint: scheme.dark.primary,
-        background: scheme.dark.background,
-        text: scheme.dark.onBackground,
-        card: scheme.dark.surfaceContainer,
-        item: scheme.dark.surfaceContainer,
-      },
-    };
+    try {
+      const scheme = getDynamicColorScheme(resolveSeed(primaryColor));
+      return {
+        light: {
+          primary: scheme.light.primary,
+          tint: scheme.light.primary,
+          background: scheme.light.surfaceContainer,
+          text: scheme.light.onBackground,
+          card: scheme.light.surfaceDim,
+          item: scheme.light.surfaceContainerLowest,
+        },
+        dark: {
+          primary: scheme.dark.primaryContainer,
+          tint: scheme.dark.primary,
+          background: scheme.dark.background,
+          text: scheme.dark.onBackground,
+          card: scheme.dark.surfaceContainer,
+          item: scheme.dark.surfaceContainer,
+        },
+      };
+    } catch {
+      return FALLBACK_COLORS;
+    }
   }
 
   return FALLBACK_COLORS;
 }
 
 export function createDefaultTheme(useMaterialYou: boolean, primaryColor: string) {
-  const colors = getThemeColors(useMaterialYou);
+  const colors = getThemeColors(useMaterialYou, primaryColor);
 
   return {
     ...NativeDefaultTheme,
@@ -72,7 +85,7 @@ export function createDefaultTheme(useMaterialYou: boolean, primaryColor: string
 }
 
 export function createDarkTheme(useMaterialYou: boolean, primaryColor: string) {
-  const colors = getThemeColors(useMaterialYou);
+  const colors = getThemeColors(useMaterialYou, primaryColor);
 
   return {
     ...NativeDarkTheme,
@@ -85,6 +98,26 @@ export function createDarkTheme(useMaterialYou: boolean, primaryColor: string) {
       text: colors.dark.text,
       card: colors.dark.card,
       item: colors.dark.item,
+    },
+  };
+}
+
+export function createAmoledTheme(useMaterialYou: boolean, primaryColor: string) {
+  const colors = getThemeColors(useMaterialYou, primaryColor);
+
+  return {
+    ...NativeDarkTheme,
+    dark: true,
+    colors: {
+      ...NativeDarkTheme.colors,
+      primary: useMaterialYou ? colors.dark.primary : (primaryColor || colors.dark.primary),
+      tint: useMaterialYou ? colors.dark.tint : (primaryColor || colors.dark.tint),
+      background: "#000000",
+      overground: "#000000",
+      text: colors.dark.text,
+      card: "#000000",
+      item: "#0A0A0A",
+      border: "rgba(255,255,255,0.12)",
     },
   };
 }

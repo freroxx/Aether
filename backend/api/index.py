@@ -5,7 +5,7 @@ import mimetypes
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timedelta
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Query, Body
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, Body, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import hashlib
@@ -58,6 +58,14 @@ def cache_set(key: str, value: Any, ttl_s: int) -> None:
         redis_client.set(key, json.dumps(value, default=str), ex=ttl_s)
     except Exception as e:
         logger.warning(f"redis set failed: {e}")
+
+
+def _set_cache_header(response: Response, hit: bool) -> None:
+    """Phase 6 quick win: expose cache status (HIT/MISS) for observability.
+
+    No behavior change — payloads inchangés, seul header ajouté.
+    """
+    response.headers["X-Aether-Cache"] = "HIT" if hit else "MISS"
 
 
 def parse_ymd(value: str, label: str) -> date:
@@ -258,6 +266,12 @@ def read_root():
         "redis_cached": redis_client is not None
     }
 
+
+@app.get("/health")
+def health():
+    """Phase 6 quick win: healthcheck simple pour Vercel/uptime (single-file, pas de router)."""
+    return {"status": "ok", "redis": redis_client is not None}
+
 @app.post("/auth/login")
 def login_direct(req: DirectLoginRequest):
     import pronotepy  # lazy : cold start
@@ -447,6 +461,7 @@ def get_parent_children(auth: Dict[str, Any] = Depends(get_session_header)):
 
 @app.get("/timetable")
 def get_timetable(
+    response: Response,
     from_date: str = Query(..., description="Date début YYYY-MM-DD"),
     to_date: str = Query(..., description="Date fin YYYY-MM-DD"),
     child: Optional[str] = Query(None),
@@ -456,6 +471,7 @@ def get_timetable(
     key = _cache_key("timetable", auth, from_date, to_date, child)
     hit = cache_get(key)
     if hit is not None:
+        _set_cache_header(response, True)
         return hit
     client = init_client(auth, child_name=child)
 
@@ -521,16 +537,20 @@ def get_timetable(
 
     payload = {"lessons": result}
     cache_set(key, payload, 60)
+    _set_cache_header(response, False)
     return payload
 
 @app.get("/grades")
 def get_grades(
+    response: Response,
     period: Optional[str] = Query(None),
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
-    hit = cache_get(_cache_key("grades", auth, period, child))
+    gkey = _cache_key("grades", auth, period, child)
+    hit = cache_get(gkey)
     if hit is not None:
+        _set_cache_header(response, True)
         return hit
     client = init_client(auth, child_name=child)
     periods = client.periods
@@ -598,7 +618,8 @@ def get_grades(
         "grades": grades_list,
         "averages": period_averages
     }
-    cache_set(_cache_key("grades", auth, period, child), payload, 300)
+    cache_set(gkey, payload, 300)
+    _set_cache_header(response, False)
     return payload
 
 @app.get("/grades/periods")
@@ -625,6 +646,7 @@ def get_grade_periods(
 
 @app.get("/homework")
 def get_homework(
+    response: Response,
     from_date: str = Query(..., description="Date début YYYY-MM-DD"),
     to_date: str = Query(..., description="Date fin YYYY-MM-DD"),
     child: Optional[str] = Query(None),
@@ -634,6 +656,7 @@ def get_homework(
     key = _cache_key("homework", auth, from_date, to_date, child)
     hit = cache_get(key)
     if hit is not None:
+        _set_cache_header(response, True)
         return hit
     client = init_client(auth, child_name=child)
 
@@ -657,6 +680,7 @@ def get_homework(
 
     payload = {"homework": result}
     cache_set(key, payload, 60)
+    _set_cache_header(response, False)
     return payload
 
 @app.post("/homework/done")
@@ -701,12 +725,14 @@ def set_homework_done(
 
 @app.get("/attendance")
 def get_attendance(
+    response: Response,
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
     akey = _cache_key("attendance", auth, child)
     ahit = cache_get(akey)
     if ahit is not None:
+        _set_cache_header(response, True)
         return ahit
     client = init_client(auth, child_name=child)
     absences = []
@@ -813,16 +839,19 @@ def get_attendance(
         "punishments": punishments
     }
     cache_set(akey, apayload, 300)
+    _set_cache_header(response, False)
     return apayload
 
 @app.get("/news")
 def get_news(
+    response: Response,
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
     nkey = _cache_key("news", auth, child)
     nhit = cache_get(nkey)
     if nhit is not None:
+        _set_cache_header(response, True)
         return nhit
     client = init_client(auth, child_name=child)
     news_list = []
@@ -840,6 +869,7 @@ def get_news(
             })
     npayload = {"news": news_list}
     cache_set(nkey, npayload, 120)
+    _set_cache_header(response, False)
     return npayload
 
 @app.post("/news/read")
@@ -858,11 +888,18 @@ def mark_news_as_read(
 
 @app.get("/canteen")
 def get_canteen(
+    response: Response,
     from_date: str = Query(..., description="Date YYYY-MM-DD"),
     to_date: Optional[str] = Query(None),
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    # Phase 6 quick win: short cache 60s (menus change peu dans la journée).
+    ckey = _cache_key("canteen", auth, from_date, to_date, child)
+    chit = cache_get(ckey)
+    if chit is not None:
+        _set_cache_header(response, True)
+        return chit
     client = init_client(auth, child_name=child)
     start_d = datetime.strptime(from_date, "%Y-%m-%d").date()
     end_d = datetime.strptime(to_date, "%Y-%m-%d").date() if to_date else start_d

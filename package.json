@@ -9,8 +9,10 @@
     "ios:native:restore": "node scripts/ios-native-files.js restore",
     "ios:native:snapshot": "node scripts/ios-native-files.js snapshot",
     "web": "expo start --web",
-    "test": "jest --watchAll",
-    "lint": "eslint --fix",
+    "test": "jest",
+    "test:watch": "jest --watchAll",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "postinstall": "patch-package"

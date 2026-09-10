@@ -64,6 +64,26 @@ export const useSettingsStore = create<SettingsStorage>()(
       name: "settings-storage",
       storage: createMMKVStorage("settings"),
       version: 1,
+      migrate: (persistedState: unknown, _version: number) => {
+        const state = persistedState as Partial<SettingsStorage> | undefined;
+        const theme = (state?.personalization as Personalization | undefined)?.theme;
+        if (
+          theme !== undefined &&
+          theme !== "light" &&
+          theme !== "dark" &&
+          theme !== "auto" &&
+          theme !== "amoled"
+        ) {
+          return {
+            ...(state as object),
+            personalization: {
+              ...state?.personalization,
+              theme: "auto",
+            },
+          } as SettingsStorage;
+        }
+        return state as SettingsStorage;
+      },
     }
   )
 );

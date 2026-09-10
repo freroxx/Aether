@@ -32,6 +32,9 @@ interface ButtonProps extends PressableProps {
   disabled?: boolean;
   disableAnimation?: boolean;
   alignment?: Alignment;
+  accessible?: boolean;
+  accessibilityRole?: PressableProps["accessibilityRole"];
+  accessibilityLabel?: string;
 }
 
 const defaultProps = {
@@ -60,10 +63,15 @@ const Button: React.FC<ButtonProps> = React.memo(({
   disabled = defaultProps.disabled,
   alignment = defaultProps.alignment,
   disableAnimation = defaultProps.disableAnimation,
+  accessible = true,
+  accessibilityRole = "button",
+  accessibilityLabel,
   style,
   ...rest
 }) => {
   const { colors } = useTheme();
+  // Phase 6 a11y quick win: default label to title, no visual change.
+  const effectiveAccessibilityLabel = accessibilityLabel ?? title;
 
   const colorsList: Record<Color, string> = React.useMemo(() => ({
     primary: colors.primary,
@@ -86,7 +94,20 @@ const Button: React.FC<ButtonProps> = React.memo(({
   }), []);
 
   const handlePressIn = useCallback(() => {
-    ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Soft)
+    try {
+      const feedback = ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Soft);
+      if (feedback && typeof (feedback as Promise<void>).catch === "function") {
+        (feedback as Promise<void>).catch(() => {
+          try {
+            ExpoHaptics.selectionAsync().catch(() => {});
+          } catch {}
+        });
+      }
+    } catch {
+      try {
+        ExpoHaptics.selectionAsync().catch(() => {});
+      } catch {}
+    }
     "use worklet";
     scale.value = withTiming(0.97, { duration: 100, easing: Easing.out(Easing.exp) });
     opacity.value = withTiming(0.7, { duration: 50, easing: Easing.out(Easing.exp) });
@@ -243,6 +264,9 @@ const Button: React.FC<ButtonProps> = React.memo(({
           buttonTint
         }
         {...rest}
+        accessible={accessible}
+        accessibilityRole={accessibilityRole}
+        accessibilityLabel={effectiveAccessibilityLabel}
         effect="regular"
         interactive={true}
       >
@@ -258,6 +282,9 @@ const Button: React.FC<ButtonProps> = React.memo(({
           }}
           disabled={disabled}
           {...rest}
+          accessible={accessible}
+          accessibilityRole={accessibilityRole}
+          accessibilityLabel={effectiveAccessibilityLabel}
         >
           {ButtonContent}
         </Pressable>
@@ -268,6 +295,9 @@ const Button: React.FC<ButtonProps> = React.memo(({
   return (
     <AnimatedPressable
       {...rest}
+      accessible={accessible}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={effectiveAccessibilityLabel}
       layout={disableAnimation ? undefined : Animation(LinearTransition)}
       entering={FadeIn}
       exiting={FadeOut}
