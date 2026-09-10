@@ -13,18 +13,19 @@ export async function safeWrite<T>(
   timeoutMs: number = 10000,
   operationName: string = 'unnamed'
 ): Promise<T> {
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
-      reject(new Error(`🍉 Database write operation "${operationName}" timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-
-  const run = writeQueue.then(() =>
-    Promise.race([
+  // Le timeout ne démarre qu'à l'exécution réelle (pas pendant l'attente
+  // en file), sinon une file chargée ferait expirer des opérations saines.
+  const run = writeQueue.then(() => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`🍉 Database write operation "${operationName}" timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+    return Promise.race([
       database.write(operation),
       timeoutPromise
-    ])
-  );
+    ]);
+  });
   // La file ne doit jamais rester bloquée sur un rejet.
   writeQueue = run.catch(() => {});
   try {
