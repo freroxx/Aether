@@ -123,6 +123,18 @@ async function request<T>(
           const errJson = await response.json();
           if (errJson.detail) errDetail = errJson.detail;
         } catch {}
+        // Backend mal déployé (rewrite Vercel cassé, mauvaise URL custom) :
+        // FastAPI renvoie `{"detail":"Not Found"}` pour toute route inconnue.
+        // Remonte un message actionnable au lieu d'un 404 brut.
+        if (
+          response.status === 404 &&
+          /not found/i.test(errDetail)
+        ) {
+          errDetail =
+            "Serveur API Aether injoignable (404 Not Found). " +
+            "Vérifie l'URL dans Personnalisation > Serveur API Pronote " +
+            `(${baseUrl}) ou redéploie le backend (Root Directory=backend, rewrite /api/index.py).`;
+        }
         // Préserve le statut (vs substring-match) ; retry backoff sur 502/503/504.
         if (retriable(null, response.status) && attempt < 2) {
           attempt += 1;

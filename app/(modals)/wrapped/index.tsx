@@ -29,20 +29,6 @@ const WrappedView = () => {
     player.play();
   });
 
-  const altBackground = useVideoPlayer({
-    assetId: require('@/assets/video/wrapped_alt.mp4'),
-  }, player => {
-    player.loop = true;
-    player.play();
-  });
-
-  const redBackground = useVideoPlayer({
-    assetId: require('@/assets/video/wrapped_red.mp4'),
-  }, player => {
-    player.loop = true;
-    player.play();
-  });
-
   const slides = [Welcome, Warning, Cooking];
   const sliderRef = useRef<FlatList>(null);
 

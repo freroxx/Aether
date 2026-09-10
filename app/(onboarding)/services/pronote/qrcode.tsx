@@ -40,7 +40,15 @@ import { hapticFor } from "@/utils/haptics";
 import uuid from "@/utils/uuid/uuid";
 
 function describeQRError(e: unknown): string {
-  const msg = String((e as any)?.message || e || "").toLowerCase();
+  const raw = String((e as any)?.message || e || "");
+  const msg = raw.toLowerCase();
+  if (
+    msg.includes("404") ||
+    msg.includes("not found") ||
+    msg.includes("serveur api")
+  ) {
+    return "Serveur API Aether injoignable (404). Vérifie l'URL dans Personnalisation > Serveur API Pronote ou redéploie le backend, puis réessaie.";
+  }
   if (msg.includes("pin") || msg.includes("code")) {
     return "Code PIN incorrect. Vérifie les 4 chiffres affichés dans Pronote.";
   }

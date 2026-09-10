@@ -1,4 +1,4 @@
-import { useTheme } from "@react-navigation/native";
+import { useTheme } from "expo-router/react-navigation";
 import { Papicons } from "@getpapillon/papicons";
 import React, { memo } from "react";
 import { StyleSheet, View } from "react-native";

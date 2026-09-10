@@ -70,6 +70,41 @@ const PersonalizationSettings = () => {
   const [tempApiUrl, setTempApiUrl] = useState(
     settingsStore.pronoteApiUrl || ""
   );
+  const [apiTestStatus, setApiTestStatus] = useState<string | null>(null);
+  const [apiTesting, setApiTesting] = useState(false);
+
+  const testApiUrl = async (rawUrl: string) => {
+    const base = (rawUrl || "").trim().replace(/\/+$/, "") || null;
+    if (!base) {
+      setApiTestStatus("URL vide : utilisera l'URL Vercel par défaut.");
+      return;
+    }
+    setApiTesting(true);
+    setApiTestStatus("Test en cours…");
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        const res = await fetch(`${base}/health`, { signal: ctrl.signal as any });
+        const body = await res.text();
+        if (res.ok && body.includes('"status":"ok"')) {
+          setApiTestStatus("OK : serveur joignable (/health).");
+        } else if (res.status === 404 || body.includes("Not Found")) {
+          setApiTestStatus(
+            "Échec 404 Not Found : rewrite Vercel cassé ou mauvaise URL. Vérifie Root Directory=backend et redéploie."
+          );
+        } else {
+          setApiTestStatus(`Échec HTTP ${res.status} : ${body.slice(0, 120)}`);
+        }
+      } finally {
+        clearTimeout(t);
+      }
+    } catch (e: any) {
+      setApiTestStatus(`Injoignable : ${String(e?.message || e).slice(0, 140)}`);
+    } finally {
+      setApiTesting(false);
+    }
+  };
 
   const height = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -567,10 +602,14 @@ const PersonalizationSettings = () => {
             <Typography variant="h3">Serveur API Pronote</Typography>
             <Typography variant="body1" color="textSecondary">
               Indiquez l&apos;URL de votre microservice Vercel (pronotepy).
+              Déployez avec Root Directory = backend.
             </Typography>
             <TextInput
               value={tempApiUrl}
-              onChangeText={setTempApiUrl}
+              onChangeText={text => {
+                setTempApiUrl(text);
+                setApiTestStatus(null);
+              }}
               placeholder="https://votre-projet.vercel.app"
               placeholderTextColor={theme.colors.text + "60"}
               autoCapitalize="none"
@@ -585,11 +624,21 @@ const PersonalizationSettings = () => {
                 backgroundColor: theme.colors.background,
               }}
             />
+            {apiTestStatus && (
+              <Typography variant="body1" color="textSecondary">
+                {apiTestStatus}
+              </Typography>
+            )}
             <Stack
               direction="horizontal"
               gap={10}
               style={{ justifyContent: "flex-end", marginTop: 8 }}
             >
+              <Button
+                label={apiTesting ? "Test…" : "Tester"}
+                variant="outlined"
+                onPress={() => void testApiUrl(tempApiUrl)}
+              />
               <Button
                 label="Réinitialiser"
                 variant="text"
@@ -597,6 +646,7 @@ const PersonalizationSettings = () => {
                   mutateProperty("personalization", {
                     pronoteApiUrl: undefined,
                   });
+                  setApiTestStatus(null);
                   setShowApiUrlModal(false);
                 }}
               />
@@ -604,9 +654,11 @@ const PersonalizationSettings = () => {
                 label="Enregistrer"
                 variant="primary"
                 onPress={() => {
+                  const cleaned = tempApiUrl.trim().replace(/\/+$/, "");
                   mutateProperty("personalization", {
-                    pronoteApiUrl: tempApiUrl.trim() || undefined,
+                    pronoteApiUrl: cleaned || undefined,
                   });
+                  setApiTestStatus(null);
                   setShowApiUrlModal(false);
                 }}
               />

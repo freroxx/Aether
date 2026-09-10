@@ -145,7 +145,12 @@ const PronoteCredentialsForm = memo(({
       finishAuthNavigation();
       return;
     } catch (e: any) {
-      const message = e?.message || "Identifiants incorrects. Vérifie ton identifiant et ton mot de passe.";
+      const rawMessage = e?.message || "Identifiants incorrects. Vérifie ton identifiant et ton mot de passe.";
+      const low = String(rawMessage).toLowerCase();
+      const message =
+        low.includes("404") || low.includes("not found") || low.includes("serveur api")
+          ? "Serveur API Aether injoignable (404). Vérifie l'URL dans Personnalisation > Serveur API Pronote ou redéploie le backend, puis réessaie."
+          : rawMessage;
       setError(message);
       alert.showAlert({ title: "Erreur de connexion", description: message, icon: "UserCross", color: "#E05D34" });
     } finally {
