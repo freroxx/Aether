@@ -6,11 +6,5 @@
       "memory": 1024,
       "regions": ["cdg1"]
     }
-  },
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index.py"
-    }
-  ]
+  }
 }

@@ -133,7 +133,7 @@ async function request<T>(
           errDetail =
             "Serveur API Aether injoignable (404 Not Found). " +
             "Vérifie l'URL dans Personnalisation > Serveur API Pronote " +
-            `(${baseUrl}) ou redéploie le backend (Root Directory=backend, rewrite /api/index.py).`;
+            `(${baseUrl}) ou redéploie le backend (Root Directory=backend, sans rewrite : Vercel route tout vers l'app FastAPI).`;
         }
         // Préserve le statut (vs substring-match) ; retry backoff sur 502/503/504.
         if (retriable(null, response.status) && attempt < 2) {
