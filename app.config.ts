@@ -100,6 +100,11 @@ export default {
       output: "static",
       favicon: "./assets/images/favicon.png",
     },
+    // Phase 6 quick win: notification icon/color (no visual change in-app).
+    notification: {
+      icon: "./assets/images/icon.png",
+      color: "#29947A",
+    },
     plugins: [
       "expo-router",
       "expo-status-bar",
@@ -139,6 +144,8 @@ export default {
       "expo-web-browser",
       "react-native-bottom-tabs",
       "expo-secure-store",
+      // Phase 6 quick win: minimal notifications plugin (android-only stays via platforms).
+      "expo-notifications",
       "./plugins/with-apk-splits",
       [
         "expo-location",
