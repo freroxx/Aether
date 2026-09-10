@@ -236,7 +236,33 @@ export async function openAttachment(
       // best-effort
     }
 
-    const { uri, filename, mime } = await downloadAttachment(attachment, auth, dueDate);
+    let downloaded: { uri: string; filename: string; mime: string };
+    try {
+      downloaded = await downloadAttachment(attachment, auth, dueDate);
+    } catch (dlErr) {
+      // Backend déployé trop vieux (route /files/download inconnue → 404
+      // "Not Found" FastAPI) : repli ouverture directe de l'URL plutôt
+      // qu'un toast sec. Le backend se met à jour au prochain déploiement.
+      const status = (dlErr as any)?.status;
+      const detail = String((dlErr as any)?.detail ?? (dlErr instanceof Error ? dlErr.message : dlErr ?? ""));
+      if (status === 404 && detail.trim().toLowerCase() === "not found" && url) {
+        const { error: logError } = await import("@/utils/logger/logger");
+        logError(`openAttachment stale-backend fallback: opening raw URL ${url}`);
+        await WebBrowser.openBrowserAsync(url);
+        if (alert) {
+          alert.showAlert({
+            title: "Serveur à mettre à jour",
+            description: "Ouverture directe : reconnecte-toi pour profiter du téléchargement intégré.",
+            icon: "Info",
+            color: "#007AFF",
+            delay: 4000,
+          });
+        }
+        return;
+      }
+      throw dlErr;
+    }
+    const { uri, filename, mime } = downloaded;
 
     const lower = filename.toLowerCase();
     const previewable =

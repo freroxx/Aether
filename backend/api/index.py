@@ -76,7 +76,7 @@ def clamp_window(start_d: date, end_d: date, max_days: int = 62) -> tuple:
 
 app = FastAPI(
     title="Aether Pronotepy API",
-    version="1.0.0",
+    version="1.1.0",
     description="Microservice serverless reliant Aether Mobile à Pronote via pronotepy avec support des comptes parents."
 )
 
@@ -204,17 +204,39 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
             candidates = []
             if hasattr(client, "children") and client.children:
                 candidates = [getattr(c, "name", "") for c in client.children]
+                # 1) match normalisé exact
                 target_child = next(
                     (c for c in client.children if _norm_child(getattr(c, "name", "")) == wanted),
                     None,
                 )
+                # 2) un seul enfant → lui, quoi qu'il arrive
+                if target_child is None and len(client.children) == 1:
+                    target_child = client.children[0]
+                # 3) match insensible à l'ordre ("DUPONT Enzo" == "Enzo DUPONT")
+                if target_child is None:
+                    wanted_tokens = set(wanted.split())
+                    if wanted_tokens:
+                        for c in client.children:
+                            if set(_norm_child(getattr(c, "name", "")).split()) == wanted_tokens:
+                                target_child = c
+                                break
+                # 4) inclusion non ambiguë (un seul candidat contient tous les tokens)
+                if target_child is None:
+                    wanted_tokens = set(wanted.split())
+                    if wanted_tokens:
+                        hits = [
+                            c for c in client.children
+                            if wanted_tokens <= set(_norm_child(getattr(c, "name", "")).split())
+                        ]
+                        if len(hits) == 1:
+                            target_child = hits[0]
                 if target_child:
                     client.set_child(target_child)
                     logger.info(f"[init_client] child requested={child_name!r} matched={getattr(target_child, 'name', '')!r}")
                 else:
                     raise HTTPException(
                         status_code=404,
-                        detail=f"Enfant « {child_name} » introuvable sur ce compte parent (enfants : {', '.join(candidates) or 'aucun'}). Rouvre la liste des enfants.",
+                        detail=f"[auth] Enfant « {child_name} » introuvable sur ce compte parent (enfants : {', '.join(candidates) or 'aucun'}). Rouvre la liste des enfants.",
                     )
             else:
                 client.set_child(child_name)
@@ -232,7 +254,7 @@ def read_root():
     return {
         "status": "online",
         "service": "Aether Pronotepy Bridge",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "redis_cached": redis_client is not None
     }
 
@@ -672,7 +694,7 @@ def set_homework_done(
             break
 
     if not target:
-        raise HTTPException(status_code=404, detail="Devoir introuvable")
+        raise HTTPException(status_code=404, detail="[homework/done] Devoir introuvable (id inconnu ou hors période ±60j). Rouvre la liste pour rafraîchir.")
 
     target.set_done(req.done)
     return {"success": True, "done": req.done}
@@ -956,7 +978,7 @@ def send_chat_message(
         disc_list = client.discussions() if callable(client.discussions) else client.discussions
         d = next((x for x in disc_list if getattr(x, "id", None) == req.chat_id), None)
         if not d:
-            raise HTTPException(status_code=404, detail="Discussion introuvable")
+            raise HTTPException(status_code=404, detail="[chats] Discussion introuvable")
         if hasattr(d, "reply") and callable(d.reply):
             d.reply(req.content)
         elif hasattr(d, "messages") and d.messages and hasattr(d.messages[-1], "reply"):
@@ -1393,7 +1415,7 @@ def download_file(
     # 3) Fallback : GET authentifié direct de file_url avec les cookies de session.
     if found_bytes is None:
         if not target_url:
-            detail = "Fichier introuvable ou session Pronote expirée."
+            detail = "[files/download] Fichier introuvable ou session Pronote expirée."
             if req.child_name:
                 detail += f" (enfant : {req.child_name})"
             raise HTTPException(status_code=404, detail=detail)
@@ -1405,11 +1427,11 @@ def download_file(
             if getattr(resp, "status_code", 500) != 200:
                 raise HTTPException(
                     status_code=404,
-                    detail="Fichier introuvable ou session Pronote expirée. Rouvrez la liste pour rafraîchir."
+                    detail="[files/download] Fichier introuvable ou session Pronote expirée. Rouvrez la liste pour rafraîchir."
                 )
             content = getattr(resp, "content", None)
             if not content:
-                raise HTTPException(status_code=404, detail="Fichier vide ou introuvable.")
+                raise HTTPException(status_code=404, detail="[files/download] Fichier vide ou introuvable.")
             found_bytes = bytes(content)
             if target_name:
                 found_name = target_name
@@ -1422,7 +1444,7 @@ def download_file(
             )
 
     if not found_bytes:
-        detail = "Fichier introuvable ou session Pronote expirée. Rouvrez la liste pour rafraîchir."
+        detail = "[files/download] Fichier introuvable ou session Pronote expirée. Rouvrez la liste pour rafraîchir."
         if req.child_name:
             detail += f" (enfant : {req.child_name})"
         raise HTTPException(status_code=404, detail=detail)
