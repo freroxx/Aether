@@ -19,6 +19,9 @@ interface SettingsHeaderProps {
   switchLabel?: string
   switchColor?: string
   disableMargin?: boolean
+  accessible?: boolean
+  accessibilityRole?: "header" | "none" | "text" | "summary" | undefined
+  accessibilityLabel?: string
 }
 
 export default function SettingsHeader({
@@ -34,6 +37,9 @@ export default function SettingsHeader({
   switchLabel,
   switchColor,
   disableMargin = false,
+  accessible = true,
+  accessibilityRole = "header",
+  accessibilityLabel,
 }: SettingsHeaderProps) {
   const theme = useTheme()
   const { colors } = theme
@@ -41,6 +47,9 @@ export default function SettingsHeader({
   return (
     <Stack
       direction="vertical"
+      accessible={accessible}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel ?? title}
       style={{
         padding: 13,
         backgroundColor: color,

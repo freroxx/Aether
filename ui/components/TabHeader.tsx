@@ -21,6 +21,9 @@ interface TabHeaderProps {
   modal?: boolean,
   backgroundColor?: string,
   showAndroidBackButton?: boolean,
+  accessible?: boolean,
+  accessibilityRole?: "header" | "none" | undefined,
+  accessibilityLabel?: string,
 };
 
 const TabHeader: React.FC<TabHeaderProps> = ({
@@ -32,6 +35,9 @@ const TabHeader: React.FC<TabHeaderProps> = ({
   modal,
   backgroundColor,
   showAndroidBackButton,
+  accessible = true,
+  accessibilityRole = "header",
+  accessibilityLabel,
 }) => {
   const isModal = Platform.OS === 'ios' ? modal : false;
   const theme = useTheme();
@@ -83,6 +89,9 @@ const TabHeader: React.FC<TabHeaderProps> = ({
       </Reanimated.View>
 
       <View
+        accessible={accessible}
+        accessibilityRole={accessibilityRole}
+        accessibilityLabel={accessibilityLabel}
         style={{
           paddingTop: usedInsets + 4,
           paddingBottom: 16,
