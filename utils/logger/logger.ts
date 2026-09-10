@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // Local-only logging (no telemetry, no upload)
-import { useLogStore } from '@/stores/logs/index';
-import { LogType } from '@/stores/logs/types';
+import { useLogStore } from "@/stores/logs/index";
+import { LogType } from "@/stores/logs/types";
 const format = "[%DATE%][%FROM%] %MESSAGE%";
 
 const typeList = ["LOG", "ERROR", "WARN", "INFO"];
@@ -10,7 +10,12 @@ export function getIsoDate(): string {
   return new Date().toISOString();
 }
 
-function getMessage(type: number, date: string, from: string, message: string): string {
+function getMessage(
+  type: number,
+  date: string,
+  from: string,
+  message: string
+): string {
   return format
     .replaceAll("%TYPE%", typeList[type].padEnd(5))
     .replaceAll("%DATE%", date)
@@ -26,11 +31,12 @@ function obtainFunctionName(from?: string): string {
   }
   const stack = new Error().stack?.split("\n") ?? [];
 
-  const relevant = stack.find((line, index) => 
-    index > 2 &&
-    line.includes("at ") &&
-    line.includes("http") &&
-    !line.includes("logger")
+  const relevant = stack.find(
+    (line, index) =>
+      index > 2 &&
+      line.includes("at ") &&
+      line.includes("http") &&
+      !line.includes("logger")
   );
 
   const match = relevant?.match(/at (\S+)\s*\(/);
@@ -48,8 +54,8 @@ function saveLog(date: string, message: string, type: LogType, from?: string) {
 }
 
 function log(message: string, from?: string): void {
-  const date = getIsoDate()
-  const functionName = obtainFunctionName(from)
+  const date = getIsoDate();
+  const functionName = obtainFunctionName(from);
   const entry = getMessage(0, date, functionName, message);
   saveLog(date, message, LogType.LOG, functionName);
   if (__DEV__) {
@@ -58,24 +64,24 @@ function log(message: string, from?: string): void {
 }
 
 function error(message: string, from?: string): Error {
-  const date = getIsoDate()
-  const functionName = obtainFunctionName(from)
+  const date = getIsoDate();
+  const functionName = obtainFunctionName(from);
   saveLog(date, message, LogType.ERROR, functionName);
   console.error(message);
   return new Error(message);
 }
 
 function warn(message: string, from?: string): void {
-  const date = getIsoDate()
-  const functionName = obtainFunctionName(from)
+  const date = getIsoDate();
+  const functionName = obtainFunctionName(from);
   const entry = getMessage(2, date, functionName, message);
   saveLog(date, message, LogType.WARN, functionName);
   console.warn(entry);
 }
 
 function info(message: string, from?: string): void {
-  const date = getIsoDate()
-  const functionName = obtainFunctionName(from)
+  const date = getIsoDate();
+  const functionName = obtainFunctionName(from);
   const entry = getMessage(3, date, functionName, message);
   saveLog(date, message, LogType.INFO, functionName);
   if (__DEV__) {

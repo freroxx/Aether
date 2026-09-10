@@ -1,10 +1,16 @@
 import { Database, Model, Q } from "@nozbe/watermelondb";
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext } from "react";
 
 import { error, info } from "@/utils/logger/logger";
 
-import { database } from './index';
-import { Absence, Attendance, Delay, Observation, Punishment } from "./models/Attendance";
+import { database } from "./index";
+import {
+  Absence,
+  Attendance,
+  Delay,
+  Observation,
+  Punishment,
+} from "./models/Attendance";
 import { Balance } from "./models/Balance";
 import CanteenHistoryItem from "./models/CanteenHistory";
 import CanteenMenu from "./models/CanteenMenu";
@@ -21,8 +27,14 @@ const _db: Database = database;
 export const getDatabaseInstance = (): Database => _db;
 const DatabaseContext = createContext(database);
 
-export const DatabaseProvider = ({ children }: { children: React.ReactNode }) => (
-  <DatabaseContext.Provider value={database}>{children}</DatabaseContext.Provider>
+export const DatabaseProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => (
+  <DatabaseContext.Provider value={database}>
+    {children}
+  </DatabaseContext.Provider>
 );
 
 export const useDatabase = () => useContext(DatabaseContext);
@@ -59,7 +71,8 @@ export async function ClearDatabaseForAccount(accountId: string) {
     }
   };
 
-  const attendanceRecords = await db.get<Attendance>("attendance")
+  const attendanceRecords = await db
+    .get<Attendance>("attendance")
     .query(Q.where("createdByAccount", accountId))
     .fetch();
   for (const attendance of attendanceRecords) {
@@ -71,15 +84,18 @@ export async function ClearDatabaseForAccount(accountId: string) {
     ]);
   }
 
-  const periodGradeRecords = await db.get<PeriodGrades>("periodgrades")
+  const periodGradeRecords = await db
+    .get<PeriodGrades>("periodgrades")
     .query(Q.where("createdByAccount", accountId))
     .fetch();
   for (const periodGrade of periodGradeRecords) {
-    const subjects = await db.get<Subject>("subjects")
+    const subjects = await db
+      .get<Subject>("subjects")
       .query(Q.where("periodGradeId", periodGrade.id))
       .fetch();
     for (const subject of subjects) {
-      const grades = await db.get<Grade>("grades")
+      const grades = await db
+        .get<Grade>("grades")
         .query(Q.where("subjectId", subject.id))
         .fetch();
       pushAll(grades);
@@ -98,7 +114,7 @@ export async function ClearDatabaseForAccount(accountId: string) {
         pushAll(records);
       }
     } catch (err) {
-      error(String(err))
+      error(String(err));
     }
   }
 
@@ -106,9 +122,16 @@ export async function ClearDatabaseForAccount(accountId: string) {
   for (let i = 0; i < allToDestroy.length; i += 50) {
     const chunk = allToDestroy.slice(i, i + 50);
     if (chunk.length === 0) continue;
-    await safeWrite(db, async () => {
-      await db.batch(...chunk.map(record => record.prepareDestroyPermanently()));
-    }, 10000, 'ClearDatabaseForAccount_batch');
+    await safeWrite(
+      db,
+      async () => {
+        await db.batch(
+          ...chunk.map(record => record.prepareDestroyPermanently())
+        );
+      },
+      10000,
+      "ClearDatabaseForAccount_batch"
+    );
   }
 }
 
@@ -117,7 +140,7 @@ export async function removeAllDuplicates() {
 
   try {
     const uniqueKeys = {
-      subjects: (r: Subject) => `${r.name}-${r.periodGradeId || ''}`,
+      subjects: (r: Subject) => `${r.name}-${r.periodGradeId || ""}`,
       homework: (r: Homework) => r.homeworkId,
       news: (r: News) => r.newsId,
       periods: (r: Period) => r.periodId,
@@ -148,21 +171,26 @@ export async function removeAllDuplicates() {
     }
 
     if (allDuplicatesToDelete.length > 0) {
+      await safeWrite(
+        db,
+        async () => {
+          const batches = batchOperations(allDuplicatesToDelete, 100);
 
-      await safeWrite(db, async () => {
-        const batches = batchOperations(allDuplicatesToDelete, 100);
-
-        for (const batch of batches) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await Promise.all(batch.map((record: any) => record.markAsDeleted()));
-        }
-      }, 120000, 'removeAllDuplicates');
+          for (const batch of batches) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await Promise.all(
+              batch.map((record: any) => record.markAsDeleted())
+            );
+          }
+        },
+        120000,
+        "removeAllDuplicates"
+      );
 
       info(`🍉 Duplicate removal completed successfully`);
     } else {
       info("🍉 No duplicates found");
     }
-
   } catch (err) {
     error(`Failed to remove duplicates: ${err}`);
     throw err;
@@ -170,7 +198,11 @@ export async function removeAllDuplicates() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function findTableDuplicates(db: Database, tableName: string, keyFn: (record: any) => string): Promise<any[]> {
+async function findTableDuplicates(
+  db: Database,
+  tableName: string,
+  keyFn: (record: any) => string
+): Promise<any[]> {
   try {
     const collection = db.collections.get(tableName);
     const all = await collection.query().fetch();

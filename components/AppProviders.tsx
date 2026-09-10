@@ -1,18 +1,25 @@
 import { ThemeProvider } from "expo-router/react-navigation";
-import * as SystemUI from 'expo-system-ui';
-import React, { useEffect, useMemo } from 'react';
-import { Platform, useColorScheme } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as SystemUI from "expo-system-ui";
+import React, { useEffect, useMemo } from "react";
+import { Platform, useColorScheme } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { DatabaseProvider } from "@/database/DatabaseProvider";
-import { DEFAULT_MATERIAL_YOU_ENABLED, useSettingsStore } from '@/stores/settings';
-import { AlertProvider } from '@/ui/components/AlertProvider';
+import {
+  DEFAULT_MATERIAL_YOU_ENABLED,
+  useSettingsStore,
+} from "@/stores/settings";
+import { AlertProvider } from "@/ui/components/AlertProvider";
 import { useNewItemsCheck } from "@/services/local/notifications";
 import { registerBackgroundSyncAsync } from "@/services/local/backgroundSync";
 import { syncTaskRemindersFromStore } from "@/services/local/reminders";
-import { runsIOS26 } from '@/ui/utils/IsLiquidGlass';
+import { runsIOS26 } from "@/ui/utils/IsLiquidGlass";
 import { AppColors } from "@/utils/colors";
-import { createAmoledTheme, createDarkTheme, createDefaultTheme } from '@/utils/theme/Theme';
+import {
+  createAmoledTheme,
+  createDarkTheme,
+  createDefaultTheme,
+} from "@/utils/theme/Theme";
 
 interface AppProvidersProps {
   children: React.ReactNode;
@@ -21,11 +28,18 @@ interface AppProvidersProps {
 export function AppProviders({ children }: AppProvidersProps) {
   const colorScheme = useColorScheme();
   const selectedTheme = useSettingsStore(state => state.personalization.theme);
-  const selectedColorEnum = useSettingsStore(state => state.personalization.colorSelected);
-  const useMaterialYou = useSettingsStore(state => state.personalization.useMaterialYou) ?? DEFAULT_MATERIAL_YOU_ENABLED;
+  const selectedColorEnum = useSettingsStore(
+    state => state.personalization.colorSelected
+  );
+  const useMaterialYou =
+    useSettingsStore(state => state.personalization.useMaterialYou) ??
+    DEFAULT_MATERIAL_YOU_ENABLED;
 
   const color = useMemo(() => {
-    const color = selectedColorEnum !== null ? AppColors.find(appColor => appColor.colorEnum === selectedColorEnum) : null;
+    const color =
+      selectedColorEnum !== null
+        ? AppColors.find(appColor => appColor.colorEnum === selectedColorEnum)
+        : null;
     return color || AppColors[0];
   }, [selectedColorEnum]);
 
@@ -34,27 +48,33 @@ export function AppProviders({ children }: AppProvidersProps) {
     const defaultTheme = createDefaultTheme(useMaterialYou, color.mainColor);
     const darkTheme = createDarkTheme(useMaterialYou, color.mainColor);
     const amoledTheme = createAmoledTheme(useMaterialYou, color.mainColor);
-    if (selectedTheme === 'amoled') {
+    if (selectedTheme === "amoled") {
       return amoledTheme;
     }
-    const newScheme = selectedTheme === 'auto' ? (colorScheme === 'dark' ? darkTheme : defaultTheme) : (selectedTheme === 'dark' ? darkTheme : defaultTheme);
+    const newScheme =
+      selectedTheme === "auto"
+        ? colorScheme === "dark"
+          ? darkTheme
+          : defaultTheme
+        : selectedTheme === "dark"
+          ? darkTheme
+          : defaultTheme;
     return newScheme;
   }, [colorScheme, color, selectedTheme, useMaterialYou]);
 
   // Memoize background color to prevent string recreation
   const backgroundColor = useMemo(() => {
-    if (selectedTheme === 'amoled' || selectedTheme === 'dark') {
-      return '#000000';
+    if (selectedTheme === "amoled" || selectedTheme === "dark") {
+      return "#000000";
     }
-    return colorScheme === 'dark' ? '#000000' : '#F5F5F5';
+    return colorScheme === "dark" ? "#000000" : "#F5F5F5";
   }, [colorScheme, selectedTheme]);
 
   // Combined effect for system UI updates to reduce effect overhead
   useEffect(() => {
     if (runsIOS26) {
       SystemUI.setBackgroundColorAsync(backgroundColor);
-    }
-    else {
+    } else {
       SystemUI.setBackgroundColorAsync("#000000");
     }
   }, [backgroundColor]);
@@ -76,9 +96,7 @@ export function AppProviders({ children }: AppProvidersProps) {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "black" }}>
       <DatabaseProvider>
         <ThemeProvider value={theme}>
-          <AlertProvider>
-            {children}
-          </AlertProvider>
+          <AlertProvider>{children}</AlertProvider>
         </ThemeProvider>
       </DatabaseProvider>
     </GestureHandlerRootView>

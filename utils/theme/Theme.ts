@@ -27,7 +27,9 @@ const FALLBACK_COLORS = {
 };
 
 const isMaterialYouAvailable =
-  Platform.OS === "android" && typeof Platform.Version === "number" && Platform.Version >= 31;
+  Platform.OS === "android" &&
+  typeof Platform.Version === "number" &&
+  Platform.Version >= 31;
 
 function resolveSeed(primaryColor?: string): string {
   if (primaryColor && primaryColor !== FALLBACK_SEED) {
@@ -66,15 +68,22 @@ function getThemeColors(useMaterialYou: boolean, primaryColor?: string) {
   return FALLBACK_COLORS;
 }
 
-export function createDefaultTheme(useMaterialYou: boolean, primaryColor: string) {
+export function createDefaultTheme(
+  useMaterialYou: boolean,
+  primaryColor: string
+) {
   const colors = getThemeColors(useMaterialYou, primaryColor);
 
   return {
     ...NativeDefaultTheme,
     colors: {
       ...NativeDefaultTheme.colors,
-      primary: useMaterialYou ? colors.light.primary : (primaryColor || colors.light.primary),
-      tint: useMaterialYou ? colors.light.tint : (primaryColor || colors.light.tint),
+      primary: useMaterialYou
+        ? colors.light.primary
+        : primaryColor || colors.light.primary,
+      tint: useMaterialYou
+        ? colors.light.tint
+        : primaryColor || colors.light.tint,
       background: colors.light.background,
       overground: "#F3F6F7",
       text: colors.light.text,
@@ -91,8 +100,12 @@ export function createDarkTheme(useMaterialYou: boolean, primaryColor: string) {
     ...NativeDarkTheme,
     colors: {
       ...NativeDarkTheme.colors,
-      primary: useMaterialYou ? colors.dark.primary : (primaryColor || colors.dark.primary),
-      tint: useMaterialYou ? colors.dark.tint : (primaryColor || colors.dark.tint),
+      primary: useMaterialYou
+        ? colors.dark.primary
+        : primaryColor || colors.dark.primary,
+      tint: useMaterialYou
+        ? colors.dark.tint
+        : primaryColor || colors.dark.tint,
       background: colors.dark.background,
       overground: "#1E1E1E",
       text: colors.dark.text,
@@ -102,7 +115,10 @@ export function createDarkTheme(useMaterialYou: boolean, primaryColor: string) {
   };
 }
 
-export function createAmoledTheme(useMaterialYou: boolean, primaryColor: string) {
+export function createAmoledTheme(
+  useMaterialYou: boolean,
+  primaryColor: string
+) {
   const colors = getThemeColors(useMaterialYou, primaryColor);
 
   return {
@@ -110,8 +126,12 @@ export function createAmoledTheme(useMaterialYou: boolean, primaryColor: string)
     dark: true,
     colors: {
       ...NativeDarkTheme.colors,
-      primary: useMaterialYou ? colors.dark.primary : (primaryColor || colors.dark.primary),
-      tint: useMaterialYou ? colors.dark.tint : (primaryColor || colors.dark.tint),
+      primary: useMaterialYou
+        ? colors.dark.primary
+        : primaryColor || colors.dark.primary,
+      tint: useMaterialYou
+        ? colors.dark.tint
+        : primaryColor || colors.dark.tint,
       background: "#000000",
       overground: "#000000",
       text: colors.dark.text,

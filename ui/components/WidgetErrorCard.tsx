@@ -13,34 +13,36 @@ type WidgetErrorCardProps = {
   onRetry?: () => void;
 };
 
-export const WidgetErrorCard = memo(({ title, message, onRetry }: WidgetErrorCardProps) => {
-  const { colors } = useTheme();
-  return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: colors.card, borderColor: colors.border },
-      ]}
-    >
-      <Icon papicon opacity={0.5} size={28}>
-        <Papicons name="AlertTriangle" />
-      </Icon>
-      <Typography variant="title" align="center">
-        {title ?? "Impossible de charger"}
-      </Typography>
-      {message ? (
-        <Typography variant="body2" color="secondary" align="center">
-          {message}
+export const WidgetErrorCard = memo(
+  ({ title, message, onRetry }: WidgetErrorCardProps) => {
+    const { colors } = useTheme();
+    return (
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
+        <Icon papicon opacity={0.5} size={28}>
+          <Papicons name="AlertTriangle" />
+        </Icon>
+        <Typography variant="title" align="center">
+          {title ?? "Impossible de charger"}
         </Typography>
-      ) : null}
-      {onRetry ? (
-        <View style={styles.buttonWrap}>
-          <Button title="Réessayer" onPress={onRetry} inline size="small" />
-        </View>
-      ) : null}
-    </View>
-  );
-});
+        {message ? (
+          <Typography variant="body2" color="secondary" align="center">
+            {message}
+          </Typography>
+        ) : null}
+        {onRetry ? (
+          <View style={styles.buttonWrap}>
+            <Button title="Réessayer" onPress={onRetry} inline size="small" />
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+);
 
 WidgetErrorCard.displayName = "WidgetErrorCard";
 

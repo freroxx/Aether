@@ -3,8 +3,14 @@ import * as Network from "expo-network";
 let cached: boolean | null = null;
 let subscribed = false;
 
-function applyState(state: { isInternetReachable?: boolean | null; isConnected?: boolean | null }): void {
-  if (state.isInternetReachable !== undefined && state.isInternetReachable !== null) {
+function applyState(state: {
+  isInternetReachable?: boolean | null;
+  isConnected?: boolean | null;
+}): void {
+  if (
+    state.isInternetReachable !== undefined &&
+    state.isInternetReachable !== null
+  ) {
     cached = state.isInternetReachable;
   } else if (state.isConnected !== undefined && state.isConnected !== null) {
     cached = state.isConnected;
@@ -15,9 +21,14 @@ function ensureSubscribed(): void {
   if (subscribed) return;
   subscribed = true;
   try {
-    Network.addNetworkStateListener((event: { isInternetReachable?: boolean | null; isConnected?: boolean | null }) => {
-      applyState(event);
-    });
+    Network.addNetworkStateListener(
+      (event: {
+        isInternetReachable?: boolean | null;
+        isConnected?: boolean | null;
+      }) => {
+        applyState(event);
+      }
+    );
     Network.getNetworkStateAsync()
       .then(state => applyState(state))
       .catch(() => {});

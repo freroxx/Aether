@@ -60,7 +60,11 @@ function trackKey(key: string): void {
 function evictIfNeeded(): void {
   try {
     const all = getAllKeys();
-    if (all.length <= MAX_SIMPLE_CACHE_KEYS && keyInsertionOrder.length <= MAX_SIMPLE_CACHE_KEYS) return;
+    if (
+      all.length <= MAX_SIMPLE_CACHE_KEYS &&
+      keyInsertionOrder.length <= MAX_SIMPLE_CACHE_KEYS
+    )
+      return;
     const overflow = Math.max(
       all.length - MAX_SIMPLE_CACHE_KEYS,
       keyInsertionOrder.length - MAX_SIMPLE_CACHE_KEYS
@@ -209,8 +213,8 @@ export async function clearSimpleCache(): Promise<void> {
   }
 }
 
-export function simpleCacheKey(parts: Array<string | number | undefined>): string {
-  return parts
-    .map(p => (p === undefined ? "" : String(p)))
-    .join(":");
+export function simpleCacheKey(
+  parts: Array<string | number | undefined>
+): string {
+  return parts.map(p => (p === undefined ? "" : String(p))).join(":");
 }

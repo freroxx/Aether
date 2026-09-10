@@ -1,6 +1,6 @@
-import { create } from 'zustand'
+import { create } from "zustand";
 
-import { Log, LogsStorage, NetworkStorage } from './types'
+import { Log, LogsStorage, NetworkStorage } from "./types";
 
 const MAX_LOGS = 200;
 const MAX_REQUESTS_PER_HOST = 50;
@@ -10,8 +10,8 @@ const MAX_HOSTS = 10;
 export const useLogStore = create<LogsStorage>((set, get) => ({
   logs: [],
   // Ring buffer: cap to 200 entries to avoid unbounded memory growth.
-  addItem: (log: Log) => set({ logs: [...get().logs, log].slice(-MAX_LOGS) })
-}))
+  addItem: (log: Log) => set({ logs: [...get().logs, log].slice(-MAX_LOGS) }),
+}));
 
 const sanitizeUrl = (rawUrl: string): string => {
   const url = new URL(rawUrl);
@@ -21,7 +21,7 @@ const sanitizeUrl = (rawUrl: string): string => {
 export const useNetworkStore = create<NetworkStorage>((set, get) => ({
   hosts: new Map(),
   addRequest: (request: Request, uuid: string) => {
-    const url = sanitizeUrl(request.url)
+    const url = sanitizeUrl(request.url);
     const hosts = get().hosts;
 
     if (!hosts.has(url)) {
@@ -43,7 +43,7 @@ export const useNetworkStore = create<NetworkStorage>((set, get) => ({
     set({ hosts: new Map(hosts) });
   },
   addResponse: (response: Response, uuid: string) => {
-    const url = sanitizeUrl(response.url)
+    const url = sanitizeUrl(response.url);
     const hosts = get().hosts;
     if (!hosts.has(url)) {
       // Evict oldest host when cap reached (Map preserves insertion order).
@@ -60,5 +60,5 @@ export const useNetworkStore = create<NetworkStorage>((set, get) => ({
       entry.responses = entry.responses.slice(-MAX_RESPONSES_PER_HOST);
     }
     set({ hosts: new Map(hosts) });
-  }
-}))
+  },
+}));

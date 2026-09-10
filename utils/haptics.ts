@@ -46,7 +46,8 @@ export async function selection(): Promise<void> {
   }
 }
 
-export type HapticResult = "success" | "error" | "light" | "medium" | "selection" | "warning";
+export type HapticResult =
+  "success" | "error" | "light" | "medium" | "selection" | "warning";
 
 export function hapticFor(result: HapticResult): Promise<void> {
   switch (result) {
@@ -60,7 +61,9 @@ export function hapticFor(result: HapticResult): Promise<void> {
       return selection();
     case "warning":
       try {
-        return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(silent);
+        return Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Warning
+        ).catch(silent);
       } catch (e) {
         silent(e);
         return Promise.resolve();
