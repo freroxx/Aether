@@ -1,4 +1,12 @@
-import { Alert, Modal, Platform, ScrollView, Switch, TextInput, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  Switch,
+  TextInput,
+  View,
+} from "react-native";
 import Stack from "@/ui/components/Stack";
 import { EarthIcon } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -14,7 +22,10 @@ import { AppColors } from "@/utils/colors";
 import LinearGradient from "react-native-linear-gradient";
 import adjust from "@/utils/adjustColor";
 import { useAccountStore } from "@/stores/account";
-import { DEFAULT_MATERIAL_YOU_ENABLED, useSettingsStore } from "@/stores/settings";
+import {
+  DEFAULT_MATERIAL_YOU_ENABLED,
+  useSettingsStore,
+} from "@/stores/settings";
 import { useTranslation } from "react-i18next";
 import { router } from "expo-router";
 import { Dynamic } from "@/ui/components/Dynamic";
@@ -33,23 +44,32 @@ const FONT_OPTIONS = [
 
 const PersonalizationSettings = () => {
   const theme = useTheme();
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   const store = useAccountStore.getState();
   const settingsStore = useSettingsStore(state => state.personalization);
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
-  const useMaterialYou = settingsStore.useMaterialYou ?? DEFAULT_MATERIAL_YOU_ENABLED;
+  const useMaterialYou =
+    settingsStore.useMaterialYou ?? DEFAULT_MATERIAL_YOU_ENABLED;
   const selectedFontFamily = settingsStore.fontFamily ?? "sn-pro";
   const selectedFontIndex = Math.max(
     FONT_OPTIONS.findIndex(option => option.value === selectedFontFamily),
     0
   );
 
-  const defaultColorData = AppColors.find(color => color.colorEnum === settingsStore.colorSelected) || AppColors[0];
-  const [selectedColor, setSelectedColor] = React.useState<string>(defaultColorData.mainColor);
-  const [selectedTheme, setSelectedTheme] = React.useState<"light" | "dark" | "auto">("auto");
+  const defaultColorData =
+    AppColors.find(color => color.colorEnum === settingsStore.colorSelected) ||
+    AppColors[0];
+  const [selectedColor, setSelectedColor] = React.useState<string>(
+    defaultColorData.mainColor
+  );
+  const [selectedTheme, setSelectedTheme] = React.useState<
+    "light" | "dark" | "auto" | "amoled"
+  >("auto");
   const [showApiUrlModal, setShowApiUrlModal] = useState(false);
-  const [tempApiUrl, setTempApiUrl] = useState(settingsStore.pronoteApiUrl || "");
+  const [tempApiUrl, setTempApiUrl] = useState(
+    settingsStore.pronoteApiUrl || ""
+  );
 
   const height = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -62,12 +82,17 @@ const PersonalizationSettings = () => {
   }, []);
 
   useEffect(() => {
-    mutateProperty('personalization', { theme: selectedTheme });
+    mutateProperty("personalization", { theme: selectedTheme });
   }, [selectedTheme]);
 
   return (
     <>
-      <Dynamic animated entering={FadeIn} exiting={FadeOut} key={'color-grad-stgs:' + theme.colors.primary}>
+      <Dynamic
+        animated
+        entering={FadeIn}
+        exiting={FadeOut}
+        key={"color-grad-stgs:" + theme.colors.primary}
+      >
         <LinearGradient
           colors={[theme.colors.primary, theme.colors.primary + "00"]}
           style={{
@@ -89,7 +114,7 @@ const PersonalizationSettings = () => {
         contentInsetAdjustmentBehavior="always"
         style={{ flex: 1 }}
       >
-        {!useMaterialYou &&
+        {!useMaterialYou && (
           <List.Section>
             <List.SectionTitle>
               <List.Label>Choix de la couleur</List.Label>
@@ -99,10 +124,12 @@ const PersonalizationSettings = () => {
                 onChangeColor={(color: string) => {
                   setSelectedColor(color);
                   setTimeout(() => {
-                    const colorData = AppColors.find(appColor => appColor.mainColor === color);
+                    const colorData = AppColors.find(
+                      appColor => appColor.mainColor === color
+                    );
                     if (colorData) {
-                      mutateProperty('personalization', {
-                        colorSelected: colorData.colorEnum
+                      mutateProperty("personalization", {
+                        colorSelected: colorData.colorEnum,
                       });
                     }
                   }, 50);
@@ -111,7 +138,7 @@ const PersonalizationSettings = () => {
               />
             </List.View>
           </List.Section>
-        }
+        )}
 
         <List.Section>
           <List.SectionTitle>
@@ -124,18 +151,27 @@ const PersonalizationSettings = () => {
                   <Papicons name={"Palette"} />
                 </Icon>
               </List.Leading>
-              <Typography variant="caption" color={"primary"}>{t("Global_Recommended")}</Typography>
-              <Typography variant="title">{t("Settings_Personalization_MaterialYou_Title")}</Typography>
+              <Typography variant="caption" color={"primary"}>
+                {t("Global_Recommended")}
+              </Typography>
+              <Typography variant="title">
+                {t("Settings_Personalization_MaterialYou_Title")}
+              </Typography>
               <Typography variant="body1" color="textSecondary">
                 {t("Settings_Personalization_MaterialYou_Description")}
               </Typography>
               <List.Trailing>
                 <NativeSwitch
                   value={useMaterialYou}
-                  onValueChange={(value) => {
-                    mutateProperty("personalization", { useMaterialYou: value });
+                  onValueChange={value => {
+                    mutateProperty("personalization", {
+                      useMaterialYou: value,
+                    });
                   }}
-                  disabled={typeof Platform.Version !== "number" || Platform.Version < 31}
+                  disabled={
+                    typeof Platform.Version !== "number" ||
+                    Platform.Version < 31
+                  }
                 />
               </List.Trailing>
             </List.Item>
@@ -146,65 +182,157 @@ const PersonalizationSettings = () => {
                 <Papicons name={"ColorTheme"} />
               </Icon>
             </List.Leading>
-            <Typography variant="title">{t("Settings_Personalization_Theme")}</Typography>
+            <Typography variant="title">
+              {t("Settings_Personalization_Theme")}
+            </Typography>
             <List.Trailing>
-              <Stack bordered={true}
+              <Stack
+                bordered={true}
                 direction={"horizontal"}
                 height={40}
                 hAlign={"center"}
                 vAlign={"center"}
               >
-                <AnimatedPressable onPress={() => {
-                  setSelectedTheme("light");
-                }}
+                <AnimatedPressable
+                  onPress={() => {
+                    setSelectedTheme("light");
+                  }}
                   style={{ overflow: "hidden", height: "100%" }}
                 >
-                  <Stack style={{ overflow: "hidden", paddingHorizontal: 15, height: "100%" }}
+                  <Stack
+                    style={{
+                      overflow: "hidden",
+                      paddingHorizontal: 15,
+                      height: "100%",
+                    }}
                     hAlign={"center"}
                     vAlign={"center"}
-                    backgroundColor={selectedTheme === "light" ? theme.colors.primary : "transparent"}
+                    backgroundColor={
+                      selectedTheme === "light"
+                        ? theme.colors.primary
+                        : "transparent"
+                    }
                     radius={20}
                   >
-                    <Papicons name={"Sun"}
+                    <Papicons
+                      name={"Sun"}
                       opacity={selectedTheme === "light" ? 1 : 0.7}
-                      color={selectedTheme === "light" ? "#FFF" : theme.colors.text}
+                      color={
+                        selectedTheme === "light" ? "#FFF" : theme.colors.text
+                      }
                     />
                   </Stack>
                 </AnimatedPressable>
-                <AnimatedPressable onPress={() => {
-                  setSelectedTheme("dark");
-                }}
+                <AnimatedPressable
+                  onPress={() => {
+                    setSelectedTheme("dark");
+                  }}
                   style={{ overflow: "hidden", height: "100%" }}
                 >
-                  <Stack style={{ overflow: "hidden", paddingHorizontal: 15, height: "100%" }}
+                  <Stack
+                    style={{
+                      overflow: "hidden",
+                      paddingHorizontal: 15,
+                      height: "100%",
+                    }}
                     hAlign={"center"}
                     vAlign={"center"}
-                    backgroundColor={selectedTheme === "dark" ? theme.colors.primary : "transparent"}
+                    backgroundColor={
+                      selectedTheme === "dark"
+                        ? theme.colors.primary
+                        : "transparent"
+                    }
                     radius={20}
                   >
-                    <Papicons name={"Moon"}
+                    <Papicons
+                      name={"Moon"}
                       opacity={selectedTheme === "dark" ? 1 : 0.7}
-                      color={selectedTheme === "dark" ? "#FFF" : theme.colors.text}
+                      color={
+                        selectedTheme === "dark" ? "#FFF" : theme.colors.text
+                      }
                     />
                   </Stack>
                 </AnimatedPressable>
-                <AnimatedPressable onPress={() => {
-                  setSelectedTheme("auto");
-                }}
+                <AnimatedPressable
+                  onPress={() => {
+                    setSelectedTheme("auto");
+                  }}
                   style={{ overflow: "hidden", height: "100%" }}
                 >
-                  <Stack style={{ overflow: "hidden", paddingHorizontal: 15, height: "100%" }}
+                  <Stack
+                    style={{
+                      overflow: "hidden",
+                      paddingHorizontal: 15,
+                      height: "100%",
+                    }}
                     hAlign={"center"}
                     vAlign={"center"}
-                    backgroundColor={selectedTheme === "auto" ? theme.colors.primary : "transparent"}
+                    backgroundColor={
+                      selectedTheme === "auto"
+                        ? theme.colors.primary
+                        : "transparent"
+                    }
                     radius={20}
                   >
-                    <Typography color={selectedTheme === "auto" ? "#FFF" : theme.colors.text + "7F"}>Auto</Typography>
+                    <Typography
+                      color={
+                        selectedTheme === "auto"
+                          ? "#FFF"
+                          : theme.colors.text + "7F"
+                      }
+                    >
+                      Auto
+                    </Typography>
+                  </Stack>
+                </AnimatedPressable>
+                <AnimatedPressable
+                  onPress={() => {
+                    setSelectedTheme("amoled");
+                  }}
+                  style={{ overflow: "hidden", height: "100%" }}
+                  accessibilityLabel="Thème AMOLED noir pur"
+                  accessibilityRole="button"
+                >
+                  <Stack
+                    style={{
+                      overflow: "hidden",
+                      paddingHorizontal: 15,
+                      height: "100%",
+                    }}
+                    hAlign={"center"}
+                    vAlign={"center"}
+                    backgroundColor={
+                      selectedTheme === "amoled"
+                        ? theme.colors.primary
+                        : "transparent"
+                    }
+                    radius={20}
+                  >
+                    <Papicons
+                      name={"Moon"}
+                      opacity={selectedTheme === "amoled" ? 1 : 0.7}
+                      color={
+                        selectedTheme === "amoled" ? "#FFF" : theme.colors.text
+                      }
+                    />
                   </Stack>
                 </AnimatedPressable>
               </Stack>
             </List.Trailing>
           </List.Item>
+          {selectedTheme === "amoled" && (
+            <List.Item>
+              <List.Leading>
+                <Icon>
+                  <Papicons name={"Info"} />
+                </Icon>
+              </List.Leading>
+              <Typography variant="title">AMOLED — noir pur</Typography>
+              <Typography variant="body1" color="textSecondary">
+                Économise la batterie sur écran OLED, contraste maximal.
+              </Typography>
+            </List.Item>
+          )}
           <List.Item>
             <List.Leading>
               <Icon>
@@ -219,10 +347,12 @@ const PersonalizationSettings = () => {
               <Picker
                 options={FONT_OPTIONS.map(option => option.label)}
                 selectedIndex={selectedFontIndex}
-                onValueChange={(index) => {
+                onValueChange={index => {
                   const option = FONT_OPTIONS[index];
                   if (!option) return;
-                  mutateProperty("personalization", { fontFamily: option.value });
+                  mutateProperty("personalization", {
+                    fontFamily: option.value,
+                  });
                 }}
               />
             </List.Trailing>
@@ -243,14 +373,16 @@ const PersonalizationSettings = () => {
                 <Papicons name={"Palette"} />
               </Icon>
             </List.Leading>
-            <Typography variant="title">Image de fond d&apos;accueil</Typography>
+            <Typography variant="title">
+              Image de fond d&apos;accueil
+            </Typography>
             <Typography variant="body1" color="textSecondary">
               {settingsStore.wallpaper?.gradient?.name ||
                 (settingsStore.wallpaper?.type === "gradient"
                   ? "Dégradé personnalisé"
                   : settingsStore.wallpaper?.id?.startsWith("custom:")
-                  ? "Image personnalisée"
-                  : "Nuages Aether (Défaut)")}
+                    ? "Image personnalisée"
+                    : "Nuages Aether (Défaut)")}
             </Typography>
             <List.Trailing>
               <Icon>
@@ -274,7 +406,9 @@ const PersonalizationSettings = () => {
                 <Papicons name={"PenAlt"} />
               </Icon>
             </List.Leading>
-            <Typography variant="title">{t("Settings_Personalization_Subject_Title")}</Typography>
+            <Typography variant="title">
+              {t("Settings_Personalization_Subject_Title")}
+            </Typography>
             <Typography variant="body1" color="textSecondary">
               {t("Settings_Personalization_Subject_Description")}
             </Typography>
@@ -300,10 +434,12 @@ const PersonalizationSettings = () => {
                 <Papicons name={"PapillonApp"} />
               </Icon>
             </List.Leading>
-            <Typography variant={"title"}>{t("Settings_Tabs_Title")}</Typography>
-            <Typography variant={"body1"}
-              color={"textSecondary"}
-            >{t("Settings_Tabs_Description")}</Typography>
+            <Typography variant={"title"}>
+              {t("Settings_Tabs_Title")}
+            </Typography>
+            <Typography variant={"body1"} color={"textSecondary"}>
+              {t("Settings_Tabs_Description")}
+            </Typography>
             <List.Trailing>
               <Icon>
                 <Papicons name="ChevronRight" opacity={0.7} />
@@ -316,15 +452,20 @@ const PersonalizationSettings = () => {
                 <Papicons name={"User"} />
               </Icon>
             </List.Leading>
-            <Typography variant={"title"}>Masquer mon nom sur l&apos;accueil</Typography>
+            <Typography variant={"title"}>
+              Masquer mon nom sur l&apos;accueil
+            </Typography>
             <Typography variant={"body1"} color={"textSecondary"}>
-              Préserve votre anonymat lors de l&apos;ouverture de l&apos;application
+              Préserve votre anonymat lors de l&apos;ouverture de
+              l&apos;application
             </Typography>
             <List.Trailing>
               <NativeSwitch
                 value={settingsStore.hideNameOnHomeScreen ?? false}
-                onValueChange={(val) => {
-                  mutateProperty("personalization", { hideNameOnHomeScreen: val });
+                onValueChange={val => {
+                  mutateProperty("personalization", {
+                    hideNameOnHomeScreen: val,
+                  });
                 }}
               />
             </List.Trailing>
@@ -335,15 +476,19 @@ const PersonalizationSettings = () => {
                 <Papicons name={"Calendar"} />
               </Icon>
             </List.Leading>
-            <Typography variant={"title"}>Afficher le week-end sur les cours</Typography>
+            <Typography variant={"title"}>
+              Afficher le week-end sur les cours
+            </Typography>
             <Typography variant={"body1"} color={"textSecondary"}>
               Affiche le samedi et le dimanche dans l&apos;emploi du temps
             </Typography>
             <List.Trailing>
               <NativeSwitch
                 value={settingsStore.showWeekendsOnTimetable ?? false}
-                onValueChange={(val) => {
-                  mutateProperty("personalization", { showWeekendsOnTimetable: val });
+                onValueChange={val => {
+                  mutateProperty("personalization", {
+                    showWeekendsOnTimetable: val,
+                  });
                 }}
               />
             </List.Trailing>
@@ -358,10 +503,12 @@ const PersonalizationSettings = () => {
                 <Papicons name={"MapPin"} />
               </Icon>
             </List.Leading>
-            <Typography variant={"title"}>{t("Settings_Language_Title")}</Typography>
-            <Typography variant={"body1"}
-              color={"textSecondary"}
-            >{t("Settings_Language_Description")}</Typography>
+            <Typography variant={"title"}>
+              {t("Settings_Language_Title")}
+            </Typography>
+            <Typography variant={"body1"} color={"textSecondary"}>
+              {t("Settings_Language_Description")}
+            </Typography>
             <List.Trailing>
               <Icon>
                 <Papicons name="ChevronRight" opacity={0.7} />
@@ -398,8 +545,25 @@ const PersonalizationSettings = () => {
         animationType="fade"
         onRequestClose={() => setShowApiUrlModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", padding: 24 }}>
-          <View style={{ backgroundColor: theme.colors.card, borderRadius: 20, padding: 22, width: "100%", maxWidth: 420, gap: 14 }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.colors.card,
+              borderRadius: 20,
+              padding: 22,
+              width: "100%",
+              maxWidth: 420,
+              gap: 14,
+            }}
+          >
             <Typography variant="h3">Serveur API Pronote</Typography>
             <Typography variant="body1" color="textSecondary">
               Indiquez l&apos;URL de votre microservice Vercel (pronotepy).
@@ -421,12 +585,18 @@ const PersonalizationSettings = () => {
                 backgroundColor: theme.colors.background,
               }}
             />
-            <Stack direction="horizontal" gap={10} style={{ justifyContent: "flex-end", marginTop: 8 }}>
+            <Stack
+              direction="horizontal"
+              gap={10}
+              style={{ justifyContent: "flex-end", marginTop: 8 }}
+            >
               <Button
                 label="Réinitialiser"
                 variant="text"
                 onPress={() => {
-                  mutateProperty("personalization", { pronoteApiUrl: undefined });
+                  mutateProperty("personalization", {
+                    pronoteApiUrl: undefined,
+                  });
                   setShowApiUrlModal(false);
                 }}
               />
@@ -434,7 +604,9 @@ const PersonalizationSettings = () => {
                 label="Enregistrer"
                 variant="primary"
                 onPress={() => {
-                  mutateProperty("personalization", { pronoteApiUrl: tempApiUrl.trim() || undefined });
+                  mutateProperty("personalization", {
+                    pronoteApiUrl: tempApiUrl.trim() || undefined,
+                  });
                   setShowApiUrlModal(false);
                 }}
               />
@@ -443,7 +615,7 @@ const PersonalizationSettings = () => {
         </View>
       </Modal>
     </>
-  )
+  );
 };
 
 export default PersonalizationSettings;

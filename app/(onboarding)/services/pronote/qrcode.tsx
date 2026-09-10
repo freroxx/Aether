@@ -6,9 +6,26 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Linking, Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
-import Reanimated, { FadeInUp, FadeOutUp, LinearTransition } from "react-native-reanimated";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
+import Reanimated, {
+  FadeInUp,
+  FadeOutUp,
+  LinearTransition,
+} from "react-native-reanimated";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { useAccountStore } from "@/stores/account";
 import { Services } from "@/stores/account/types";
@@ -18,7 +35,34 @@ import { useAlert } from "@/ui/components/AlertProvider";
 import Icon from "@/ui/components/Icon";
 import Typography from "@/ui/components/Typography";
 import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
+import { error as logError } from "@/utils/logger/logger";
+import { hapticFor } from "@/utils/haptics";
 import uuid from "@/utils/uuid/uuid";
+
+function describeQRError(e: unknown): string {
+  const msg = String((e as any)?.message || e || "").toLowerCase();
+  if (msg.includes("pin") || msg.includes("code")) {
+    return "Code PIN incorrect. Vérifie les 4 chiffres affichés dans Pronote.";
+  }
+  if (
+    msg.includes("expir") ||
+    msg.includes("jeton") ||
+    msg.includes("token") ||
+    msg.includes("datasec")
+  ) {
+    return "QR Code expiré ou déjà utilisé. Génère un nouveau QR Code dans Pronote (Profil > QR Code).";
+  }
+  if (
+    msg.includes("network") ||
+    msg.includes("timeout") ||
+    msg.includes("injoignable") ||
+    msg.includes("504") ||
+    msg.includes("502")
+  ) {
+    return "Serveur Pronote injoignable. Vérifie ta connexion puis réessaie.";
+  }
+  return "Code PIN incorrect ou QR Code expiré. Génère un nouveau QR Code dans Pronote.";
+}
 
 export default function PronoteLoginWithQR() {
   const theme = useTheme();
@@ -60,15 +104,22 @@ export default function PronoteLoginWithQR() {
       const { initAccountAfterLogin } = await import("./postLogin");
       await initAccountAfterLogin(accountID);
       setLoadingModalVisible(false);
-      const { finishAuthNavigation } = await import("@/utils/navigation/finishAuth");
+      await hapticFor("success");
+      const { finishAuthNavigation } =
+        await import("@/utils/navigation/finishAuth");
       finishAuthNavigation();
     } catch (e) {
-      console.error("QR post-login retry failed:", e);
+      logError(
+        "QR post-login retry failed: " + String(e),
+        "qrcode.retryPostLoginInit"
+      );
       setLoadingModalVisible(false);
+      await hapticFor("error");
       const { describeInitError } = await import("./postLogin");
       alert.showAlert({
         title: "Synchronisation impossible",
-        description: "La synchronisation a encore échoué : " + describeInitError(e),
+        description:
+          "La synchronisation a encore échoué : " + describeInitError(e),
         icon: "Refresh",
         color: "#E05D34",
         customButton: {
@@ -91,6 +142,13 @@ export default function PronoteLoginWithQR() {
     if (QRValidationCode === "" || QRValidationCode.length !== 4) {
       setLoadingModalVisible(false);
       loginInFlight.current = false;
+      await hapticFor("error");
+      alert.showAlert({
+        title: "Code incomplet",
+        description: "Saisis les 4 chiffres affichés dans Pronote.",
+        icon: "QrCode",
+        color: "#E05D34",
+      });
       return;
     }
 
@@ -100,7 +158,9 @@ export default function PronoteLoginWithQR() {
 
     try {
       const decodedJSON = JSON.parse(QRData!);
-      const detectedAccountType = initialAccountType || (decodedJSON?.url?.includes("parent") ? "parent" : "eleve");
+      const detectedAccountType =
+        initialAccountType ||
+        (decodedJSON?.url?.includes("parent") ? "parent" : "eleve");
 
       const res = await PronoteApiClient.qrCodeLogin(
         {
@@ -117,10 +177,14 @@ export default function PronoteLoginWithQR() {
         throw new Error("Échec de connexion QR Code");
       }
 
-      const { firstName, lastName } = GetIdentityFromPronoteUsername(res.user?.name || decodedJSON.login);
+      const { firstName, lastName } = GetIdentityFromPronoteUsername(
+        res.user?.name || decodedJSON.login
+      );
       const schoolName = res.user?.establishment || "Pronote";
       const className = res.user?.class_name || "";
-      const isParent = res.user?.account_type === "parent" || (res.children && res.children.length > 0);
+      const isParent =
+        res.user?.account_type === "parent" ||
+        (res.children && res.children.length > 0);
       const accountType = isParent ? "parent" : "eleve";
       const children = res.children || [];
       const selectedChild = children.length > 0 ? children[0].name : undefined;
@@ -146,31 +210,33 @@ export default function PronoteLoginWithQR() {
         selectedChild,
         customisation: {
           profilePicture: "",
-          subjects: {}
+          subjects: {},
         },
-        services: [{
-          id: accountID,
-          auth: {
-            accessToken: res.auth_token,
-            refreshToken: res.auth_token,
-            additionals: {
-              instanceURL: rawUrl,
-              url: rawUrl,
-              username: rawUsername,
-              deviceUUID: deviceUuid,
-              uuid: rawUuid,
-              token: rawToken,
-              authToken: res.auth_token,
-              accountType,
-              account_type: accountType,
-            }
+        services: [
+          {
+            id: accountID,
+            auth: {
+              accessToken: res.auth_token,
+              refreshToken: res.auth_token,
+              additionals: {
+                instanceURL: rawUrl,
+                url: rawUrl,
+                username: rawUsername,
+                deviceUUID: deviceUuid,
+                uuid: rawUuid,
+                token: rawToken,
+                authToken: res.auth_token,
+                accountType,
+                account_type: accountType,
+              },
+            },
+            serviceId: Services.PRONOTE,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           },
-          serviceId: Services.PRONOTE,
-          createdAt: (new Date()).toISOString(),
-          updatedAt: (new Date()).toISOString()
-        }],
-        createdAt: (new Date()).toISOString(),
-        updatedAt: (new Date()).toISOString()
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
       useAccountStore.getState().setLastUsedAccount(accountID);
       // Vérifie que le compte s'initialise (manager + première session) AVANT
@@ -181,9 +247,10 @@ export default function PronoteLoginWithQR() {
         const { initAccountAfterLogin } = await import("./postLogin");
         await initAccountAfterLogin(accountID);
       } catch (e) {
-        console.error("QR post-login init failed:", e);
+        logError("QR post-login init failed: " + String(e), "qrcode.loginQR");
         setLoadingModalVisible(false);
         loginInFlight.current = false;
+        await hapticFor("error");
         const { describeInitError } = await import("./postLogin");
         alert.showAlert({
           title: "Synchronisation impossible",
@@ -202,15 +269,20 @@ export default function PronoteLoginWithQR() {
       }
       setLoadingModalVisible(false);
       loginInFlight.current = false;
-      const { finishAuthNavigation } = await import("@/utils/navigation/finishAuth");
+      const { finishAuthNavigation } =
+        await import("@/utils/navigation/finishAuth");
       finishAuthNavigation();
     } catch (error: any) {
-      console.error("QR Login Error:", error);
+      logError(
+        "QR Login Error: " + String(error?.message || error),
+        "qrcode.loginQR"
+      );
       setLoadingModalVisible(false);
       loginInFlight.current = false;
+      await hapticFor("error");
       alert.showAlert({
         title: "Erreur de connexion",
-        description: error?.message || "Code PIN incorrect ou QR Code expiré. Veuillez générer un nouveau QR Code.",
+        description: describeQRError(error),
         icon: "QrCode",
         color: "#E05D34",
       });
@@ -223,10 +295,7 @@ export default function PronoteLoginWithQR() {
     }
   }, [permission?.granted, requestPermission]);
 
-  const handleBarCodeScanned = ({ data }: {
-    type: string;
-    data: string;
-  }) => {
+  const handleBarCodeScanned = ({ data }: { type: string; data: string }) => {
     setScanned(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setQRData(data);
@@ -244,8 +313,14 @@ export default function PronoteLoginWithQR() {
   const keyboardDidHide = () => setKeyboardOpen(false);
 
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", keyboardDidShow);
-    const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", keyboardDidHide);
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      keyboardDidShow
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      keyboardDidHide
+    );
 
     return () => {
       keyboardDidShowListener?.remove();
@@ -272,9 +347,7 @@ export default function PronoteLoginWithQR() {
         >
           <View style={{ flex: 1 }} />
 
-          <ActivityIndicator
-            size="large"
-          />
+          <ActivityIndicator size="large" />
 
           <Typography
             style={{
@@ -368,15 +441,17 @@ export default function PronoteLoginWithQR() {
             }}
             layout={LinearTransition}
           >
-            <Typography style={{
-              color: colors.text,
-              fontSize: 16,
-              textAlign: "center",
-              marginHorizontal: 24,
-              fontWeight: "400",
-              width: 300,
-              marginBottom: 12
-            }}>
+            <Typography
+              style={{
+                color: colors.text,
+                fontSize: 16,
+                textAlign: "center",
+                marginHorizontal: 24,
+                fontWeight: "400",
+                width: 300,
+                marginBottom: 12,
+              }}
+            >
               {t("ONBOARDING_PRONOTE_PIN")}
             </Typography>
           </Reanimated.View>
@@ -408,7 +483,7 @@ export default function PronoteLoginWithQR() {
               maxLength={4}
               secureTextEntry
               value={QRValidationCode}
-              onChangeText={(text) => setQRValidationCode(text)}
+              onChangeText={text => setQRValidationCode(text)}
               ref={codeInput}
               autoFocus
             />
@@ -440,9 +515,7 @@ export default function PronoteLoginWithQR() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <View style={[styles.explainations,
-        { top: insets.top + 48 + 10 }
-      ]}>
+      <View style={[styles.explainations, { top: insets.top + 48 + 10 }]}>
         <Icon size={40} fill={"white"} papicon>
           <Papicons name="QrCode" />
         </Icon>
@@ -459,19 +532,27 @@ export default function PronoteLoginWithQR() {
           <CameraView
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={
-              scanned ? undefined : handleBarCodeScanned
-            }
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
             onMountError={() => setCameraError("Impossible d'ouvrir la caméra")}
             style={StyleSheet.absoluteFill}
           />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", padding: 32 }]}>
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { alignItems: "center", justifyContent: "center", padding: 32 },
+            ]}
+          >
             {!permission ? (
               <ActivityIndicator size="large" color="#FFFFFF" />
             ) : cameraError ? (
               <>
-                <Typography style={[styles.text, { textAlign: "center", marginBottom: 16 }]}>
+                <Typography
+                  style={[
+                    styles.text,
+                    { textAlign: "center", marginBottom: 16 },
+                  ]}
+                >
                   {cameraError}
                 </Typography>
                 <Pressable
@@ -479,22 +560,47 @@ export default function PronoteLoginWithQR() {
                     setCameraError(null);
                     setScanned(false);
                   }}
-                  style={{ backgroundColor: "#FFFFFF2A", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16 }}
+                  style={{
+                    backgroundColor: "#FFFFFF2A",
+                    paddingHorizontal: 20,
+                    paddingVertical: 12,
+                    borderRadius: 16,
+                  }}
                 >
                   <Typography style={styles.title}>Réessayer</Typography>
                 </Pressable>
               </>
             ) : (
               <>
-                <Typography style={[styles.text, { textAlign: "center", marginBottom: 16 }]}>
-                  {t("ONBOARDING_CAMERA_PERMISSION") || "Aether a besoin de la caméra pour scanner le QR Code."}
+                <Typography
+                  style={[
+                    styles.text,
+                    { textAlign: "center", marginBottom: 16 },
+                  ]}
+                >
+                  {t("ONBOARDING_CAMERA_PERMISSION") ||
+                    "Aether a besoin de la caméra pour scanner le QR Code."}
                 </Typography>
                 <Pressable
                   onPress={handleRequestPermission}
-                  style={{ backgroundColor: "#FFFFFF", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16 }}
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    paddingHorizontal: 20,
+                    paddingVertical: 12,
+                    borderRadius: 16,
+                  }}
                 >
-                  <Typography style={{ fontSize: 16, fontWeight: "600", color: "#000", textAlign: "center" }}>
-                    {permission?.canAskAgain === false ? "Ouvrir les réglages" : "Autoriser la caméra"}
+                  <Typography
+                    style={{
+                      fontSize: 16,
+                      fontWeight: "600",
+                      color: "#000",
+                      textAlign: "center",
+                    }}
+                  >
+                    {permission?.canAskAgain === false
+                      ? "Ouvrir les réglages"
+                      : "Autoriser la caméra"}
                   </Typography>
                 </Pressable>
               </>
@@ -510,9 +616,7 @@ export default function PronoteLoginWithQR() {
           }
           pointerEvents="none"
         >
-          <View
-            style={styles.maskContainer}
-          />
+          <View style={styles.maskContainer} />
           <View style={styles.transparentSquareBorder} />
         </MaskedView>
       </View>
@@ -546,10 +650,10 @@ const styles = StyleSheet.create({
     top: "35%",
   },
   backButton: {
-    position: 'absolute',
+    position: "absolute",
     left: 16,
     zIndex: 200,
-    backgroundColor: '#ffffff42',
+    backgroundColor: "#ffffff42",
     padding: 10,
     borderRadius: 100,
   },

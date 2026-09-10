@@ -70,7 +70,7 @@ export default defineConfig([
       "unused-imports/no-unused-imports": "error", // Supprimer automatiquement les imports inutilisés
       "@typescript-eslint/no-require-imports": "off", // Interdire les imports CommonJS
       "@typescript-eslint/no-explicit-any": "warn", // Avertir sur l'utilisation de 'any'
-      "@typescript-eslint/no-unescaped-entities": "warn", // Interdire les entités non échappées dans les chaînes de caractères
+      "react/no-unescaped-entities": "warn", // Apostrophes non échappées en JSX
       "unused-imports/no-unused-vars": [
         "warn",
         {

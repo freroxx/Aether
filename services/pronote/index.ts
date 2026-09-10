@@ -1,4 +1,7 @@
-import { fetchPronoteAttendance, fetchPronoteAttendancePeriods } from "@/services/pronote/attendance";
+import {
+  fetchPronoteAttendance,
+  fetchPronoteAttendancePeriods,
+} from "@/services/pronote/attendance";
 import { fetchPronoteCanteenMenu } from "@/services/pronote/canteen";
 import {
   createPronoteMail,
@@ -8,18 +11,35 @@ import {
   fetchPronoteRecipients,
   sendPronoteMessageInChat,
 } from "@/services/pronote/chat";
-import { fetchPronoteGradePeriods, fetchPronoteGrades } from "@/services/pronote/grades";
+import {
+  fetchPronoteGradePeriods,
+  fetchPronoteGrades,
+} from "@/services/pronote/grades";
 import { fetchPronoteEvaluations } from "@/services/pronote/evaluations";
-import { fetchPronoteHomeworks, setPronoteHomeworkAsDone } from "@/services/pronote/homework";
-import { fetchPronoteNews, setPronoteNewsAsAcknowledged } from "@/services/pronote/news";
+import {
+  fetchPronoteHomeworks,
+  setPronoteHomeworkAsDone,
+} from "@/services/pronote/homework";
+import {
+  fetchPronoteNews,
+  setPronoteNewsAsAcknowledged,
+} from "@/services/pronote/news";
 import { refreshPronoteAccount } from "@/services/pronote/refresh";
 import { fetchPronoteReport } from "@/services/pronote/report";
 import { fetchPronoteTeachingStaff } from "@/services/pronote/staff";
-import { fetchPronoteCourseResources, fetchPronoteWeekTimetable } from "@/services/pronote/timetable";
+import {
+  fetchPronoteCourseResources,
+  fetchPronoteWeekTimetable,
+} from "@/services/pronote/timetable";
 import { Attendance } from "@/services/shared/attendance";
 import { CanteenMenu } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
-import { Period, PeriodGrades, Evaluation, Report } from "@/services/shared/grade";
+import {
+  Period,
+  PeriodGrades,
+  Evaluation,
+  Report,
+} from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import { TeachingStaff } from "@/services/shared/staff";
@@ -67,7 +87,9 @@ export class Pronote implements SchoolServicePlugin {
   }
 
   private getSelectedChildName(): string | undefined {
-    const account = useAccountStore.getState().accounts.find(a => a.id === this.accountId);
+    const account = useAccountStore
+      .getState()
+      .accounts.find(a => a.id === this.accountId);
     return account?.selectedChild;
   }
 
@@ -84,17 +106,25 @@ export class Pronote implements SchoolServicePlugin {
       await this.refreshInFlight;
       return;
     }
-    if (Date.now() <= this.tokenExpiration) return;
+    // Early refresh with jitter: refresh at ~4min instead of 5min deadline
+    // so parallel widgets don't stampede the single-use token at once.
+    // Jitter desyncs multiple Pronote instances across accounts/widgets.
+    if (Date.now() <= this.tokenExpiration - 60 * 1000) return;
 
     this.refreshInFlight = (async () => {
       try {
-        const refresh = await refreshPronoteAccount(this.accountId, this.authData);
+        const refresh = await refreshPronoteAccount(
+          this.accountId,
+          this.authData
+        );
         this.authData = refresh.auth;
         this.session = refresh.session;
-        // Token + password types share the same 5-minute validity window.
+        // Token + password types share the same validity window.
         // Password-type accounts return refreshed:false with valid creds but must
         // not re-refresh on every call (tokenExpiration would otherwise stay 0).
-        this.tokenExpiration = Date.now() + 5 * 60 * 1000;
+        // Add 0-60s jitter to desync parallel refreshers.
+        this.tokenExpiration =
+          Date.now() + 4 * 60 * 1000 + Math.floor(Math.random() * 60 * 1000);
       } catch (e) {
         // Échec de refresh : on propage pour laisser le manager lever AuthenticationError
         // (écran "déconnecté / Me reconnecter") plutôt qu'un token mort en silence.
@@ -111,7 +141,8 @@ export class Pronote implements SchoolServicePlugin {
     const refresh = await refreshPronoteAccount(this.accountId, credentials);
     this.authData = refresh.auth;
     this.session = refresh.session;
-    this.tokenExpiration = Date.now() + 5 * 60 * 1000;
+    this.tokenExpiration =
+      Date.now() + 4 * 60 * 1000 + Math.floor(Math.random() * 60 * 1000);
 
     const capabilitiesSet = new Set<Capabilities>([
       Capabilities.REFRESH,
@@ -136,7 +167,9 @@ export class Pronote implements SchoolServicePlugin {
   }
 
   getKids(): Kid[] {
-    const account = useAccountStore.getState().accounts.find(a => a.id === this.accountId);
+    const account = useAccountStore
+      .getState()
+      .accounts.find(a => a.id === this.accountId);
     if (!account?.children?.length) return [];
     return account.children.map((c, idx) => ({
       id: `kid_${idx}_${c.name}`,
@@ -186,7 +219,10 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async getEvaluationsForPeriod(period: Period, kid?: Kid): Promise<Evaluation[]> {
+  async getEvaluationsForPeriod(
+    period: Period,
+    kid?: Kid
+  ): Promise<Evaluation[]> {
     await this.checkTokenValidty();
     return fetchPronoteEvaluations(
       this.getAuthToken(),
@@ -243,11 +279,16 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async getWeeklyTimetable(weekNumber: number, date: Date, childName?: string): Promise<CourseDay[]> {
+  async getWeeklyTimetable(
+    weekNumber: number,
+    date: Date,
+    childName?: string
+  ): Promise<CourseDay[]> {
     await this.checkTokenValidty();
     // Enfant snapshoté à l'appel (jamais relu en live) : un switch mid-loop
     // ne mélange plus les tags kidName entre les semaines.
-    const kid = childName !== undefined ? childName : this.getSelectedChildName();
+    const kid =
+      childName !== undefined ? childName : this.getSelectedChildName();
     return fetchPronoteWeekTimetable(
       this.getAuthToken(),
       this.accountId,
@@ -316,7 +357,10 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async setHomeworkCompletion(homework: Homework, state?: boolean): Promise<Homework> {
+  async setHomeworkCompletion(
+    homework: Homework,
+    state?: boolean
+  ): Promise<Homework> {
     await this.checkTokenValidty();
     return setPronoteHomeworkAsDone(
       this.getAuthToken(),
@@ -326,7 +370,11 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async createMail(subject: string, content: string, recipients: Recipient[]): Promise<Chat> {
+  async createMail(
+    subject: string,
+    content: string,
+    recipients: Recipient[]
+  ): Promise<Chat> {
     await this.checkTokenValidty();
     return createPronoteMail(
       this.getAuthToken(),

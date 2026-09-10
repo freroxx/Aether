@@ -1,4 +1,5 @@
-import { Image, View, ViewProps, ViewStyle } from "react-native";
+import { View, ViewProps, ViewStyle } from "react-native";
+import { Image } from "expo-image";
 import { useTheme } from "expo-router/react-navigation";
 import adjust from "@/utils/adjustColor";
 import Typography from "@/ui/components/Typography";
@@ -53,7 +54,7 @@ const Avatar = ({
     baseStyle.borderColor = colors.border;
 
     return baseStyle;
-  }
+  };
 
   return (
     <View {...rest} style={[generateBodyStyle(), style]}>
@@ -74,7 +75,9 @@ const Avatar = ({
         <Image
           source={{ uri: imageUrl }}
           style={{ width: size, height: size, borderRadius: borderRadius }}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={imageUrl}
           onError={() => setHasFailed(true)}
         />
       )}
@@ -82,7 +85,11 @@ const Avatar = ({
         <Typography
           color={initialsColor}
           weight={"bold"}
-          style={{ textTransform: "uppercase", fontSize: size * 0.4, lineHeight: size * 0.95 }}
+          style={{
+            textTransform: "uppercase",
+            fontSize: size * 0.4,
+            lineHeight: size * 0.95,
+          }}
         >
           {initials || "?"}
         </Typography>

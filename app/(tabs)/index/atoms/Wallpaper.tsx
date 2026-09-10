@@ -1,10 +1,11 @@
-import MaskedView from '@react-native-masked-view/masked-view';
-import { File, Paths } from 'expo-file-system';
-import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import MaskedView from "@react-native-masked-view/masked-view";
+import { File, Paths } from "expo-file-system";
+import { Image } from "expo-image";
+import React, { useEffect, useState } from "react";
+import { StyleSheet } from "react-native";
+import LinearGradient from "react-native-linear-gradient";
 
-import { useSettingsStore } from '@/stores/settings';
+import { useSettingsStore } from "@/stores/settings";
 
 interface WallpaperProps {
   height?: number;
@@ -20,28 +21,33 @@ const WallpaperInner = ({ height = 400, dim = true }: WallpaperProps) => {
 
     useEffect(() => {
       if (currentWallpaper?.path?.name) {
-        const file = new File(Paths.document, currentWallpaper.path.directory || '', currentWallpaper.path.name);
+        const file = new File(
+          Paths.document,
+          currentWallpaper.path.directory || "",
+          currentWallpaper.path.name
+        );
         if (file.exists) {
           setImage(file.uri);
         } else {
           setImage(null);
         }
-      }
-      else {
+      } else {
         setImage(null);
       }
     }, [currentWallpaper]);
 
-    const isGradient = currentWallpaper?.type === "gradient" && Boolean(currentWallpaper?.gradient?.colors);
+    const isGradient =
+      currentWallpaper?.type === "gradient" &&
+      Boolean(currentWallpaper?.gradient?.colors);
 
     return (
       <MaskedView
         style={[styles.container, { height }]}
         maskElement={
           <LinearGradient
-            colors={['rgba(0, 0, 0, 1)', 'rgba(0, 0, 0, 0)']}
+            colors={["rgba(0, 0, 0, 1)", "rgba(0, 0, 0, 0)"]}
             locations={[0.5, 1]}
-            style={{ width: '100%', height }}
+            style={{ width: "100%", height }}
           />
         }
       >
@@ -54,18 +60,25 @@ const WallpaperInner = ({ height = 400, dim = true }: WallpaperProps) => {
           />
         ) : (
           <Image
-            source={image ? { uri: image } : require('@/assets/images/wallpapers/clouds.jpg')}
+            source={
+              image
+                ? { uri: image }
+                : require("@/assets/images/wallpapers/clouds.jpg")
+            }
             style={[styles.image, { height }]}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={image ?? "default-clouds"}
           />
         )}
 
-        {dim &&
+        {dim && (
           <LinearGradient
-            colors={['rgba(0, 0, 0, 0.7)', 'rgba(0, 0, 0, 0)']}
+            colors={["rgba(0, 0, 0, 0.7)", "rgba(0, 0, 0, 0)"]}
             locations={[0, 1]}
             style={[styles.dimGradient, { height: height / 2 }]}
           />
-        }
+        )}
       </MaskedView>
     );
   } catch {
@@ -75,25 +88,25 @@ const WallpaperInner = ({ height = 400, dim = true }: WallpaperProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    position: 'absolute',
+    width: "100%",
+    position: "absolute",
     top: 0,
     left: 0,
-    zIndex: -9
+    zIndex: -9,
   },
   image: {
-    width: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0
-  },
-  dimGradient: {
-    width: '100%',
-    position: 'absolute',
+    width: "100%",
+    position: "absolute",
     top: 0,
     left: 0,
-    zIndex: 1
-  }
+  },
+  dimGradient: {
+    width: "100%",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    zIndex: 1,
+  },
 });
 
 // Memoized: props are stable primitives and the File.exists check runs only

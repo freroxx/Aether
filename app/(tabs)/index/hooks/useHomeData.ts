@@ -1,19 +1,19 @@
-import { router } from 'expo-router';
-import { t } from 'i18next';
-import { useCallback, useEffect, useRef } from 'react';
-import { AppState, Platform } from 'react-native';
+import { router } from "expo-router";
+import { t } from "i18next";
+import { useCallback, useEffect, useRef } from "react";
+import { AppState, Platform } from "react-native";
 
-import { getWeekNumberFromDate } from '@/database/useHomework';
-import { AuthenticationError } from '@/services/errors/AuthenticationError';
-import { ServiceUnavailableError } from '@/services/errors/ServiceUnavailableError';
+import { getWeekNumberFromDate } from "@/database/useHomework";
+import { AuthenticationError } from "@/services/errors/AuthenticationError";
+import { ServiceUnavailableError } from "@/services/errors/ServiceUnavailableError";
 import { getManager, initializeAccountManager } from "@/services/shared";
-import { Services } from '@/stores/account/types';
-import { useSettingsStore } from '@/stores/settings';
-import { useSyncStore } from '@/stores/sync';
-import { useAlert } from '@/ui/components/AlertProvider';
-import { getCurrentPeriod } from '@/utils/grades/helper/period';
-import { log, warn } from '@/utils/logger/logger';
-import { useAccountStore } from '@/stores/account';
+import { Services } from "@/stores/account/types";
+import { useSettingsStore } from "@/stores/settings";
+import { useSyncStore } from "@/stores/sync";
+import { useAlert } from "@/ui/components/AlertProvider";
+import { getCurrentPeriod } from "@/utils/grades/helper/period";
+import { log, warn } from "@/utils/logger/logger";
+import { useAccountStore } from "@/stores/account";
 
 const REMOVED_SERVICE_ID = 9;
 
@@ -28,7 +28,9 @@ export const useHomeData = () => {
   const settingsstore = useSettingsStore(state => state.personalization);
   const lastUsedAccount = useAccountStore(state => state.lastUsedAccount);
   const accounts = useAccountStore(state => state.accounts);
-  const homeChild = useAccountStore(s => s.accounts.find(a => a.id === s.lastUsedAccount)?.selectedChild);
+  const homeChild = useAccountStore(
+    s => s.accounts.find(a => a.id === s.lastUsedAccount)?.selectedChild
+  );
   const removeAccount = useAccountStore(state => state.removeAccount);
   const cancelledRef = useRef(false);
 
@@ -42,7 +44,7 @@ export const useHomeData = () => {
   const fetchEDT = useCallback(async () => {
     const manager = getManager();
     if (!manager) {
-      warn('Manager is null, skipping timetable fetch');
+      warn("Manager is null, skipping timetable fetch");
       return;
     }
     // Préfetch semaine courante ±1 (comme le calendrier) : le widget
@@ -53,161 +55,211 @@ export const useHomeData = () => {
     prev.setDate(prev.getDate() - 7);
     const next = new Date(date);
     next.setDate(next.getDate() + 7);
-    await manager.getWeeklyTimetable(weekNumber - 1, prev, homeChild).catch(() => {});
+    await manager
+      .getWeeklyTimetable(weekNumber - 1, prev, homeChild)
+      .catch(() => {});
     await manager.getWeeklyTimetable(weekNumber, date, homeChild);
-    await manager.getWeeklyTimetable(weekNumber + 1, next, homeChild).catch(() => {});
+    await manager
+      .getWeeklyTimetable(weekNumber + 1, next, homeChild)
+      .catch(() => {});
   }, [homeChild]);
 
   const fetchGrades = useCallback(async () => {
     const manager = getManager();
     if (!manager) {
-      warn('Manager is null, skipping grades fetch');
+      warn("Manager is null, skipping grades fetch");
       return;
     }
     const gradePeriods = await manager.getGradesPeriods();
     const currentPeriod = getCurrentPeriod(gradePeriods);
 
     if (currentPeriod) {
-      await manager.getGradesForPeriod(currentPeriod, currentPeriod.createdByAccount);
+      await manager.getGradesForPeriod(
+        currentPeriod,
+        currentPeriod.createdByAccount
+      );
     }
   }, []);
 
-  const initialize = useCallback(async (force = false) => {
-    if (!lastUsedAccount) {
-      return;
-    }
-
-    const currentAccount = accounts.find(acc => acc.id === lastUsedAccount);
-    const usesRemovedService = currentAccount?.services.some(
-      service => (service.serviceId as number) === REMOVED_SERVICE_ID
-    );
-    if (currentAccount && usesRemovedService) {
-      warn(`Account ${currentAccount.id} uses a removed service, disconnecting.`);
-
-      alert.showAlert({
-        title: t("SERVICE_REMOVED_TITLE"),
-        description: t("SERVICE_REMOVED_DESCRIPTION"),
-        icon: "Trash",
-        color: "#D60046",
-        delay: 8000,
-      });
-
-      const remainingAccounts = accounts.filter(acc => acc.id !== currentAccount.id);
-      removeAccount(currentAccount);
-
-      if (remainingAccounts.length === 0) {
-        router.replace("/(onboarding)/welcome");
+  const initialize = useCallback(
+    async (force = false) => {
+      if (!lastUsedAccount) {
+        return;
       }
 
-      return;
-    }
+      const currentAccount = accounts.find(acc => acc.id === lastUsedAccount);
+      const usesRemovedService = currentAccount?.services.some(
+        service => (service.serviceId as number) === REMOVED_SERVICE_ID
+      );
+      if (currentAccount && usesRemovedService) {
+        warn(
+          `Account ${currentAccount.id} uses a removed service, disconnecting.`
+        );
 
-    const state =
-      homeSyncState.get(lastUsedAccount) ?? {
+        alert.showAlert({
+          title: t("SERVICE_REMOVED_TITLE"),
+          description: t("SERVICE_REMOVED_DESCRIPTION"),
+          icon: "Trash",
+          color: "#D60046",
+          delay: 8000,
+        });
+
+        const remainingAccounts = accounts.filter(
+          acc => acc.id !== currentAccount.id
+        );
+        removeAccount(currentAccount);
+
+        if (remainingAccounts.length === 0) {
+          router.replace("/(onboarding)/welcome");
+        }
+
+        return;
+      }
+
+      const state = homeSyncState.get(lastUsedAccount) ?? {
         lastSyncedAt: 0,
         inFlight: null,
       };
-    homeSyncState.set(lastUsedAccount, state);
+      homeSyncState.set(lastUsedAccount, state);
 
-    if (state.inFlight) {
-      await state.inFlight;
-      return;
-    }
-
-    if (!force && Date.now() - state.lastSyncedAt < HOME_SYNC_TTL_MS) {
-      return;
-    }
-
-    state.inFlight = (async () => {
-    const setSyncing = useSyncStore.getState().setSyncing;
-    setSyncing(true);
-    try {
-      // Toast "syncing" à chaque sync réelle
-      alert.showAlert({
-        title: "Synchronisation…",
-        description: "Mise à jour de tes données…",
-        icon: "Refresh",
-        color: "#007AFF",
-        withoutNavbar: true,
-        delay: 2000,
-      });
-      await initializeAccountManager(lastUsedAccount);
-      if (cancelledRef.current) return;
-      log("Refreshed Manager received");
-
-      await Promise.all([fetchEDT(), fetchGrades()]);
-      if (cancelledRef.current) return;
-      state.lastSyncedAt = Date.now();
-
-      if (settingsstore.showAlertAtLogin && !cancelledRef.current) {
-        alert.showAlert({
-          title: "Synchronisation réussie",
-          description: "Toutes vos données ont été mises à jour avec succès.",
-          icon: "CheckCircle",
-          color: "#00C851",
-          withoutNavbar: true,
-          delay: 1000
-        });
+      if (state.inFlight) {
+        await state.inFlight;
+        return;
       }
 
-    } catch (error) {
-      if (cancelledRef.current) return;
-      if (String(error).includes("Unable to find")) { return; }
-      if (error instanceof AuthenticationError) {
-        const additionals = error?.service?.auth?.additionals ?? {};
-        const instanceURL = additionals["instanceURL"] ?? additionals["url"] ?? "";
-        const accountType = additionals["accountType"] ?? additionals["account_type"] ?? "eleve";
-
-        alert.showAlert({
-          title: "Vous avez été déconnecté",
-          message: instanceURL ? `En savoir plus et se reconnecter` : "En savoir plus",
-          description: "Il semblerait que ta session a expiré. Tu pourras renouveler ta session dans les paramètres en liant à nouveau ton compte.",
-          icon: "UserCross",
-          color: "#D60046",
-          customButton: instanceURL ? {
-            label: "Me reconnecter",
-            showCancelButton: error.service.serviceId === Services.PRONOTE,
-            onPress: async () => {
-              const ownerAccount = accounts.find(acc =>
-                acc.services.some(s => s.id === error.service.id)
-              );
-              if (ownerAccount) {
-                removeAccount(ownerAccount);
-              }
-
-              const authUrl = instanceURL;
-              const authType = accountType;
-              setTimeout(() => {
-                router.navigate("/(onboarding)/ageSelection");
-                setTimeout(() => {
-                  router.navigate({ pathname: "/(onboarding)/services/pronote/browser", params: { url: authUrl, school: "Pronote", accountType: authType } });
-                }, 400);
-              }, 100);
-            }
-          } : undefined,
-          technical: error.message
-        })
-      } else if (error instanceof ServiceUnavailableError) {
-        alert.showAlert({
-          title: t("home.unavailable.title", "Pronote temporairement indisponible"),
-          description: t("home.unavailable.description", "Impossible de contacter Pronote pour le moment. Les données affichées correspondent à la dernière synchronisation."),
-          icon: "WifiOff",
-          color: "#FF8C00",
-          withoutNavbar: true,
-        });
+      if (!force && Date.now() - state.lastSyncedAt < HOME_SYNC_TTL_MS) {
+        return;
       }
-    } finally {
-      useSyncStore.getState().setSyncing(false);
-    }
-    })();
 
-    try {
-      await state.inFlight;
-    } finally {
-      state.inFlight = null;
-      useSyncStore.getState().setSyncing(false);
-    }
-  }, [alert, fetchEDT, fetchGrades, settingsstore.showAlertAtLogin, lastUsedAccount, accounts, removeAccount]);
+      state.inFlight = (async () => {
+        const setSyncing = useSyncStore.getState().setSyncing;
+        setSyncing(true);
+        try {
+          // Toast "syncing" à chaque sync réelle
+          alert.showAlert({
+            title: "Synchronisation…",
+            description: "Mise à jour de tes données…",
+            icon: "Refresh",
+            color: "#007AFF",
+            withoutNavbar: true,
+            delay: 2000,
+          });
+          await initializeAccountManager(lastUsedAccount);
+          if (cancelledRef.current) return;
+          log("Refreshed Manager received");
+
+          await Promise.all([fetchEDT(), fetchGrades()]);
+          if (cancelledRef.current) return;
+
+          // Offline outbox is durable (7j, local only). Replay happens from the
+          // detail screens on next user action (they retry the mutation directly
+          // and drop the queue entry on success) — no silent drops here.
+          state.lastSyncedAt = Date.now();
+
+          if (settingsstore.showAlertAtLogin && !cancelledRef.current) {
+            alert.showAlert({
+              title: "Synchronisation réussie",
+              description:
+                "Toutes vos données ont été mises à jour avec succès.",
+              icon: "CheckCircle",
+              color: "#00C851",
+              withoutNavbar: true,
+              delay: 1000,
+            });
+          }
+        } catch (error) {
+          if (cancelledRef.current) return;
+          if (String(error).includes("Unable to find")) {
+            return;
+          }
+          if (error instanceof AuthenticationError) {
+            const additionals = error?.service?.auth?.additionals ?? {};
+            const instanceURL =
+              additionals["instanceURL"] ?? additionals["url"] ?? "";
+            const accountType =
+              additionals["accountType"] ??
+              additionals["account_type"] ??
+              "eleve";
+
+            alert.showAlert({
+              title: "Vous avez été déconnecté",
+              message: instanceURL
+                ? `En savoir plus et se reconnecter`
+                : "En savoir plus",
+              description:
+                "Il semblerait que ta session a expiré. Tu pourras renouveler ta session dans les paramètres en liant à nouveau ton compte.",
+              icon: "UserCross",
+              color: "#D60046",
+              customButton: instanceURL
+                ? {
+                    label: "Me reconnecter",
+                    showCancelButton:
+                      error.service.serviceId === Services.PRONOTE,
+                    onPress: async () => {
+                      const ownerAccount = accounts.find(acc =>
+                        acc.services.some(s => s.id === error.service.id)
+                      );
+                      if (ownerAccount) {
+                        removeAccount(ownerAccount);
+                      }
+
+                      const authUrl = instanceURL;
+                      const authType = accountType;
+                      setTimeout(() => {
+                        router.navigate("/(onboarding)/ageSelection");
+                        setTimeout(() => {
+                          router.navigate({
+                            pathname: "/(onboarding)/services/pronote/browser",
+                            params: {
+                              url: authUrl,
+                              school: "Pronote",
+                              accountType: authType,
+                            },
+                          });
+                        }, 400);
+                      }, 100);
+                    },
+                  }
+                : undefined,
+              technical: error.message,
+            });
+          } else if (error instanceof ServiceUnavailableError) {
+            alert.showAlert({
+              title: t(
+                "home.unavailable.title",
+                "Pronote temporairement indisponible"
+              ),
+              description: t(
+                "home.unavailable.description",
+                "Impossible de contacter Pronote pour le moment. Les données affichées correspondent à la dernière synchronisation."
+              ),
+              icon: "WifiOff",
+              color: "#FF8C00",
+              withoutNavbar: true,
+            });
+          }
+        } finally {
+          useSyncStore.getState().setSyncing(false);
+        }
+      })();
+
+      try {
+        await state.inFlight;
+      } finally {
+        state.inFlight = null;
+        useSyncStore.getState().setSyncing(false);
+      }
+    },
+    [
+      alert,
+      fetchEDT,
+      fetchGrades,
+      settingsstore.showAlertAtLogin,
+      lastUsedAccount,
+      accounts,
+      removeAccount,
+    ]
+  );
 
   useEffect(() => {
     initialize();
@@ -225,16 +277,20 @@ export const useHomeData = () => {
   // Live sync: foreground + hourly (Android only, no iOS bg)
   const appStateRef = useRef(AppState.currentState);
   useEffect(() => {
-    const sub = AppState.addEventListener("change", (next) => {
-      if (appStateRef.current.match(/inactive|background/) && next === "active") {
+    const sub = AppState.addEventListener("change", next => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        next === "active"
+      ) {
         initialize(false);
       }
       appStateRef.current = next;
     });
     // Poll horaire data fraîche (Android)
-    const timer = Platform.OS === "android"
-      ? setInterval(() => initialize(true), 60 * 60 * 1000)
-      : undefined;
+    const timer =
+      Platform.OS === "android"
+        ? setInterval(() => initialize(true), 60 * 60 * 1000)
+        : undefined;
     return () => {
       sub.remove();
       if (timer) clearInterval(timer);

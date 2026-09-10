@@ -1,8 +1,8 @@
 import { useTheme } from "expo-router/react-navigation";
-import { Stack } from 'expo-router';
-import { t } from 'i18next';
-import React, { useMemo } from 'react';
-import { Platform, StatusBar, View } from 'react-native';
+import { Stack } from "expo-router";
+import { t } from "i18next";
+import React, { useMemo } from "react";
+import { Platform, StatusBar, View } from "react-native";
 
 import {
   AI_SCREEN_OPTIONS,
@@ -10,26 +10,30 @@ import {
   DEMO_SCREEN_OPTIONS,
   DEVMODE_REQUESTS_SCREEN_OPTIONS,
   DEVMODE_SCREEN_OPTIONS,
-  STACK_SCREEN_OPTIONS
-} from '@/constants/LayoutScreenOptions';
-import getCorners from '@/ui/utils/Corners';
-import { runsIOS26 } from '@/ui/utils/IsLiquidGlass';
-import { screenOptions } from '@/utils/theme/ScreenOptions';
-import AndroidHeaderBackground from './AndroidHeaderBackground';
-import MainTabErrorBoundary from '@/ui/components/MainTabErrorBoundary';
+  STACK_SCREEN_OPTIONS,
+} from "@/constants/LayoutScreenOptions";
+import getCorners from "@/ui/utils/Corners";
+import { runsIOS26 } from "@/ui/utils/IsLiquidGlass";
+import { screenOptions } from "@/utils/theme/ScreenOptions";
+import AndroidHeaderBackground from "./AndroidHeaderBackground";
+import MainTabErrorBoundary from "@/ui/components/MainTabErrorBoundary";
+import OfflineBanner from "./OfflineBanner";
 
 function RootNavigatorContent() {
   const theme = useTheme();
   const corners = getCorners();
 
   // Memoize combined screen options to prevent object recreation
-  const stackScreenOptions = useMemo(() => ({
-    ...screenOptions,
-    ...STACK_SCREEN_OPTIONS,
-    contentStyle: {
-      backgroundColor: theme.colors.background
-    }
-  }), [theme]);
+  const stackScreenOptions = useMemo(
+    () => ({
+      ...screenOptions,
+      ...STACK_SCREEN_OPTIONS,
+      contentStyle: {
+        backgroundColor: theme.colors.background,
+      },
+    }),
+    [theme]
+  );
 
   return (
     <View
@@ -45,6 +49,8 @@ function RootNavigatorContent() {
           animated
         />
       )}
+      {/* Offline-first global banner — thin, non-blocking, above all stacks */}
+      <OfflineBanner topInset={8} />
       <Stack initialRouteName="(tabs)" screenOptions={stackScreenOptions}>
         <Stack.Screen
           name="(tabs)"
@@ -129,9 +135,10 @@ function RootNavigatorContent() {
             presentation: Platform.OS !== "ios" ? "modal" : "formSheet",
             sheetGrabberVisible: true,
             sheetAllowedDetents: [0.5, 1],
+            sheetCornerRadius: 28,
             headerBackground: AndroidHeaderBackground,
             contentStyle: {
-              borderRadius: Platform.OS === "ios" ? 30 : 0,
+              borderRadius: Platform.OS === "ios" ? 28 : 0,
               overflow: Platform.OS === "ios" ? "hidden" : "visible",
             },
           }}
@@ -146,7 +153,7 @@ function RootNavigatorContent() {
             presentation: "formSheet",
             sheetGrabberVisible: true,
             sheetAllowedDetents: [0.5, 0.75, 1],
-            sheetCornerRadius: runsIOS26 ? undefined : 30,
+            sheetCornerRadius: runsIOS26 ? undefined : 28,
             contentStyle: {
               backgroundColor: runsIOS26 ? "transparent" : undefined,
             },

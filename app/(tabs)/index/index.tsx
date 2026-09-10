@@ -1,33 +1,42 @@
-import { Papicons } from '@getpapillon/papicons';
+import { Papicons } from "@getpapillon/papicons";
 import { useIsFocused } from "expo-router/react-navigation";
-import { useRouter } from 'expo-router';
-import { t } from 'i18next';
-import React from 'react';
-import { FlatList, Platform, RefreshControl, StatusBar, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
+import { t } from "i18next";
+import React from "react";
+import {
+  FlatList,
+  Platform,
+  RefreshControl,
+  StatusBar,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useAccountStore } from '@/stores/account';
-import { useSettingsStore } from '@/stores/settings';
+import { useAccountStore } from "@/stores/account";
+import { useSettingsStore } from "@/stores/settings";
 
-import HomeHeader from './atoms/HomeHeader';
-import HomeTopBar from './atoms/HomeTopBar';
-import Wallpaper from './atoms/Wallpaper';
-import HomeWidget, { HomeWidgetItem } from './components/HomeWidget';
-import { useHomeData } from './hooks/useHomeData';
-import { useTimetableWidgetData } from './hooks/useTimetableWidgetData';
-import { useTimetableWidgetTitle } from './hooks/useTimetableWidgetTitle';
-import HomeTimeTableWidget from './widgets/timetable';
-import GradesWidget from './widgets/Grades';
-import EvaluationsWidget from './widgets/evaluations';
-import SanctionsWidget from './widgets/sanctions';
-import LessonContentWidget, { findNextCourseWithContent } from './widgets/LessonContent';
-import { getCourseRouteId } from '@/database/useTimetable';
-import SyncingCard from './widgets/SyncingCard';
-import { useSyncStore } from '@/stores/sync';
-import MaskedView from '@react-native-masked-view/masked-view';
-import LinearGradient from 'react-native-linear-gradient';
-import { ErrorBoundary } from '@/ui/components/ErrorBoundary';
-import MainTabErrorBoundary from '@/ui/components/MainTabErrorBoundary';
+import HomeHeader from "./atoms/HomeHeader";
+import HomeTopBar from "./atoms/HomeTopBar";
+import Wallpaper from "./atoms/Wallpaper";
+import HomeWidget, { HomeWidgetItem } from "./components/HomeWidget";
+import { useHomeData } from "./hooks/useHomeData";
+import { useTimetableWidgetData } from "./hooks/useTimetableWidgetData";
+import { useTimetableWidgetTitle } from "./hooks/useTimetableWidgetTitle";
+import HomeTimeTableWidget from "./widgets/timetable";
+import GradesWidget from "./widgets/Grades";
+import EvaluationsWidget from "./widgets/evaluations";
+import SanctionsWidget from "./widgets/sanctions";
+import LessonContentWidget, {
+  findNextCourseWithContent,
+} from "./widgets/LessonContent";
+import { getCourseRouteId } from "@/database/useTimetable";
+import SyncingCard from "./widgets/SyncingCard";
+import { useSyncStore } from "@/stores/sync";
+import MaskedView from "@react-native-masked-view/masked-view";
+import LinearGradient from "react-native-linear-gradient";
+import { ErrorBoundary } from "@/ui/components/ErrorBoundary";
+import MainTabErrorBoundary from "@/ui/components/MainTabErrorBoundary";
+import WidgetErrorCard from "@/ui/components/WidgetErrorCard";
 
 const HomeScreen = () => {
   const insets = useSafeAreaInsets();
@@ -36,10 +45,12 @@ const HomeScreen = () => {
 
   // Account
   const store = useAccountStore();
-  const accounts = useAccountStore((state) => state.accounts);
+  const accounts = useAccountStore(state => state.accounts);
   const account = accounts.find(a => a.id === store.lastUsedAccount);
   const router = useRouter();
-  const welcomeModalSeen = useSettingsStore(state => state.personalization.welcomeModalSeen);
+  const welcomeModalSeen = useSettingsStore(
+    state => state.personalization.welcomeModalSeen
+  );
   const mutateSettings = useSettingsStore(state => state.mutateProperty);
   const isSyncing = useSyncStore(s => s.isSyncing);
 
@@ -65,8 +76,10 @@ const HomeScreen = () => {
 
   const [gradesWidgetHidden, setGradesWidgetHidden] = React.useState(true);
   const [lessonContentHidden, setLessonContentHidden] = React.useState(true);
-  const [evaluationsWidgetHidden, setEvaluationsWidgetHidden] = React.useState(true);
-  const [sanctionsWidgetHidden, setSanctionsWidgetHidden] = React.useState(true);
+  const [evaluationsWidgetHidden, setEvaluationsWidgetHidden] =
+    React.useState(true);
+  const [sanctionsWidgetHidden, setSanctionsWidgetHidden] =
+    React.useState(true);
 
   const renderTimeTable = React.useCallback(() => <HomeTimeTableWidget />, []);
   const renderGrades = React.useCallback(
@@ -102,52 +115,68 @@ const HomeScreen = () => {
     []
   );
 
-  const data: HomeWidgetItem[] = React.useMemo(() => [
-    ...(isSyncing
-      ? [
-          {
-            icon: <Papicons name={"Refresh"} />,
-            title: t("Home_Syncing_Title", "Synchronisation"),
-            hidden: false,
-            render: () => <SyncingCard />,
-          } as HomeWidgetItem,
-        ]
-      : []),
-    {
-      icon: <Papicons name={"Info"} />,
-      title: t("Home_Widget_LessonContent", "Contenu et ressources"),
-      redirect: lessonRedirect as any,
-      hidden: false,
-      render: renderLessonContent
-    },
-    {
-      icon: <Papicons name={"Calendar"} />,
-      title: timetableTitle,
-      redirect: "(tabs)/calendar",
-      render: renderTimeTable
-    },
-    {
-      icon: <Papicons name={"Grades"} />,
-      title: t("Home_Widget_Grades_Average"),
-      redirect: "(tabs)/grades",
-      hidden: gradesWidgetHidden,
-      render: renderGrades
-    },
-    {
-      icon: <Papicons name={"Grades"} />,
-      title: t("Home_Evaluations_Title"),
-      redirect: "(features)/evaluations",
-      hidden: false,
-      render: renderEvaluations
-    },
-    {
-      icon: <Papicons name={"AlertTriangle"} />,
-      title: t("Home_Sanctions_Title"),
-      redirect: "(features)/sanctions",
-      hidden: false,
-      render: renderSanctions
-    }
-  ], [renderTimeTable, renderGrades, renderLessonContent, renderEvaluations, renderSanctions, gradesWidgetHidden, lessonContentHidden, evaluationsWidgetHidden, sanctionsWidgetHidden, timetableTitle, isSyncing, lessonRedirect]);
+  const data: HomeWidgetItem[] = React.useMemo(
+    () => [
+      ...(isSyncing
+        ? [
+            {
+              icon: <Papicons name={"Refresh"} />,
+              title: t("Home_Syncing_Title", "Synchronisation"),
+              hidden: false,
+              render: () => <SyncingCard />,
+            } as HomeWidgetItem,
+          ]
+        : []),
+      {
+        icon: <Papicons name={"Info"} />,
+        title: t("Home_Widget_LessonContent", "Contenu et ressources"),
+        redirect: lessonRedirect as any,
+        hidden: false,
+        render: renderLessonContent,
+      },
+      {
+        icon: <Papicons name={"Calendar"} />,
+        title: timetableTitle,
+        redirect: "(tabs)/calendar",
+        render: renderTimeTable,
+      },
+      {
+        icon: <Papicons name={"Grades"} />,
+        title: t("Home_Widget_Grades_Average"),
+        redirect: "(tabs)/grades",
+        hidden: gradesWidgetHidden,
+        render: renderGrades,
+      },
+      {
+        icon: <Papicons name={"Grades"} />,
+        title: t("Home_Evaluations_Title"),
+        redirect: "(features)/evaluations",
+        hidden: false,
+        render: renderEvaluations,
+      },
+      {
+        icon: <Papicons name={"AlertTriangle"} />,
+        title: t("Home_Sanctions_Title"),
+        redirect: "(features)/sanctions",
+        hidden: false,
+        render: renderSanctions,
+      },
+    ],
+    [
+      renderTimeTable,
+      renderGrades,
+      renderLessonContent,
+      renderEvaluations,
+      renderSanctions,
+      gradesWidgetHidden,
+      lessonContentHidden,
+      evaluationsWidgetHidden,
+      sanctionsWidgetHidden,
+      timetableTitle,
+      isSyncing,
+      lessonRedirect,
+    ]
+  );
 
   React.useEffect(() => {
     if (!account || welcomeModalSeen || isSyncing) {
@@ -164,36 +193,55 @@ const HomeScreen = () => {
 
   return (
     <>
-      <ErrorBoundary fallback={null}>
+      <ErrorBoundary
+        fallback={<WidgetErrorCard message="Fond d'écran indisponible" />}
+      >
         <Wallpaper />
       </ErrorBoundary>
-      <ErrorBoundary fallback={null}>
+      <ErrorBoundary
+        fallback={
+          <WidgetErrorCard
+            message="Barre de navigation indisponible"
+            onRetry={onHomeRefresh}
+          />
+        }
+      >
         <HomeTopBar />
       </ErrorBoundary>
-      {focused && <StatusBar translucent animated barStyle={'light-content'} />}
+      {focused && <StatusBar translucent animated barStyle={"light-content"} />}
       <HomeViewContainer key={"home"}>
         <FlatList
           renderItem={({ item }) => <HomeWidget item={item} />}
-          keyExtractor={(item) => item.title}
+          keyExtractor={item => item.title}
           ListHeaderComponent={
-            <ErrorBoundary fallback={null}>
+            <ErrorBoundary
+              fallback={
+                <WidgetErrorCard
+                  message="En-tête indisponible"
+                  onRetry={onHomeRefresh}
+                />
+              }
+            >
               <HomeHeader />
             </ErrorBoundary>
           }
           refreshControl={
-            <RefreshControl refreshing={homeRefreshing} onRefresh={onHomeRefresh} />
+            <RefreshControl
+              refreshing={homeRefreshing}
+              onRefresh={onHomeRefresh}
+            />
           }
           style={{ flex: 1 }}
           contentContainerStyle={{
-            paddingBottom: Platform.OS === 'ios' ? bottomTabBarHeight : 16,
+            paddingBottom: Platform.OS === "ios" ? bottomTabBarHeight : 16,
             paddingHorizontal: 16,
             flexGrow: 1,
             gap: 12,
             marginTop: 6,
             paddingLeft: insets.left + 16,
-            width: '100%',
+            width: "100%",
             maxWidth: 670,
-            marginHorizontal: 'auto',
+            marginHorizontal: "auto",
           }}
           data={data}
         />
@@ -208,21 +256,21 @@ const HomeViewContainer = ({ children }) => {
   return (
     <MaskedView
       maskElement={
-        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <View style={{ flex: 1, backgroundColor: "transparent" }}>
           <LinearGradient
-            colors={['#ff000022', 'white']}
+            colors={["#ff000022", "white"]}
             locations={[0.5, 1]}
             style={{ height: insets.top + 68 }}
           />
-          <View style={{ flex: 1, backgroundColor: 'white' }} />
+          <View style={{ flex: 1, backgroundColor: "white" }} />
         </View>
       }
       style={{ flex: 1 }}
     >
       {children}
     </MaskedView>
-  )
-}
+  );
+};
 
 const HomeScreenWithBoundary = () => (
   <MainTabErrorBoundary>

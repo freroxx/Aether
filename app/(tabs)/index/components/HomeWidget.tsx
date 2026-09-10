@@ -1,14 +1,15 @@
 import React from "react";
-import Stack from '@/ui/components/Stack';
-import Icon from '@/ui/components/Icon';
-import { t } from 'i18next';
-import Typography from '@/ui/components/Typography';
-import { Papicons } from '@getpapillon/papicons';
-import { Link } from 'expo-router';
+import Stack from "@/ui/components/Stack";
+import Icon from "@/ui/components/Icon";
+import { t } from "i18next";
+import Typography from "@/ui/components/Typography";
+import { Papicons } from "@getpapillon/papicons";
+import { Link } from "expo-router";
 import { useTheme } from "expo-router/react-navigation";
 import { Platform } from "react-native";
-import { ErrorBoundary } from '@/ui/components/ErrorBoundary';
-import { ListTouchable } from '@/ui/new/List';
+import { ErrorBoundary } from "@/ui/components/ErrorBoundary";
+import WidgetErrorCard from "@/ui/components/WidgetErrorCard";
+import { ListTouchable } from "@/ui/new/List";
 
 export interface HomeWidgetItem {
   icon: React.ReactNode;
@@ -105,8 +106,15 @@ const HomeWidgetContent: React.FC<HomeWidgetProps> = ({ item }) => {
   );
 };
 
-const HomeWidget: React.FC<HomeWidgetProps> = React.memo((props) => (
-  <ErrorBoundary fallback={null}>
+const HomeWidget: React.FC<HomeWidgetProps> = React.memo(props => (
+  <ErrorBoundary
+    fallback={
+      <WidgetErrorCard
+        title={props.item?.title}
+        message="Ce widget n'a pas pu se charger"
+      />
+    }
+  >
     <HomeWidgetContent {...props} />
   </ErrorBoundary>
 ));

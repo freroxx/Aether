@@ -1,14 +1,15 @@
-import React, { memo, useCallback, useMemo, useState } from 'react';
-import Reanimated from 'react-native-reanimated';
+import React, { memo, useCallback, useMemo, useState } from "react";
+import Reanimated from "react-native-reanimated";
 
 import { Homework } from "@/services/shared/homework";
 import Task from "@/ui/components/Task";
-import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
+import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import { getSubjectName } from "@/utils/subjects/name";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectColor } from "@/utils/subjects/colors";
-import { Link } from 'expo-router';
-import { getHomeworkRouteId } from '@/database/useHomework';
+import { hapticFor } from "@/utils/haptics";
+import { Link } from "expo-router";
+import { getHomeworkRouteId } from "@/database/useHomework";
 import { scheduleTaskReminder } from "@/services/local/reminders";
 import { areNotificationsEnabled } from "@/services/local/notifications";
 import { useAlert } from "@/ui/components/AlertProvider";
@@ -24,18 +25,18 @@ interface TaskItemProps {
 
 function stripHtml(s: string): string {
   try {
-    return formatHTML(s).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+    return formatHTML(s)
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120);
   } catch {
     return String(s ?? "").slice(0, 120);
   }
 }
 
 const TaskItem = memo(
-  ({
-    item,
-    fromCache = false,
-    setAsDone
-  }: TaskItemProps) => {
+  ({ item, fromCache = false, setAsDone }: TaskItemProps) => {
     const alert = useAlert();
     const [modalVisible, setModalVisible] = useState(false);
 
@@ -51,12 +52,23 @@ const TaskItem = memo(
         { label: "Dans 1 heure", at: now + 60 * 60 * 1000 },
         { label: "Dans 12 heures", at: now + 12 * 60 * 60 * 1000 },
         { label: "Demain matin (8h)", at: tomorrowMorning },
-        { label: "Chaque 1 heure", at: now + 60 * 60 * 1000, repeat: "hourly", hint: "Jusqu'à terminée" },
-        { label: "Chaque 2 heures", at: now + 2 * 60 * 60 * 1000, repeat: "bihourly", hint: "Jusqu'à terminée" },
+        {
+          label: "Chaque 1 heure",
+          at: now + 60 * 60 * 1000,
+          repeat: "hourly",
+          hint: "Jusqu'à terminée",
+        },
+        {
+          label: "Chaque 2 heures",
+          at: now + 2 * 60 * 60 * 1000,
+          repeat: "bihourly",
+          hint: "Jusqu'à terminée",
+        },
       ];
     }, []);
 
     const handleLongPress = useCallback(() => {
+      void hapticFor("medium");
       setModalVisible(true);
     }, []);
 
@@ -83,7 +95,9 @@ const TaskItem = memo(
         );
         alert.showAlert({
           title: r ? "Rappel ajouté" : "Échec",
-          description: r ? "Retrouve-le dans Réglages → Rappels." : "Impossible de planifier ce rappel.",
+          description: r
+            ? "Retrouve-le dans Réglages → Rappels."
+            : "Impossible de planifier ce rappel.",
           icon: r ? "CheckCircle" : "Cross",
           color: r ? "#00C851" : "#D60046",
           delay: 2500,
@@ -114,7 +128,10 @@ const TaskItem = memo(
             date={new Date(item.dueDate)}
             completed={item.isDone}
             hasAttachments={item.attachments.length > 0}
-            onToggle={() => setAsDone(item, !item.isDone)}
+            onToggle={() => {
+              void hapticFor(item.isDone ? "light" : "success");
+              setAsDone(item, !item.isDone);
+            }}
             onLongPress={handleLongPress}
           />
         </Link>

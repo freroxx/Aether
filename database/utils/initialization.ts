@@ -1,6 +1,6 @@
 import { Database } from "@nozbe/watermelondb";
 
-import { error,info, warn } from "@/utils/logger/logger";
+import { error, info, warn } from "@/utils/logger/logger";
 
 import { getDatabaseInstance } from "../DatabaseProvider";
 
@@ -26,7 +26,7 @@ export class DatabaseInitializer {
       await this.forceResetDatabaseQueue(db);
 
       const isResponsive = await this.testInitialDatabaseHealth(db);
-      
+
       if (!isResponsive) {
         warn("Database appears to be unresponsive, attempting recovery...");
         await this.attemptDatabaseRecovery(db);
@@ -34,7 +34,6 @@ export class DatabaseInitializer {
 
       this.isInitialized = true;
       info("🍉 Database initialization completed successfully");
-
     } catch (err) {
       error(`Database initialization failed: ${err}`);
       throw err;
@@ -44,26 +43,23 @@ export class DatabaseInitializer {
   private async forceResetDatabaseQueue(db: Database): Promise<void> {
     try {
       info("🍉 Force resetting database queue...");
-      
-      for (let i = 0; i < 3; i++) {
-        const resetPromise = db.write(async () => {
-          // Empty write operation to flush the queue
-        });
 
-        await Promise.race([
-          resetPromise,
-          new Promise<void>((_, reject) => {
-            setTimeout(() => {
-              reject(new Error(`Queue reset ${i + 1} timeout`));
-            }, 3000);
-          })
-        ]);
+      // Single empty write flushes the queue — 3x was startup latency
+      // with no benefit (queue is FIFO, one barrier suffices).
+      const resetPromise = db.write(async () => {
+        // Empty write operation to flush the queue
+      });
 
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      await Promise.race([
+        resetPromise,
+        new Promise<void>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error("Queue reset timeout"));
+          }, 2000);
+        }),
+      ]);
 
       info("🍉 Database queue reset completed");
-      
     } catch (err) {
       warn(`Database queue reset failed: ${err}`);
       warn("🍉 Database may start with degraded performance");
@@ -73,21 +69,20 @@ export class DatabaseInitializer {
   private async testInitialDatabaseHealth(db: Database): Promise<boolean> {
     try {
       const startTime = Date.now();
-      
-      const testPromise = db.collections.get('news').query().fetch();
+
+      const testPromise = db.collections.get("news").query().fetch();
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error("Database health check timeout"));
-        }, 5000);
+        }, 2000);
       });
 
       await Promise.race([testPromise, timeoutPromise]);
 
       const duration = Date.now() - startTime;
       info(`🍉 Database health check passed (${duration}ms)`);
-      
-      return duration < 3000; // Consider healthy if under 3 seconds
-      
+
+      return duration < 2000; // Consider healthy if under 2 seconds
     } catch (err) {
       error(`Database health check failed: ${err}`);
       return false;
@@ -97,9 +92,9 @@ export class DatabaseInitializer {
   private async attemptDatabaseRecovery(db: Database): Promise<void> {
     try {
       info("🍉 Attempting database recovery...");
-      
+
       const recoveryPromise = db.write(async () => {
-        const collections = ['news', 'homework', 'grades', 'subjects'];
+        const collections = ["news", "homework", "grades", "subjects"];
         for (const collectionName of collections) {
           try {
             await db.collections.get(collectionName).query().fetch();
@@ -115,11 +110,10 @@ export class DatabaseInitializer {
           setTimeout(() => {
             reject(new Error("Recovery timeout"));
           }, 10000);
-        })
+        }),
       ]);
 
       info("🍉 Database recovery completed");
-      
     } catch (err) {
       error(`Database recovery failed: ${err}`);
     }

@@ -2,13 +2,16 @@ import { createMMKV } from 'react-native-mmkv'
 import { PersistStorage } from 'zustand/middleware'
 
 import { UniversalClassSerializer } from './serializer';
+import { resolveMMKVKey } from '@/utils/secure/mmkvKey';
 
 const classRegistry = new Map<string, any>();
 
 export const createMMKVStorage = <T>(id: string, encryptionKey?: string): PersistStorage<T> => {
+  // Per-device key when warmed (see initSecureMMKVKey on app start),
+  // else explicit key, else legacy fallback — never unencrypted.
   const mmkv = createMMKV({
     id: id,
-    encryptionKey: encryptionKey
+    encryptionKey: encryptionKey ?? resolveMMKVKey()
   });
 
   return {

@@ -952,13 +952,23 @@ def get_canteen(
                 "meal": structured_meal,
                 "meals": meals
             })
-    return {"menus": menus}
+    cpayload = {"menus": menus}
+    cache_set(ckey, cpayload, 60)
+    _set_cache_header(response, False)
+    return cpayload
 
 @app.get("/chats")
 def get_chats(
+    response: Response,
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    # Phase 6 quick win: short cache 30s (liste sensible, TTL court).
+    lkey = _cache_key("chats", auth, child)
+    lhit = cache_get(lkey)
+    if lhit is not None:
+        _set_cache_header(response, True)
+        return lhit
     client = init_client(auth, child_name=child)
     discussions = []
     if hasattr(client, "discussions"):
@@ -978,7 +988,10 @@ def get_chats(
                 })
         except Exception:
             pass
-    return {"chats": discussions}
+    chat_payload = {"chats": discussions}
+    cache_set(lkey, chat_payload, 30)
+    _set_cache_header(response, False)
+    return chat_payload
 
 @app.get("/chats/{chat_id}/messages")
 def get_chat_messages(
@@ -1066,6 +1079,7 @@ def create_new_chat(
 
 @app.get("/evaluations")
 def get_evaluations(
+    response: Response,
     period: Optional[str] = Query(None),
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
@@ -1073,6 +1087,7 @@ def get_evaluations(
     ekey = _cache_key("evaluations", auth, period, child)
     ehit = cache_get(ekey)
     if ehit is not None:
+        _set_cache_header(response, True)
         return ehit
     client = init_client(auth, child_name=child)
     periods = getattr(client, "periods", []) or []
@@ -1141,11 +1156,13 @@ def get_evaluations(
         })
 
     epayload = {"evaluations": result}
-    cache_set(_cache_key("evaluations", auth, period, child), epayload, 300)
+    cache_set(ekey, epayload, 300)
+    _set_cache_header(response, False)
     return epayload
 
 @app.get("/report")
 def get_report(
+    response: Response,
     period: Optional[str] = Query(None),
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
@@ -1153,6 +1170,7 @@ def get_report(
     rkey = _cache_key("report", auth, period, child)
     rhit = cache_get(rkey)
     if rhit is not None:
+        _set_cache_header(response, True)
         return rhit
     client = init_client(auth, child_name=child)
     periods = getattr(client, "periods", []) or []
@@ -1209,6 +1227,7 @@ def get_report(
 
     rpayload = {"report": {"comments": top_comments, "subjects": subjects}}
     cache_set(rkey, rpayload, 300)
+    _set_cache_header(response, False)
     return rpayload
 
 @app.get("/teaching-staff")
@@ -1413,6 +1432,10 @@ def download_file(
                 return True
         return found_bytes is not None
 
+    # Phase 6: pas de lookup direct par homeworkId dans pronotepy (requiert une
+    # fenêtre de dates). Le match par ID exact dans la fenêtre étroite ±7j ci-dessous
+    # joue ce rôle de lookup direct — déjà OK, on garde la fenêtre étroite d'abord
+    # pour éviter le scan large 150j systématique.
     # 0) Indice due_date/given_at d'abord (±7j) : évite le scan 150j systématique.
     if found_bytes is None and req.due_date:
         try:

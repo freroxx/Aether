@@ -48,7 +48,12 @@ import {
   QRCode,
 } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
-import { Period, PeriodGrades, Evaluation, Report } from "@/services/shared/grade";
+import {
+  Period,
+  PeriodGrades,
+  Evaluation,
+  Report,
+} from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
@@ -68,7 +73,10 @@ const isPermanentAuthError = (e: unknown): boolean => {
   if (!e) return false;
   // PronoteHttpError porte le statut : 429/5xx = transitoire, jamais un logout.
   const status = (e as any)?.status;
-  if (status === 429 || (typeof status === "number" && status >= 500 && status <= 599)) {
+  if (
+    status === 429 ||
+    (typeof status === "number" && status >= 500 && status <= 599)
+  ) {
     return false;
   }
   const msg = String((e as any)?.message || e).toLowerCase();
@@ -130,7 +138,7 @@ export class AccountManager {
     // Parallèle (pas séquentiel) : le switch compte/enfant ne doit pas
     // payer N handshakes Pronote en série.
     const results = await Promise.all(
-      this.account.services.map(async (service) => {
+      this.account.services.map(async service => {
         try {
           log("Trying to refresh " + service.id);
           const plugin = this.getServicePluginForAccount(service);
@@ -141,7 +149,9 @@ export class AccountManager {
           }
 
           if (plugin?.capabilities.includes(Capabilities.REFRESH)) {
-            this.clients[service.id] = await plugin.refreshAccount(service.auth);
+            this.clients[service.id] = await plugin.refreshAccount(
+              service.auth
+            );
             refreshedAtLeastOne = true;
             log("Successfully refreshed " + service.id);
           } else {
@@ -167,8 +177,14 @@ export class AccountManager {
         Object.keys(this.clients).length
     );
 
-    if (!hasInternet && Object.keys(this.clients).length === 0 && this.account.services.length > 0) {
-      throw new Error("Internet not reachable and no offline service is available.");
+    if (
+      !hasInternet &&
+      Object.keys(this.clients).length === 0 &&
+      this.account.services.length > 0
+    ) {
+      throw new Error(
+        "Internet not reachable and no offline service is available."
+      );
     }
     return refreshedAtLeastOne;
   }
@@ -286,7 +302,8 @@ export class AccountManager {
       {
         multiple: false,
         clientId,
-        fallback: async () => (await getSimpleCache<Evaluation[]>(cacheKey)) ?? [],
+        fallback: async () =>
+          (await getSimpleCache<Evaluation[]>(cacheKey)) ?? [],
         saveToCache: async (data: Evaluation[]) => {
           await setSimpleCache(cacheKey, data, 300000);
         },
@@ -321,7 +338,10 @@ export class AccountManager {
     );
   }
 
-  async getTeachingStaff(clientId: string, kid?: Kid): Promise<TeachingStaff[]> {
+  async getTeachingStaff(
+    clientId: string,
+    kid?: Kid
+  ): Promise<TeachingStaff[]> {
     const cacheKey = `staff:${clientId}`;
     return await this.fetchData(
       Capabilities.TEACHING_STAFF,
@@ -334,7 +354,8 @@ export class AccountManager {
       {
         multiple: false,
         clientId,
-        fallback: async () => (await getSimpleCache<TeachingStaff[]>(cacheKey)) ?? [],
+        fallback: async () =>
+          (await getSimpleCache<TeachingStaff[]>(cacheKey)) ?? [],
         saveToCache: async (data: TeachingStaff[]) => {
           await setSimpleCache(cacheKey, data, 300000);
         },
@@ -453,7 +474,11 @@ export class AccountManager {
     );
   }
 
-  async getWeeklyTimetable(weekNumber: number, date: Date, kidName?: string): Promise<CourseDay[]> {
+  async getWeeklyTimetable(
+    weekNumber: number,
+    date: Date,
+    kidName?: string
+  ): Promise<CourseDay[]> {
     return await this.fetchData(
       Capabilities.TIMETABLE,
       async client =>
@@ -462,7 +487,8 @@ export class AccountManager {
           : [],
       {
         multiple: true,
-        fallback: async () => getCoursesFromCache([weekNumber], date.getFullYear()),
+        fallback: async () =>
+          getCoursesFromCache([weekNumber], date.getFullYear()),
         saveToCache: async (data: CourseDay[]) => {
           await addCourseDayToDatabase(data);
         },
@@ -482,40 +508,82 @@ export class AccountManager {
   }
 
   async sendMessageInChat(chat: Chat, content: string): Promise<void> {
-    return await this.fetchData(
-      Capabilities.CHAT_REPLY,
-      async client => {
-        if (client.sendMessageInChat) {
-          await client.sendMessageInChat(chat, content);
-        }
-      },
-      { clientId: chat.createdByAccount }
-    );
+    try {
+      return await this.fetchData(
+        Capabilities.CHAT_REPLY,
+        async client => {
+          if (client.sendMessageInChat) {
+            await client.sendMessageInChat(chat, content);
+          }
+        },
+        { clientId: chat.createdByAccount }
+      );
+    } catch (e) {
+      // Offline-first: enqueue for retry, surface immediately (optimistic).
+      try {
+        const { enqueueOutbox } = await import("@/services/local/outbox");
+        await enqueueOutbox("message-send", {
+          chatId: (chat as any)?.id,
+          createdByAccount: chat.createdByAccount,
+          content,
+        });
+      } catch {
+        // best-effort queue only
+      }
+      throw e;
+    }
   }
 
   async setNewsAsDone(news: News): Promise<News> {
-    return await this.fetchData(
-      Capabilities.NEWS,
-      async client =>
-        client.setNewsAsAcknowledged
-          ? await client.setNewsAsAcknowledged(news)
-          : news,
-      { multiple: false, clientId: news.createdByAccount }
-    );
+    try {
+      return await this.fetchData(
+        Capabilities.NEWS,
+        async client =>
+          client.setNewsAsAcknowledged
+            ? await client.setNewsAsAcknowledged(news)
+            : news,
+        { multiple: false, clientId: news.createdByAccount }
+      );
+    } catch (e) {
+      try {
+        const { enqueueOutbox } = await import("@/services/local/outbox");
+        await enqueueOutbox("news-read", {
+          newsId: (news as any)?.id,
+          createdByAccount: news.createdByAccount,
+        });
+      } catch {
+        // best-effort
+      }
+      throw e;
+    }
   }
 
   async setHomeworkCompletion(
     homework: Homework,
     state?: boolean
   ): Promise<Homework> {
-    return await this.fetchData(
-      Capabilities.HOMEWORK,
-      async client =>
-        client.setHomeworkCompletion
-          ? await client.setHomeworkCompletion(homework, state)
-          : homework,
-      { multiple: false, clientId: homework.createdByAccount }
-    );
+    try {
+      return await this.fetchData(
+        Capabilities.HOMEWORK,
+        async client =>
+          client.setHomeworkCompletion
+            ? await client.setHomeworkCompletion(homework, state)
+            : homework,
+        { multiple: false, clientId: homework.createdByAccount }
+      );
+    } catch (e) {
+      try {
+        const { enqueueOutbox } = await import("@/services/local/outbox");
+        await enqueueOutbox("homework-done", {
+          homeworkId: (homework as any)?.id ?? (homework as any)?.pronoteId,
+          createdByAccount: homework.createdByAccount,
+          state: state ?? !(homework as any)?.isDone,
+        });
+      } catch {
+        // best-effort
+      }
+      throw e;
+    }
   }
 
   async createMail(
@@ -620,7 +688,6 @@ export class AccountManager {
   clientHasCapatibility(capatibility: Capabilities, clientId: string): boolean {
     const client = this.clients[clientId];
     return !!client?.capabilities.includes(capatibility);
-
   }
 
   getAvailableClients(capability: Capabilities): SchoolServicePlugin[] {
@@ -680,7 +747,9 @@ export class AccountManager {
       let availableClients = this.getAvailableClients(capability);
 
       if (!(await this.hasInternet())) {
-        availableClients = availableClients.filter(client => client.requiresInternet === false);
+        availableClients = availableClients.filter(
+          client => client.requiresInternet === false
+        );
         if (availableClients.length === 0 && options?.fallback) {
           warn("No internet connection, using fallback.");
           return await options.fallback();
@@ -744,9 +813,7 @@ export class AccountManager {
         ". Please review your implementation",
       "AccountManager.getServicePluginForAccount"
     );
-    throw new Error(
-      "Unsupported service: " + String(service?.serviceId)
-    );
+    throw new Error("Unsupported service: " + String(service?.serviceId));
   }
 }
 
@@ -786,7 +853,9 @@ export const initializeAccountManager = async (
     if (!accountId) {
       const lastUsedAccount = useAccountStore.getState().lastUsedAccount;
       if (!lastUsedAccount) {
-        throw new Error("No account ID provided and no last used account found.");
+        throw new Error(
+          "No account ID provided and no last used account found."
+        );
       }
       accountId = lastUsedAccount;
     }
@@ -819,7 +888,10 @@ export const getManager = (): AccountManager | null => {
   // resservir. Les appelants ré-initialisent via initializeAccountManager.
   const lastUsedAccount = useAccountStore.getState().lastUsedAccount;
   if (!globalManager || globalManagerAccountId !== lastUsedAccount) {
-    if (globalManagerAccountId !== null && globalManagerAccountId !== lastUsedAccount) {
+    if (
+      globalManagerAccountId !== null &&
+      globalManagerAccountId !== lastUsedAccount
+    ) {
       globalManager = null;
       globalManagerAccountId = null;
     } else {

@@ -1,14 +1,16 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
-import { useFonts } from 'expo-font';
+import { useEffect, useState, useRef, useCallback } from "react";
+import { AppState, AppStateStatus } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
 
-import { initializeDatabaseOnStartup } from '@/database/utils/initialization';
-import { initializeAccountManager } from '@/services/shared';
-import { useSettingsStore } from '@/stores/settings';
-import i18n from '@/utils/i18n';
-import { warn } from '@/utils/logger/logger';
-import { FONT_CONFIG } from '@/constants/LayoutScreenOptions';
+import { initializeDatabaseOnStartup } from "@/database/utils/initialization";
+import { initializeAccountManager } from "@/services/shared";
+import { clearExpiredSimpleCache } from "@/services/shared/simple-cache";
+import { initSecureMMKVKey } from "@/utils/secure/mmkvKey";
+import { useSettingsStore } from "@/stores/settings";
+import i18n from "@/utils/i18n";
+import { warn } from "@/utils/logger/logger";
+import { FONT_CONFIG } from "@/constants/LayoutScreenOptions";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -16,16 +18,18 @@ SplashScreen.preventAutoHideAsync();
 export function useAppInitialization() {
   const [fontsLoaded, fontsError] = useFonts(FONT_CONFIG);
   const [isDatabaseReady, setIsDatabaseReady] = useState(false);
-  
+
   // Settings
-  const customLanguage = useSettingsStore(state => state.personalization.language);
+  const customLanguage = useSettingsStore(
+    state => state.personalization.language
+  );
   const selectedTheme = useSettingsStore(state => state.personalization.theme);
   const mutateProperty = useSettingsStore(state => state.mutateProperty);
 
   useEffect(() => {
     if (!selectedTheme) {
-      mutateProperty('personalization', {
-        theme: "auto"
+      mutateProperty("personalization", {
+        theme: "auto",
       });
     }
   }, [mutateProperty, selectedTheme]);
@@ -33,17 +37,22 @@ export function useAppInitialization() {
   // Language Initialization
   useEffect(() => {
     if (customLanguage && i18n.language !== customLanguage) {
-      i18n.changeLanguage(customLanguage).catch((error) => {
-        console.error("Error changing language:", error);
+      i18n.changeLanguage(customLanguage).catch(error => {
+        warn("Error changing language: " + String(error));
       });
     }
   }, [customLanguage]);
 
-  // Database Initialization
+  // Database Initialization + expired cache purge (parallel, non-blocking)
+  // + per-device MMKV key warm (SecureStore, local only).
   useEffect(() => {
     async function initDatabase() {
       try {
-        await initializeDatabaseOnStartup();
+        await Promise.all([
+          initSecureMMKVKey().catch(() => {}),
+          initializeDatabaseOnStartup(),
+          clearExpiredSimpleCache().catch(() => {}),
+        ]);
       } catch (err) {
         warn(`Database initialization failed: ${err}`);
       } finally {
@@ -59,14 +68,19 @@ export function useAppInitialization() {
   const lastBackgroundRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextAppState) => {
-      if (appState.current.match(/inactive|background/) && nextAppState === "active") {
+    const subscription = AppState.addEventListener("change", nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
         if (lastBackgroundRef.current) {
           const now = Date.now();
           const durationMs = now - lastBackgroundRef.current;
 
           if (durationMs > 5 * 60 * 1000) {
-            initializeAccountManager().catch(e => warn(`Background account refresh failed: ${e}`));
+            initializeAccountManager().catch(e =>
+              warn(`Background account refresh failed: ${e}`)
+            );
           }
         }
       }
@@ -85,7 +99,9 @@ export function useAppInitialization() {
 
   // Error Handling for Fonts
   const handleError = useCallback(() => {
-    if (fontsError) { throw fontsError; }
+    if (fontsError) {
+      throw fontsError;
+    }
   }, [fontsError]);
 
   useEffect(handleError, [handleError]);
@@ -93,6 +109,6 @@ export function useAppInitialization() {
   return {
     isAppReady: isDatabaseReady && fontsLoaded,
     fontsLoaded,
-    fontsError
+    fontsError,
   };
 }

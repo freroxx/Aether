@@ -246,8 +246,9 @@ const GradesView: React.FC = () => {
 
   // Sort
   // Sort grades in subjects by date descending then sort subjects by latest grade descending
+  // NOTE: never mutate Watermelon/Zustand objects in-place — copy grades per subject.
   const sortedSubjects = useMemo(() => {
-    const subjectsCopy = [...subjects];
+    const subjectsCopy = subjects.map(s => ({ ...s, grades: [...(s.grades || [])] }));
     subjectsCopy.forEach((subject) => {
       subject.grades.sort((a, b) => b.givenAt.getTime() - a.givenAt.getTime());
     });
