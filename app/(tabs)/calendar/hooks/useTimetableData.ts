@@ -97,17 +97,24 @@ export function useTimetableData(weekNumber: number, currentDate: Date = new Dat
         }
 
         const baseDate = new Date(safeDateMs);
+        const { getISOWeekYear } = await import("@/utils/services/periods");
         const candidates = [targetWeekNumber - 1, targetWeekNumber, targetWeekNumber + 1]
           .map(week => {
             const targetDate = new Date(baseDate);
             targetDate.setDate(targetDate.getDate() + (week - targetWeekNumber) * 7);
-            const year = targetDate.getFullYear();
-            const key = `${year}-${week}`;
+            // Clé ISO de la date cible (pas du numéro arithmétique) :
+            // semaine 0/54 -> année voisine, jamais filtrée (sinon préfetch
+            // manquant aux frontières d'année -> EDT vide en swipe).
+            let key: string;
+            try {
+              const iso = getISOWeekYear(targetDate);
+              key = `${iso.year}-${iso.week}`;
+            } catch {
+              const year = targetDate.getFullYear();
+              key = `${year}-${week}`;
+            }
             return { week, targetDate, key };
-          })
-          // Semaines 0/54 invalides (chevauchement d'année) : on évite
-          // de requêter une mauvaise semaine qui viderait le cache.
-          .filter(c => c.week >= 1 && c.week <= 53);
+          });
 
         const toFetch = candidates.filter(c => !fetchedWeeksRef.current.includes(c.key));
 

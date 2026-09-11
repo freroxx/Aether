@@ -114,16 +114,22 @@ const addDays = (date: Date, days: number): Date => {
 };
 
 const getDateRangeOfWeek = (weekNumber: number, year: number) => {
-  const janFirst = new Date(year, 0, 1);
-  const daysOffset = (weekNumber - 1) * 7;
-  const weekStart = new Date(janFirst.setDate(janFirst.getDate() + daysOffset));
-  const day = weekStart.getDay();
-  const diff = weekStart.getDate() - day + (day <= 4 ? 1 : 8);
-  const start = new Date(weekStart.setDate(diff));
-  const end = addDays(start, 6);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getWeekRange } = require("@/utils/services/periods");
+    return getWeekRange(weekNumber, year);
+  } catch {
+    const janFirst = new Date(year, 0, 1);
+    const daysOffset = (weekNumber - 1) * 7;
+    const weekStart = new Date(janFirst.setDate(janFirst.getDate() + daysOffset));
+    const day = weekStart.getDay();
+    const diff = weekStart.getDate() - day + (day <= 4 ? 1 : 8);
+    const start = new Date(weekStart.setDate(diff));
+    const end = addDays(start, 6);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
 };
 
 export function generateMockTimetable(

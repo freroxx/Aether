@@ -484,58 +484,282 @@ def get_timetable(
         elif getattr(l, "status", None):
             status_str = str(l.status)
 
-        teacher = getattr(l, "teacher_name", "")
-        if not teacher and hasattr(l, "teachers") and l.teachers:
-            teacher = ", ".join(getattr(t, "name", str(t)) for t in l.teachers)
+        teacher = getattr(l, "teacher_name", "") or ""
+        if not teacher:
+            try:
+                names = getattr(l, "teacher_names", None) or []
+                if names:
+                    teacher = ", ".join(str(n) for n in names)
+            except Exception:
+                pass
+        if not teacher and hasattr(l, "teachers") and getattr(l, "teachers", None):
+            try:
+                teacher = ", ".join(getattr(t, "name", str(t)) for t in l.teachers)
+            except Exception:
+                pass
 
-        room = getattr(l, "classroom", "")
-        if not room and hasattr(l, "classrooms") and l.classrooms:
-            room = ", ".join(getattr(c, "name", str(c)) for c in l.classrooms)
+        room = getattr(l, "classroom", "") or ""
+        if not room:
+            try:
+                rooms = getattr(l, "classrooms", None) or []
+                if rooms:
+                    room = ", ".join(str(n) for n in rooms)
+            except Exception:
+                pass
+        if not room and hasattr(l, "classrooms") and getattr(l, "classrooms", None):
+            try:
+                val = getattr(l, "classrooms", None)
+                if isinstance(val, list) and val and not isinstance(val[0], str):
+                    room = ", ".join(getattr(c, "name", str(c)) for c in val)
+            except Exception:
+                pass
+
+        group = getattr(l, "group_name", "") or ""
+        if not group:
+            try:
+                gnames = getattr(l, "group_names", None) or []
+                if gnames:
+                    group = ", ".join(str(n) for n in gnames)
+            except Exception:
+                pass
 
         end_time = getattr(l, "end", None)
         end_iso = end_time.isoformat() if end_time else (l.start + timedelta(hours=1)).isoformat()
 
-        # Contenu et ressources du cours (cahier de textes) — getattr-guarded,
-        # liste vide si l'établissement ne l'expose pas.
-        lesson_contents = []
-        try:
-            raw_contents = getattr(l, "content", None) or []
-            for c in raw_contents:
-                files = []
-                try:
-                    for f in (getattr(c, "files", None) or []):
-                        files.append({
-                            "name": getattr(f, "name", "Fichier"),
-                            "url": getattr(f, "url", None),
-                            "type": getattr(f, "type", None),
-                        })
-                except Exception:
-                    pass
-                lesson_contents.append({
-                    "title": getattr(c, "title", None),
-                    "description": getattr(c, "description", None),
-                    "category": getattr(c, "category", None),
-                    "files": files,
-                })
-        except Exception:
-            lesson_contents = []
+        # NOTE (pronotepy 2.x) : `Lesson.content` est un objet UNIQUE
+        # `LessonContent | None` (pas une liste) ET chaque accès déclenche
+        # une requête `PageCahierDeTexte` dédiée. L'appeler ici pour ~30
+        # cours = ~30 POSTs supplémentaires -> timeout Vercel (EDT vide).
+        # L'EDT reste donc volontairement SANS contenu (rapide) ; le
+        # contenu se récupère à la demande via POST /timetable/lesson-content
+        # (1 seul PageCahierDeTexte par semaine) et via /files/download.
+        lesson_id = getattr(l, "id", f"{l.start}_{getattr(l.subject, 'name', '')}")
 
         result.append({
-            "id": getattr(l, "id", f"{l.start}_{getattr(l.subject, 'name', '')}"),
+            "id": lesson_id,
+            "resource_id": lesson_id,
             "subject": getattr(l.subject, "name", "Matière") if hasattr(l, "subject") and l.subject else "Matière",
             "teacher": teacher,
             "room": room,
+            "group": group,
             "start": l.start.isoformat(),
             "end": end_iso,
             "canceled": getattr(l, "canceled", False),
             "status": status_str,
             "color": getattr(l.subject, "color", None) if hasattr(l, "subject") and l.subject else None,
+            "background_color": getattr(l, "background_color", None),
             "memo": getattr(l, "memo", None),
             "is_outing": getattr(l, "outing", False),
-            "content": lesson_contents,
+            "is_detention": getattr(l, "detention", False),
+            "is_test": getattr(l, "test", False),
+            "exempted": getattr(l, "exempted", False),
+            "virtual_classrooms": getattr(l, "virtual_classrooms", []) or [],
+            # Contenu rempli à la demande (voir /timetable/lesson-content).
+            "content": [],
         })
 
     payload = {"lessons": result}
+    cache_set(key, payload, 60)
+    _set_cache_header(response, False)
+    return payload
+
+
+class LessonContentRequest(BaseModel):
+    lesson_id: Optional[str] = None
+    lesson_start: Optional[str] = None  # ISO datetime du début du cours
+    subject: Optional[str] = None
+    child_name: Optional[str] = None
+    date: Optional[str] = None  # YYYY-MM-DD (semaine à scanner si lesson_start absent)
+
+
+def _serialize_lesson_content(c) -> Dict[str, Any]:
+    files = []
+    try:
+        for f in (getattr(c, "files", None) or []):
+            files.append({
+                "name": getattr(f, "name", "Fichier"),
+                "url": getattr(f, "url", None),
+                "type": getattr(f, "type", 1),
+            })
+    except Exception:
+        pass
+    return {
+        "title": getattr(c, "title", None),
+        "description": getattr(c, "description", None),
+        "category": getattr(c, "category", None),
+        "files": files,
+    }
+
+
+def _fetch_contents_for_school_week(client, week: int) -> Dict[str, Any]:
+    """Un seul PageCahierDeTexte par semaine scolaire -> map lesson_id -> content brut."""
+    try:
+        resp = client.post("PageCahierDeTexte", 89, {"domaine": {"_T": 8, "V": f"[{week}..{week}]"}})
+        items = resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", []) or []
+        out: Dict[str, Any] = {}
+        for entry in items:
+            try:
+                lid = ((entry.get("cours") or {}).get("V") or {}).get("N")
+                conts = ((entry.get("listeContenus") or {}).get("V") or [])
+                if lid and conts:
+                    out[str(lid)] = conts[0]
+            except Exception:
+                continue
+        return out
+    except Exception:
+        return {}
+
+
+@app.post("/timetable/lesson-content")
+def get_lesson_content(
+    req: LessonContentRequest,
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Contenu + ressources d'un cours précis (cahier de textes).
+
+    pronotepy `Lesson.content` = UN objet (pas une liste) + 1 requête
+    réseau par accès. On mutualise : 1 seul `PageCahierDeTexte` pour la
+    semaine scolaire du cours, puis mapping par lesson_id (ou fallback
+    par date/heure + matière, les ids Pronote tournant à chaque session).
+    """
+    client = init_client(auth, child_name=req.child_name)
+
+    # Résout la date pivot (semaine scolaire) : lesson_start > date > aujourd'hui.
+    pivot: Optional[datetime] = None
+    if req.lesson_start:
+        try:
+            pivot = datetime.fromisoformat(str(req.lesson_start).replace("Z", "+00:00"))
+            if pivot.tzinfo is not None:
+                pivot = pivot.replace(tzinfo=None)
+        except Exception:
+            pivot = None
+    anchor_d: Optional[date] = None
+    if pivot is not None:
+        anchor_d = pivot.date()
+    elif req.date:
+        try:
+            anchor_d = parse_ymd(req.date, "date")
+        except Exception:
+            anchor_d = None
+    if anchor_d is None:
+        anchor_d = date.today()
+
+    # Semaine(s) scolaire(s) à scanner : pivot ±1j (chevauchement week-end).
+    weeks = set()
+    for delta in (-1, 0, 1):
+        try:
+            weeks.add(client.get_week(anchor_d + timedelta(days=delta)))
+        except Exception:
+            pass
+    if not weeks:
+        return {"contents": []}
+
+    # 1) Chemin direct par lesson_id (le plus fiable quand l'id est frais).
+    if req.lesson_id:
+        for w in weeks:
+            raw_map = _fetch_contents_for_school_week(client, w)
+            if str(req.lesson_id) in raw_map:
+                try:
+                    import pronotepy as _pn
+                    lc = _pn.LessonContent(client, raw_map[str(req.lesson_id)])
+                    return {"contents": [_serialize_lesson_content(lc)]}
+                except Exception:
+                    raw = raw_map[str(req.lesson_id)]
+                    try:
+                        files = [{"name": f.get("L", "Fichier"), "url": f.get("url"), "type": f.get("G", 1)} for f in (raw.get("ListePieceJointe", {}) or {}).get("V", [])]
+                    except Exception:
+                        files = []
+                    return {"contents": [{
+                        "title": raw.get("L"),
+                        "description": raw.get("descriptif", {}).get("V") if isinstance(raw.get("descriptif"), dict) else raw.get("descriptif"),
+                        "category": (raw.get("categorie", {}) or {}).get("V") if isinstance(raw.get("categorie"), dict) else raw.get("categorie"),
+                        "files": files,
+                    }]}
+
+    # 2) Fallback par date/heure : retrouve le cours dans ±2j puis lit son contenu.
+    try:
+        lessons = client.lessons(anchor_d - timedelta(days=2), anchor_d + timedelta(days=2))
+    except Exception as e:
+        raise _classify_pronote_error(e)
+    target = None
+    if pivot is not None:
+        # Match exact à la minute, sinon ±30min + matière.
+        for l in (lessons or []):
+            try:
+                ls = getattr(l, "start", None)
+                if ls and abs((ls.replace(tzinfo=None) - pivot).total_seconds()) < 60:
+                    target = l
+                    break
+            except Exception:
+                continue
+        if target is None and req.subject:
+            want = str(req.subject).lower().strip()
+            for l in (lessons or []):
+                try:
+                    ls = getattr(l, "start", None)
+                    subj = getattr(getattr(l, "subject", None), "name", "") or ""
+                    if ls and abs((ls.replace(tzinfo=None) - pivot).total_seconds()) < 1800 and want in str(subj).lower():
+                        target = l
+                        break
+                except Exception:
+                    continue
+    if target is None and lessons:
+        # Dernier recours : cours le plus proche du pivot.
+        try:
+            def _dist(l):
+                try:
+                    return abs((getattr(l, "start").replace(tzinfo=None) - pivot).total_seconds()) if pivot else 0
+                except Exception:
+                    return 1e18
+            target = sorted(list(lessons), key=_dist)[0]
+        except Exception:
+            target = None
+
+    if target is None:
+        return {"contents": []}
+    try:
+        c = target.content
+    except Exception as e:
+        raise _classify_pronote_error(e)
+    if c is None:
+        return {"contents": []}
+    return {"contents": [_serialize_lesson_content(c)]}
+
+
+@app.get("/timetable/contents")
+def get_timetable_contents(
+    response: Response,
+    from_date: str = Query(..., description="Date début YYYY-MM-DD"),
+    to_date: str = Query(..., description="Date fin YYYY-MM-DD"),
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Contenus de tous les cours d'une fenêtre (1 PageCahierDeTexte / semaine)."""
+    start_d, end_d = clamp_window(parse_ymd(from_date, "from_date"), parse_ymd(to_date, "to_date"))
+    key = _cache_key("timetable_contents", auth, from_date, to_date, child)
+    hit = cache_get(key)
+    if hit is not None:
+        _set_cache_header(response, True)
+        return hit
+    client = init_client(auth, child_name=child)
+    weeks = set()
+    cur = start_d
+    while cur <= end_d:
+        try:
+            weeks.add(client.get_week(cur))
+        except Exception:
+            pass
+        cur += timedelta(days=1)
+    by_lesson: Dict[str, Any] = {}
+    for w in sorted(weeks):
+        raw_map = _fetch_contents_for_school_week(client, w)
+        for lid, raw in raw_map.items():
+            try:
+                import pronotepy as _pn
+                by_lesson[str(lid)] = _serialize_lesson_content(_pn.LessonContent(client, raw))
+            except Exception:
+                continue
+    payload = {"contents": [{"lesson_id": k, **v} for k, v in by_lesson.items()]}
     cache_set(key, payload, 60)
     _set_cache_header(response, False)
     return payload
@@ -664,9 +888,19 @@ def get_homework(
     result = []
     for h in hw_list:
         files = []
-        if hasattr(h, "files"):
-            for f in h.files:
-                files.append({"name": getattr(f, "name", "Fichier"), "url": getattr(f, "url", "")})
+        try:
+            raw_files = getattr(h, "files", None) or []
+            # pronotepy: `files` est une @property -> liste d'Attachment.
+            if callable(raw_files):
+                raw_files = raw_files()
+            for f in (raw_files or []):
+                files.append({
+                    "name": getattr(f, "name", "Fichier"),
+                    "url": getattr(f, "url", ""),
+                    "type": getattr(f, "type", 1),
+                })
+        except Exception:
+            files = []
 
         result.append({
             "id": getattr(h, "id", f"{h.date}_{getattr(h.subject, 'name', '')}"),
@@ -816,19 +1050,49 @@ def get_attendance(
 
         if hasattr(p, "punishments"):
             for pun in p.punishments:
-                pun_reason = getattr(pun, "reason", "")
-                if not pun_reason and hasattr(pun, "reasons") and isinstance(pun.reasons, list):
-                    pun_reason = ", ".join(pun.reasons)
+                # pronotepy Punishment: `given` (datetime|date), `reasons: List[str]`,
+                # `nature`, `giver`, `homework`, `circumstances`, `duration: timedelta|None`.
+                # (pas de champ `date` ni `reason` au singulier.)
+                pun_reason = ""
+                try:
+                    rs = getattr(pun, "reasons", None) or []
+                    if isinstance(rs, list) and rs:
+                        pun_reason = ", ".join(str(r) for r in rs)
+                except Exception:
+                    pun_reason = ""
+                if not pun_reason:
+                    pun_reason = getattr(pun, "reason", "") or ""
+                given = getattr(pun, "given", None)
+                given_iso = None
+                try:
+                    if given is not None and hasattr(given, "isoformat"):
+                        given_iso = given.isoformat()
+                except Exception:
+                    given_iso = None
+                def _att_list(raw):
+                    out = []
+                    try:
+                        for f in (raw or []):
+                            out.append({
+                                "name": getattr(f, "name", "Fichier"),
+                                "url": getattr(f, "url", ""),
+                                "type": getattr(f, "type", 1),
+                            })
+                    except Exception:
+                        pass
+                    return out
                 punishments.append({
-                    "id": getattr(pun, "id", str(getattr(pun, "date", ""))),
-                    "date": pun.date.isoformat() if hasattr(pun, "date") and pun.date else None,
+                    "id": getattr(pun, "id", str(given_iso or "")),
+                    "date": given_iso,
                     "reason": pun_reason,
                     "giver": getattr(pun, "giver", ""),
                     "nature": getattr(pun, "nature", ""),
                     "exclusion": bool(getattr(pun, "exclusion", False)),
                     "during_lesson": bool(getattr(pun, "during_lesson", False)),
                     "homework": getattr(pun, "homework", "") or "",
+                    "homework_documents": _att_list(getattr(pun, "homework_documents", None)),
                     "circumstances": getattr(pun, "circumstances", "") or "",
+                    "circumstance_documents": _att_list(getattr(pun, "circumstance_documents", None)),
                     "duration_minutes": _parse_float_safe(getattr(pun, "duration", None), None),
                     "schedulable": bool(getattr(pun, "schedulable", False)),
                 })
@@ -858,14 +1122,37 @@ def get_news(
     if hasattr(client, "information_and_surveys"):
         items = client.information_and_surveys() if callable(client.information_and_surveys) else client.information_and_surveys
         for item in items:
-            start_d = getattr(item, "start_date", getattr(item, "creation_date", None))
+            start_d = getattr(item, "start_date", None) or getattr(item, "creation_date", None)
+            # pronotepy: `content` et `attachments` sont des MÉTHODES
+            # (requête PageActualites par actu). `getattr(item, "content")`
+            # renverrait la méthode elle-même, pas le texte !
+            content_str = ""
+            try:
+                c = getattr(item, "content", None)
+                content_str = c() if callable(c) else (str(c) if c else "")
+            except Exception:
+                content_str = ""
+            atts = []
+            try:
+                a = getattr(item, "attachments", None)
+                raw_atts = a() if callable(a) else (a or [])
+                for f in (raw_atts or []):
+                    atts.append({
+                        "name": getattr(f, "name", "Fichier"),
+                        "url": getattr(f, "url", ""),
+                        "type": getattr(f, "type", 1),
+                    })
+            except Exception:
+                atts = []
             news_list.append({
                 "id": getattr(item, "id", str(start_d or "")),
                 "title": getattr(item, "title", "Actualité"),
                 "author": getattr(item, "author", ""),
-                "content": getattr(item, "content", ""),
-                "date": start_d.isoformat() if start_d else None,
+                "content": content_str,
+                "date": start_d.isoformat() if start_d and hasattr(start_d, "isoformat") else None,
                 "acknowledged": getattr(item, "read", True),
+                "category": getattr(item, "category", "Information") or "Information",
+                "attachments": atts,
             })
     npayload = {"news": news_list}
     cache_set(nkey, npayload, 120)
@@ -882,7 +1169,14 @@ def mark_news_as_read(
         items = client.information_and_surveys() if callable(client.information_and_surveys) else client.information_and_surveys
         target = next((x for x in items if getattr(x, "id", None) == req.news_id), None)
         if target and hasattr(target, "mark_as_read"):
-            target.mark_as_read()
+            try:
+                # pronotepy exige mark_as_read(status: bool).
+                target.mark_as_read(True)
+            except TypeError:
+                try:
+                    target.mark_as_read()
+                except Exception:
+                    pass
             return {"success": True}
     return {"success": True}
 
@@ -1068,10 +1362,21 @@ def create_new_chat(
         try:
             all_r = client.get_recipients()
             target_r = [r for r in all_r if getattr(r, "id", r.name) in req.recipient_ids]
-            new_disc = client.new_discussion(req.subject, req.content, target_r if target_r else all_r[:1])
+            # pronotepy `new_discussion` renvoie None (pas d'objet).
+            # On recrée puis on résout le vrai id en relistant.
+            client.new_discussion(req.subject, req.content, target_r if target_r else all_r[:1])
+            chat_id = f"disc_{req.subject}"
+            try:
+                fresh = client.discussions() if callable(client.discussions) else client.discussions
+                # La discussion la plus récente avec le même objet = la nôtre.
+                match = next((d for d in reversed(fresh or []) if getattr(d, "subject", "") == req.subject), None)
+                if match is not None and getattr(match, "id", None):
+                    chat_id = str(getattr(match, "id"))
+            except Exception:
+                pass
             return {
                 "success": True,
-                "chat_id": getattr(new_disc, "id", f"disc_{req.subject}")
+                "chat_id": chat_id
             }
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Impossible d'initier la discussion: {str(e)}")
@@ -1294,6 +1599,65 @@ def get_ical_url(
         url = None
     return {"url": url}
 
+
+@app.get("/profile")
+def get_profile(
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Infos élève complètes (pronotepy ClientInfo) : nom, classe, établissement,
+    adresse, email, téléphone, INE, délégué. Non-critique : champs manquants -> ""."""
+    client = init_client(auth, child_name=child)
+    info = getattr(client, "info", None)
+    if info is None:
+        return {"name": "", "class_name": "", "establishment": ""}
+    def _safe(fn, default=""):
+        try:
+            v = fn()
+            return v if v is not None else default
+        except Exception:
+            try:
+                v = fn
+                return v if isinstance(v, (str, list)) else default
+            except Exception:
+                return default
+    try:
+        address = _safe(lambda: info.address, ("", "", "", "", "", "", "", ""))
+        if not isinstance(address, (list, tuple)):
+            address = ("", "", "", "", "", "", "", "")
+    except Exception:
+        address = ("", "", "", "", "", "", "", "")
+    return {
+        "name": getattr(info, "name", "") or "",
+        "class_name": getattr(info, "class_name", "") or "",
+        "establishment": getattr(info, "establishment", "") or "",
+        "address": list(address) if isinstance(address, (list, tuple)) else [],
+        "email": _safe(lambda: info.email),
+        "phone": _safe(lambda: info.phone),
+        "ine_number": _safe(lambda: info.ine_number),
+        "delegue": _safe(lambda: info.delegue, []),
+    }
+
+
+@app.get("/timetable/pdf")
+def get_timetable_pdf(
+    day: Optional[str] = Query(None, description="Jour YYYY-MM-DD (semaine générée, défaut: année)"),
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """URL du PDF EDT via pronotepy `generate_timetable_pdf` (non-critique)."""
+    client = init_client(auth, child_name=child)
+    if not hasattr(client, "generate_timetable_pdf"):
+        raise HTTPException(status_code=400, detail="Export PDF non supporté par ce compte.")
+    try:
+        d = parse_ymd(day, "day") if day else None
+        url = client.generate_timetable_pdf(day=d)
+        return {"url": str(url)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _classify_pronote_error(e)
+
 @app.post("/files/download")
 def download_file(
     req: FileDownloadRequest,
@@ -1397,39 +1761,59 @@ def download_file(
         for h in (hw_list or []):
             try:
                 files = getattr(h, "files", None) or []
+                if callable(files):
+                    files = files()
             except Exception:
                 continue
-            for f in files:
+            for f in (files or []):
                 if _try_consume_attachment(f):
                     return True
             if found_bytes is not None:
                 return True
         return found_bytes is not None
 
-    def _scan_lessons(start_d, end_d) -> bool:
-        try:
-            lessons = client.lessons(start_d, end_d)
-        except HTTPException:
-            raise
-        except Exception:
-            return False
-        for lesson in (lessons or []):
+    def _iter_contents_for_range(start_d, end_d):
+        """Contenus de cours sans explosion N+1 : 1 PageCahierDeTexte / semaine scolaire."""
+        weeks = set()
+        cur = start_d
+        # Garde-fou : ne scanne jamais plus de 22 semaines d'un coup.
+        guard = 0
+        while cur <= end_d and guard < 160:
             try:
-                contents = getattr(lesson, "content", None) or []
+                weeks.add(client.get_week(cur))
             except Exception:
-                continue
-            for c in contents:
+                pass
+            cur += timedelta(days=1)
+            guard += 1
+        for w in sorted(weeks):
+            raw_map = _fetch_contents_for_school_week(client, w)
+            for raw in (raw_map or {}).values():
                 try:
-                    files = getattr(c, "files", None) or []
+                    import pronotepy as _pn
+                    yield _pn.LessonContent(client, raw)
                 except Exception:
                     continue
-                for f in files:
+
+    def _scan_lessons(start_d, end_d) -> bool:
+        # pronotepy `Lesson.content` = objet UNIQUE + 1 requête par accès :
+        # on ne fait JAMAIS `lesson.content` en boucle (N+1 -> timeout).
+        try:
+            for c in _iter_contents_for_range(start_d, end_d):
+                try:
+                    files = getattr(c, "files", None) or []
+                    if callable(files):
+                        files = files()
+                except Exception:
+                    continue
+                for f in (files or []):
                     if _try_consume_attachment(f):
                         return True
                 if found_bytes is not None:
                     return True
-            if found_bytes is not None:
-                return True
+        except HTTPException:
+            raise
+        except Exception:
+            return False
         return found_bytes is not None
 
     # Phase 6: pas de lookup direct par homeworkId dans pronotepy (requiert une

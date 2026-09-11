@@ -487,8 +487,14 @@ export class AccountManager {
           : [],
       {
         multiple: true,
-        fallback: async () =>
-          getCoursesFromCache([weekNumber], date.getFullYear()),
+        fallback: async () => {
+          const { getISOWeekYear } = await import("@/utils/services/periods");
+          let y = date.getFullYear();
+          try {
+            y = getISOWeekYear(date).year;
+          } catch {}
+          return getCoursesFromCache([weekNumber], y);
+        },
         saveToCache: async (data: CourseDay[]) => {
           await addCourseDayToDatabase(data);
         },

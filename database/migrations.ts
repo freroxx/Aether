@@ -20,5 +20,14 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 40,
+      steps: [
+        addColumns({
+          table: "courses",
+          columns: [{ name: "resourceId", type: "string", isOptional: true }],
+        }),
+      ],
+    },
   ],
 });

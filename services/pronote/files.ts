@@ -1,7 +1,8 @@
 import { Directory, File, Paths } from "expo-file-system";
+import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
-import { Share } from "react-native";
+import { Platform, Share } from "react-native";
 
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import { Attachment, AttachmentType } from "@/services/shared/attachment";
@@ -187,8 +188,9 @@ export async function downloadAttachment(
 /**
  * Ouvre une pièce jointe :
  * - LINK -> WebBrowser.openBrowserAsync
- * - FILE -> téléchargement via backend puis partage (Share) avec fallback
- *   WebBrowser pour les PDF/images si le partage est indisponible.
+ * - FILE -> téléchargement via backend puis ouverture directe :
+ *   Android = Intent ACTION_VIEW (visionneuse par défaut, pas de share sheet),
+ *   iOS = aperçu navigateur pour PDF/images, sinon partage système en repli.
  * Les erreurs sont affichées en français via `alert` (useAlert), jamais Alert.alert.
  */
 export async function openAttachment(
@@ -294,8 +296,44 @@ export async function openAttachment(
       // Stat impossible (FS exotique) : on tente quand même l'ouverture.
     }
 
-    // Partage via FileProvider (content://) — jamais de file:// en ACTION_SEND,
-    // sinon FileUriExposedException tue l'app (incatchable en JS).
+    // Ouverture directe (pas de menu Partage) :
+    // - Android : Intent ACTION_VIEW avec URI content:// (FileProvider) + MIME.
+    //   Ouvre la visionneuse par défaut (PDF, image, etc.) au lieu du share sheet.
+    // - iOS : aperçu navigateur pour PDF/images, sinon partage système.
+    if (Platform.OS === "android") {
+      try {
+        const { getContentUriAsync } = await import("expo-file-system/legacy");
+        const contentUri = await getContentUriAsync(uri);
+        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+          data: contentUri,
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+          type: mime,
+        });
+        return;
+      } catch (viewErr) {
+        const { error: logError } = await import("@/utils/logger/logger");
+        logError(`openAttachment VIEW failed, fallback to share: ${filename} ${mime} :: ${String(viewErr)}`);
+        const msg = String(viewErr instanceof Error ? viewErr.message : viewErr ?? "").toLowerCase();
+        // Aucune appli pour ce type -> message clair plutôt que share sheet confus.
+        if (msg.includes("no activity") || msg.includes("no app") || msg.includes("activitynotfound")) {
+          throw new Error(`Ouverture impossible (${filename}, ${mime}). Aucune application installée pour ouvrir ce type de fichier.`);
+        }
+        // Sinon : repli partage (l'utilisateur peut quand même l'envoyer ailleurs).
+      }
+    } else if (previewable) {
+      // iOS : aperçu intégré sans passer par le share sheet.
+      try {
+        await WebBrowser.openBrowserAsync(uri);
+        return;
+      } catch (openErr) {
+        const { error: logError } = await import("@/utils/logger/logger");
+        logError(`openAttachment browser failed: ${filename} ${mime} ${uri} :: ${String(openErr)}`);
+      }
+    }
+
+    // Repli : partage système (FileProvider content://, jamais file:// en
+    // ACTION_SEND sinon FileUriExposedException). Proposé seulement si
+    // l'ouverture directe a échoué.
     const canShareNative = await Sharing.isAvailableAsync().catch(() => false);
     if (canShareNative) {
       await Sharing.shareAsync(uri, {
@@ -308,17 +346,6 @@ export async function openAttachment(
             : undefined,
       });
       return;
-    }
-
-    // Fallback sans expo-sharing : aperçu intégré pour PDF/images uniquement.
-    if (previewable) {
-      try {
-        await WebBrowser.openBrowserAsync(uri);
-        return;
-      } catch (openErr) {
-        const { error: logError } = await import("@/utils/logger/logger");
-        logError(`openAttachment browser failed: ${filename} ${mime} ${uri} :: ${String(openErr)}`);
-      }
     }
 
     // Dernier recours : Share RN (peut échouer sur file:// Android 7+).

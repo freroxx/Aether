@@ -1,4 +1,5 @@
 import { PronoteApiClient } from "@/services/pronote/api-client";
+import { AttachmentType } from "@/services/shared/attachment";
 import { News } from "@/services/shared/news";
 import { error } from "@/utils/logger/logger";
 
@@ -14,10 +15,15 @@ export async function fetchPronoteNews(
       title: item.title || "Actualité",
       createdAt: new Date(item.date || Date.now()),
       acknowledged: item.acknowledged ?? true,
-      attachments: [],
+      attachments: Array.isArray(item.attachments) ? item.attachments.map((f: any) => ({
+        type: f?.type === 0 ? AttachmentType.LINK : AttachmentType.FILE,
+        name: f?.name ?? "Fichier",
+        url: f?.url ?? "",
+        createdByAccount: accountId,
+      })) : [],
       content: item.content || "",
       author: item.author || "",
-      category: "Information",
+      category: item.category || "Information",
       createdByAccount: accountId,
     }));
   } catch (err) {

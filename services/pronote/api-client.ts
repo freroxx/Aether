@@ -251,6 +251,36 @@ export const PronoteApiClient = {
     });
   },
 
+  async getLessonContent(
+    authToken: string,
+    opts: { lessonId?: string; lessonStart?: string; subject?: string; date?: string; child?: string }
+  ): Promise<{ contents: any[] }> {
+    return request("/timetable/lesson-content", {
+      method: "POST",
+      authToken,
+      body: {
+        lesson_id: opts.lessonId,
+        lesson_start: opts.lessonStart,
+        subject: opts.subject,
+        date: opts.date,
+        child_name: opts.child,
+      },
+      timeoutMs: 30000,
+    });
+  },
+
+  async getTimetableContents(
+    authToken: string,
+    fromDate: string,
+    toDate: string,
+    child?: string
+  ): Promise<{ contents: any[] }> {
+    return request("/timetable/contents", {
+      authToken,
+      params: { from_date: fromDate, to_date: toDate, child },
+    });
+  },
+
   async getGrades(
     authToken: string,
     period?: string,

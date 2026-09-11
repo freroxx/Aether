@@ -1,7 +1,7 @@
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import { AttachmentType } from "@/services/shared/attachment";
 import { Homework, ReturnFormat } from "@/services/shared/homework";
-import { getWeekRange } from "@/utils/services/periods";
+import { getWeekRangeForWeekNumber } from "@/utils/services/periods";
 import { error } from "@/utils/logger/logger";
 
 export async function fetchPronoteHomeworks(
@@ -11,7 +11,9 @@ export async function fetchPronoteHomeworks(
   childName?: string
 ): Promise<Homework[]> {
   try {
-    const { start, end } = getWeekRange(weekNumberRaw, new Date().getFullYear());
+    // Année ISO inférée (proximité à aujourd'hui) : `weekNumber` seul est
+    // ambigu (semaine 1 en décembre = janvier suivant, pas janvier passé).
+    const { start, end } = getWeekRangeForWeekNumber(weekNumberRaw, new Date());
     const fromStr = start.toISOString().split("T")[0];
     const toStr = end.toISOString().split("T")[0];
 

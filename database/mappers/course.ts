@@ -31,6 +31,7 @@ export function mapCourseToShared(course: Course): SharedCourse {
     customStatus: course.customStatus,
     url: course.url,
     kidName: course.kidName,
+    resourceId: (course as { resourceId?: unknown }).resourceId as string | undefined,
     content: parseContent((course as { contentRaw?: unknown }).contentRaw),
   }
 }

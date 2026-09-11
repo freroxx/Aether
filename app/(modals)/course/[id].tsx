@@ -43,14 +43,39 @@ export default function CourseModal() {
   });
   const [course, setCourse] = useState<SharedCourse>();
   const [loading, setLoading] = useState(true);
+  const [resourcesLoading, setResourcesLoading] = useState(false);
   const [downloadingName, setDownloadingName] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setResourcesLoading(false);
     getCourseById(id)
       .then(result => {
-        if (!cancelled) setCourse(result);
+        if (cancelled) return;
+        setCourse(result);
+        // Contenu à la demande : l'EDT rapide ne l'inclut plus.
+        // Si vide, on interroge le backend (1 seul PageCahierDeTexte).
+        if (result && (!Array.isArray(result.content) || result.content.length === 0)) {
+          setResourcesLoading(true);
+          import("@/services/shared").then(({ getManager }) => {
+            const manager = getManager();
+            if (!manager) {
+              if (!cancelled) setResourcesLoading(false);
+              return;
+            }
+            manager.getCourseResources(result).then(fresh => {
+              if (cancelled) return;
+              if (Array.isArray(fresh) && fresh.length > 0) {
+                setCourse(prev => (prev ? { ...prev, content: fresh } : prev));
+              }
+            }).catch(() => {}).finally(() => {
+              if (!cancelled) setResourcesLoading(false);
+            });
+          }).catch(() => {
+            if (!cancelled) setResourcesLoading(false);
+          });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -233,13 +258,22 @@ export default function CourseModal() {
           </List.Item>
         </List.Section>
 
-        {Array.isArray(course.content) && course.content.length > 0 && (
-          <List.Section>
-            <List.SectionTitle>
-              <List.Label>{t("Modal_Course_Content", "Contenu et ressources")}</List.Label>
-            </List.SectionTitle>
+        <List.Section>
+          <List.SectionTitle>
+            <List.Label>{t("Modal_Course_Content", "Contenu et ressources")}</List.Label>
+          </List.SectionTitle>
 
-            {course.content.map((c, i) => (
+          {resourcesLoading && (!Array.isArray(course.content) || course.content.length === 0) ? (
+            <List.Item>
+              <List.Leading>
+                <ActivityIndicator size={20} />
+              </List.Leading>
+              <Typography variant="body1" color="textSecondary">
+                {t("Modal_Course_Content_Loading", "Chargement du contenu…")}
+              </Typography>
+            </List.Item>
+          ) : Array.isArray(course.content) && course.content.length > 0 ? (
+            course.content.map((c, i) => (
               <React.Fragment key={`${c.title ?? ""}-${i}`}>
                 {(c.title || c.description) && (
                   <List.Item>
@@ -255,7 +289,7 @@ export default function CourseModal() {
                     )}
                     {!!c.description && (
                       <Typography variant="body1" color="textSecondary" numberOfLines={4}>
-                        {c.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
+                        {String(c.description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
                       </Typography>
                     )}
                   </List.Item>
@@ -300,9 +334,20 @@ export default function CourseModal() {
                   );
                 })}
               </React.Fragment>
-            ))}
-          </List.Section>
-        )}
+            ))
+          ) : (
+            <List.Item>
+              <List.Leading>
+                <Icon>
+                  <Papicons name="Info" />
+                </Icon>
+              </List.Leading>
+              <Typography variant="body1" color="textSecondary">
+                {t("Modal_Course_Content_Empty", "Aucun contenu publié pour ce cours.")}
+              </Typography>
+            </List.Item>
+          )}
+        </List.Section>
       </List>
     </View>
   );

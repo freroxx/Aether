@@ -28,7 +28,7 @@ export interface Course extends GenericInterface {
 export interface CourseResource {
   title?: string;
   description?: string;
-  category: number;
+  category: number | string;
   attachments: Attachment[]
 }
 

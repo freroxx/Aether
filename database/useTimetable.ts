@@ -10,7 +10,15 @@ import { getDatabaseInstance, useDatabase } from "./DatabaseProvider"
 import { mapCourseToShared } from "./mappers/course";
 import Course from "./models/Timetable";
 import { safeWrite } from "./utils/safeTransaction";
-import { getWeekRange } from "@/utils/services/periods";
+import { getISOWeekYear, getWeekRange } from "@/utils/services/periods";
+
+function isoYearOf(d: Date): number {
+  try {
+    return getISOWeekYear(d).year;
+  } catch {
+    return d.getFullYear();
+  }
+}
 
 export function getCourseRouteId(course: SharedCourse): string {
   try {
@@ -50,26 +58,27 @@ export function useTimetable(refresh = 0, weekNumber: number | number[] = 0, dat
   const weeks = Array.isArray(weekNumber) ? weekNumber : [weekNumber];
   // Create a stable key for the weeks array to use in dependency arrays
   const weeksKey = weeks.join(',');
+  const isoYear = isoYearOf(date);
 
   useEffect(() => {
     const fetchTimetable = async () => {
-      const timetableFetched = await getCoursesFromCache(weeks, date.getFullYear());
+      const timetableFetched = await getCoursesFromCache(weeks, isoYearOf(date));
       setTimetable(timetableFetched);
     };
     fetchTimetable();
-  }, [refresh, database, weeksKey, date.getFullYear()]);
+  }, [refresh, database, weeksKey, isoYear]);
 
   useEffect(() => {
     const icalQuery = database.get('icals').query();
     const subscription = icalQuery.observe().subscribe(() => {
       const fetchTimetable = async () => {
-        const timetableFetched = await getCoursesFromCache(weeks, date.getFullYear());
+        const timetableFetched = await getCoursesFromCache(weeks, isoYearOf(date));
         setTimetable(timetableFetched);
       };
       fetchTimetable();
     });
     return () => subscription.unsubscribe();
-  }, [database, weeksKey, date.getFullYear()]);
+  }, [database, weeksKey, isoYear]);
 
   return timetable;
 }
@@ -153,7 +162,8 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
                 customStatus: item.customStatus,
                 url: item.url,
                 kidName: item.kidName,
-                contentRaw: item.content ? JSON.stringify(item.content) : undefined,
+                resourceId: (item as { resourceId?: string }).resourceId,
+                contentRaw: item.content && item.content.length > 0 ? JSON.stringify(item.content) : undefined,
               });
             });
           } else {
@@ -174,7 +184,10 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
                 customStatus: item.customStatus ?? course.customStatus,
                 url: item.url ?? course.url,
                 kidName: item.kidName ?? course.kidName,
-                contentRaw: item.content ? JSON.stringify(item.content) : course.contentRaw,
+                resourceId: (item as { resourceId?: string }).resourceId ?? (course as unknown as { resourceId?: string }).resourceId,
+                // Ne jamais écraser un contenu existant par un EDT vide :
+                // l'EDT rapide renvoie content: [] volontairement.
+                contentRaw: item.content && item.content.length > 0 ? JSON.stringify(item.content) : course.contentRaw,
               });
             });
           }

@@ -299,7 +299,39 @@ export class Pronote implements SchoolServicePlugin {
   }
 
   async getCourseResources(course: Course): Promise<CourseResource[]> {
-    return [];
+    await this.checkTokenValidty();
+    // Cache DB d'abord (EDT rapide sans contenu), sinon backend on-demand.
+    if (Array.isArray(course.content) && course.content.length > 0) {
+      return course.content;
+    }
+    try {
+      const fresh = await fetchPronoteCourseResources(this.getAuthToken(), course);
+      if (fresh.length > 0) {
+        // Persiste pour le widget LessonContent / l'ouverture hors-ligne.
+        try {
+          const { getDatabaseInstance } = await import("@/database/DatabaseProvider");
+          const { getCourseRouteId } = await import("@/database/useTimetable");
+          const routeId = getCourseRouteId(course);
+          const db = getDatabaseInstance();
+          const { Q } = await import("@nozbe/watermelondb");
+          const recs = await db.get("courses").query(Q.where("courseId", routeId)).fetch();
+          if (recs.length > 0) {
+            const { safeWrite } = await import("@/database/utils/safeTransaction");
+            await safeWrite(db, async () => {
+              await (recs[0] as any).update((m: any) => {
+                m.contentRaw = JSON.stringify(fresh);
+              });
+            }, 10000, "save_course_resources");
+          }
+        } catch {
+          // best-effort cache only
+        }
+      }
+      return fresh;
+    } catch (e) {
+      error(String(e), "Pronote.getCourseResources");
+      return Array.isArray(course.content) ? course.content : [];
+    }
   }
 
   async getChats(): Promise<Chat[]> {

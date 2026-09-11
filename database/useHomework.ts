@@ -5,7 +5,7 @@ import { Attachment } from "@/services/shared/attachment";
 import { Homework as SharedHomework } from "@/services/shared/homework";
 import { generateId } from "@/utils/generateId";
 import { warn } from "@/utils/logger/logger";
-import { getWeekRange } from "@/utils/services/periods";
+import { getWeekRange, getWeekRangeForDate, getWeekRangeForWeekNumber } from "@/utils/services/periods";
 
 import { getDatabaseInstance, useDatabase } from "./DatabaseProvider";
 import Homework from "./models/Homework";
@@ -113,7 +113,7 @@ export async function getHomeworksFromCache(
 ): Promise<SharedHomework[]> {
   try {
     const database = getDatabaseInstance();
-    const { start, end } = getWeekRange(weekNumber, new Date().getFullYear());
+    const { start, end } = getWeekRangeForWeekNumber(weekNumber, new Date());
     const conditions: any[] = [Q.where("dueDate", Q.between(start.getTime(), end.getTime()))];
     if (scope?.createdByAccount) {
       conditions.push(Q.where("createdByAccount", scope.createdByAccount));
@@ -148,8 +148,7 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
   }
   const db = getDatabaseInstance();
 
-  const weekNumber = getWeekNumberFromDate(homeworks[0].dueDate);
-  const { start, end } = getWeekRange(weekNumber, homeworks[0].dueDate.getFullYear());
+  const { start, end } = getWeekRangeForDate(homeworks[0].dueDate);
   const dbHomeworks = await db.get<Homework>("homework")
     .query(Q.where("dueDate", Q.between(start.getTime(), end.getTime())))
     .fetch();
@@ -292,9 +291,27 @@ export function parseJsonArray(s: string): unknown[] {
 }
 
 export function getWeekNumberFromDate(date: Date): number {
-  const startOfYear = new Date(date.getFullYear(), 0, 1);
-  const days = Math.floor(
-    (date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+  try {
+    // ISO 8601 partagé avec getWeekRange (lundi-start). L'ancien calcul
+    // dimanche-start décalait tous les dimanches d'une semaine (EDT vide).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getISOWeekYear } = require("@/utils/services/periods");
+    return getISOWeekYear(date).week;
+  } catch {
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+    const days = Math.floor(
+      (date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+  }
+}
+
+export function getISOYearFromDate(date: Date): number {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getISOWeekYear } = require("@/utils/services/periods");
+    return getISOWeekYear(date).year;
+  } catch {
+    return date.getFullYear();
+  }
 }

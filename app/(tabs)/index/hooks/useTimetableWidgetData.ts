@@ -201,7 +201,12 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
       .filter((day) => day.courses.length > 0)
       .sort((a, b) => toTime(a.courses[0]?.from) - toTime(b.courses[0]?.from));
 
-    const nextCourses = daysWithFutureCourses[0]?.courses ?? [];
+    // Tous les cours futurs (triés), pas seulement le 1er jour : le widget
+    // Contenu doit chercher au-delà de demain (sinon "Rien pour l'instant"
+    // alors qu'un contenu existe après-demain). Limité à 30 pour le cache.
+    const nextCourses = daysWithFutureCourses.flatMap(d => d.courses)
+      .sort((a, b) => toTime(a.from) - toTime(b.from))
+      .slice(0, 30);
     setCourses(nextCourses);
     if (cacheKey) {
       try {

@@ -1,4 +1,5 @@
 import { PronoteApiClient } from "@/services/pronote/api-client";
+import { AttachmentType } from "@/services/shared/attachment";
 import { Absence, Attendance, Delay, Observation, Punishment } from "@/services/shared/attendance";
 import { Period } from "@/services/shared/grade";
 import { error } from "@/utils/logger/logger";
@@ -47,14 +48,20 @@ export async function fetchPronoteAttendance(
       const durationRaw = p.duration_minutes ?? p.duration ?? 0;
       const durationMinutes =
         typeof durationRaw === "number" ? durationRaw : Number(durationRaw) || 0;
+      const mapDocs = (arr: any) => Array.isArray(arr) ? arr.map((f: any) => ({
+        type: f?.type === 0 ? AttachmentType.LINK : AttachmentType.FILE,
+        name: f?.name ?? "Fichier",
+        url: f?.url ?? "",
+        createdByAccount: accountId,
+      })) : [];
       return {
         id: p.id,
         givenAt: new Date(p.date || Date.now()),
         givenBy: p.giver || "",
         exclusion: Boolean(p.exclusion ?? false),
         duringLesson: Boolean(p.during_lesson ?? false),
-        homework: { text: p.homework ?? "", documents: [] },
-        reason: { text: p.reason || "", circumstances: p.circumstances ?? "", documents: [] },
+        homework: { text: p.homework ?? "", documents: mapDocs(p.homework_documents) },
+        reason: { text: p.reason || "", circumstances: p.circumstances ?? "", documents: mapDocs(p.circumstance_documents) },
         nature: p.nature || "",
         duration: durationMinutes,
         durationMinutes,
