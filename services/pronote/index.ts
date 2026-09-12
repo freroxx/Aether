@@ -29,6 +29,7 @@ import { fetchPronoteReport } from "@/services/pronote/report";
 import { fetchPronoteTeachingStaff } from "@/services/pronote/staff";
 import {
   fetchPronoteCourseResources,
+  fetchPronoteWeekContents,
   fetchPronoteWeekTimetable,
 } from "@/services/pronote/timetable";
 import { Attendance } from "@/services/shared/attendance";
@@ -43,7 +44,7 @@ import {
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
 import { TeachingStaff } from "@/services/shared/staff";
-import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
+import { Course, CourseDay, CourseResource, WeekLessonContent } from "@/services/shared/timetable";
 import { Capabilities, SchoolServicePlugin } from "@/services/shared/types";
 import { Kid } from "@/services/shared/kid";
 import { useAccountStore } from "@/stores/account";
@@ -60,6 +61,7 @@ export class Pronote implements SchoolServicePlugin {
     Capabilities.CHAT_REPLY,
     Capabilities.CHAT_CREATE,
     Capabilities.TIMETABLE,
+    Capabilities.TIMETABLE_PDF,
     Capabilities.GRADES,
     Capabilities.HOMEWORK,
     Capabilities.NEWS,
@@ -69,6 +71,7 @@ export class Pronote implements SchoolServicePlugin {
     Capabilities.EVALUATIONS,
     Capabilities.REPORT,
     Capabilities.TEACHING_STAFF,
+    Capabilities.PROFILE,
   ];
   session: any = undefined;
   tokenExpiration = 0;
@@ -148,6 +151,7 @@ export class Pronote implements SchoolServicePlugin {
       Capabilities.REFRESH,
       Capabilities.CANTEEN_MENU,
       Capabilities.TIMETABLE,
+      Capabilities.TIMETABLE_PDF,
       Capabilities.GRADES,
       Capabilities.HOMEWORK,
       Capabilities.NEWS,
@@ -160,6 +164,7 @@ export class Pronote implements SchoolServicePlugin {
       Capabilities.EVALUATIONS,
       Capabilities.REPORT,
       Capabilities.TEACHING_STAFF,
+      Capabilities.PROFILE,
     ]);
 
     this.capabilities = Array.from(capabilitiesSet);
@@ -171,14 +176,130 @@ export class Pronote implements SchoolServicePlugin {
       .getState()
       .accounts.find(a => a.id === this.accountId);
     if (!account?.children?.length) return [];
-    return account.children.map((c, idx) => ({
-      id: `kid_${idx}_${c.name}`,
-      firstName: c.name.split(" ")[0] || c.name,
-      lastName: c.name.split(" ").slice(1).join(" ") || "",
-      class: c.grade || "",
-      dateOfBirth: new Date(),
-      createdByAccount: this.accountId,
-    }));
+    return account.children.map((c: any, idx: number) => {
+      const rawName: string = c.name || "";
+      // Prénom = premier token, nom = reste (ordre Pronote variable, id stable).
+      const parts = rawName.split(" ").filter(Boolean);
+      return {
+        id: c.id || `kid_${idx}_${rawName}`,
+        firstName: parts[0] || rawName,
+        lastName: parts.slice(1).join(" ") || "",
+        class: c.grade || "",
+        dateOfBirth: new Date(),
+        createdByAccount: this.accountId,
+      };
+    });
+  }
+
+  async getProfile(kid?: Kid): Promise<import("@/services/shared/profile").StudentProfile | null> {
+    await this.checkTokenValidty();
+    try {
+      const { PronoteApiClient } = await import("@/services/pronote/api-client");
+      const data = await PronoteApiClient.getProfile(this.getAuthToken(), this.resolveChildName(kid));
+      return {
+        id: (data as any).id ?? null,
+        name: data.name || "",
+        className: data.class_name || "",
+        establishment: data.establishment || "",
+        address: Array.isArray(data.address) ? data.address : [],
+        email: data.email || "",
+        phone: data.phone || "",
+        ineNumber: (data as any).ine_number || "",
+        delegue: Array.isArray((data as any).delegue) ? (data as any).delegue : [],
+        hasProfilePicture: Boolean((data as any).has_profile_picture ?? false),
+      };
+    } catch (e) {
+      error(String(e), "Pronote.getProfile");
+      return null;
+    }
+  }
+
+  async getProfilePicture(kid?: Kid): Promise<{ picture: string | null; mime?: string } | null> {
+    await this.checkTokenValidty();
+    try {
+      const { PronoteApiClient } = await import("@/services/pronote/api-client");
+      return await PronoteApiClient.getProfilePicture(this.getAuthToken(), this.resolveChildName(kid));
+    } catch (e) {
+      error(String(e), "Pronote.getProfilePicture");
+      return null;
+    }
+  }
+
+  async requestQrCode(pin: string, kid?: Kid): Promise<{ qr: any }> {
+    await this.checkTokenValidty();
+    const { PronoteApiClient } = await import("@/services/pronote/api-client");
+    return await PronoteApiClient.requestQrCode(this.getAuthToken(), pin, this.resolveChildName(kid));
+  }
+
+  async getSessionInfo(kid?: Kid): Promise<{ start_day: string; week: number; logged_in: boolean; last_connection: string | null }> {
+    await this.checkTokenValidty();
+    const { PronoteApiClient } = await import("@/services/pronote/api-client");
+    return await PronoteApiClient.getSessionInfo(this.getAuthToken(), this.resolveChildName(kid));
+  }
+
+  async getCurrentPeriod(kid?: Kid): Promise<Period | null> {
+    await this.checkTokenValidty();
+    try {
+      const { PronoteApiClient } = await import("@/services/pronote/api-client");
+      const data = await PronoteApiClient.getCurrentPeriod(this.getAuthToken(), this.resolveChildName(kid));
+      const p = (data as any).period;
+      if (!p) return null;
+      return {
+        id: p.id || p.name,
+        name: p.name,
+        start: p.start ? new Date(p.start) : new Date(),
+        end: p.end ? new Date(p.end) : new Date(),
+        createdByAccount: this.accountId,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async getTimetablePdf(day?: Date, portrait?: boolean, overflow?: number): Promise<string | null> {
+    await this.checkTokenValidty();
+    try {
+      const { PronoteApiClient } = await import("@/services/pronote/api-client");
+      const fmt = day ? `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}` : undefined;
+      const res = await PronoteApiClient.getTimetablePdf(this.getAuthToken(), { day: fmt, portrait, overflow, child: this.getSelectedChildName() });
+      return res.url ?? null;
+    } catch (e) {
+      error(String(e), "Pronote.getTimetablePdf");
+      return null;
+    }
+  }
+
+  async getIcalUrl(): Promise<string | null> {
+    await this.checkTokenValidty();
+    try {
+      const { fetchPronoteIcalUrl } = await import("@/services/pronote/staff");
+      return await fetchPronoteIcalUrl(this.getAuthToken(), this.getSelectedChildName());
+    } catch {
+      return null;
+    }
+  }
+
+  async getChatParticipants(chat: Chat): Promise<string[]> {
+    await this.checkTokenValidty();
+    try {
+      const { PronoteApiClient } = await import("@/services/pronote/api-client");
+      const res = await PronoteApiClient.getChatParticipants(this.getAuthToken(), chat.id, this.getSelectedChildName());
+      return res.participants || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async markChatAsRead(chat: Chat, read = true): Promise<void> {
+    await this.checkTokenValidty();
+    const { PronoteApiClient } = await import("@/services/pronote/api-client");
+    await PronoteApiClient.markChatRead(this.getAuthToken(), chat.id, read, this.getSelectedChildName());
+  }
+
+  async deleteChat(chat: Chat): Promise<void> {
+    await this.checkTokenValidty();
+    const { PronoteApiClient } = await import("@/services/pronote/api-client");
+    await PronoteApiClient.deleteChat(this.getAuthToken(), chat.id, this.getSelectedChildName());
   }
 
   async getHomeworks(weekNumber: number): Promise<Homework[]> {
@@ -191,12 +312,13 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async getNews(): Promise<News[]> {
+  async getNews(opts?: { onlyUnread?: boolean }): Promise<News[]> {
     await this.checkTokenValidty();
     return fetchPronoteNews(
       this.getAuthToken(),
       this.accountId,
-      this.getSelectedChildName()
+      this.getSelectedChildName(),
+      opts?.onlyUnread ? { onlyUnread: true } : undefined
     );
   }
 
@@ -298,8 +420,7 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async getCourseResources(course: Course): Promise<CourseResource[]> {
-    await this.checkTokenValidty();
+  async getCourseResources(course: Course): Promise<CourseResource[]> {    await this.checkTokenValidty();
     // Cache DB d'abord (EDT rapide sans contenu), sinon backend on-demand.
     if (Array.isArray(course.content) && course.content.length > 0) {
       return course.content;
@@ -334,12 +455,24 @@ export class Pronote implements SchoolServicePlugin {
     }
   }
 
-  async getChats(): Promise<Chat[]> {
+  async getWeekContents(from: Date, to: Date): Promise<WeekLessonContent[]> {
+    await this.checkTokenValidty();
+    return fetchPronoteWeekContents(
+      this.getAuthToken(),
+      this.accountId,
+      from,
+      to,
+      this.getSelectedChildName()
+    );
+  }
+
+  async getChats(onlyUnread?: boolean): Promise<Chat[]> {
     await this.checkTokenValidty();
     return fetchPronoteChats(
       this.getAuthToken(),
       this.accountId,
-      this.getSelectedChildName()
+      this.getSelectedChildName(),
+      onlyUnread ? true : undefined
     );
   }
 
@@ -370,13 +503,14 @@ export class Pronote implements SchoolServicePlugin {
     );
   }
 
-  async sendMessageInChat(chat: Chat, content: string): Promise<void> {
+  async sendMessageInChat(chat: Chat, content: string, messageId?: string): Promise<void> {
     await this.checkTokenValidty();
     await sendPronoteMessageInChat(
       this.getAuthToken(),
       chat,
       content,
-      this.getSelectedChildName()
+      this.getSelectedChildName(),
+      messageId
     );
   }
 

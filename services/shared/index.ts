@@ -56,7 +56,7 @@ import {
 } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
-import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
+import { Course, CourseDay, CourseResource, WeekLessonContent } from "@/services/shared/timetable";
 import {
   Capabilities,
   FetchOptions,
@@ -230,13 +230,17 @@ export class AccountManager {
     );
   }
 
-  async getNews(): Promise<News[]> {
+  async getNews(opts?: { onlyUnread?: boolean }): Promise<News[]> {
     return await this.fetchData(
       Capabilities.NEWS,
-      async client => (client.getNews ? await client.getNews() : []),
+      async client => (client.getNews ? await client.getNews(opts) : []),
       {
         multiple: true,
-        fallback: async () => getNewsFromCache(),
+        fallback: async () => {
+          const cached = await getNewsFromCache();
+          if (opts?.onlyUnread) return cached.filter(n => !n.acknowledged);
+          return cached;
+        },
         saveToCache: async (data: News[]) => {
           await addNewsToDatabase(data);
         },
@@ -281,6 +285,26 @@ export class AccountManager {
         },
       }
     );
+  }
+
+  /** Période courante backend (best-effort, null si indisponible). */
+  async getCurrentPeriod(): Promise<Period | null> {
+    try {
+      const clients = Object.values(this.clients);
+      for (const client of clients) {
+        try {
+          if (typeof (client as { getCurrentPeriod?: unknown }).getCurrentPeriod === "function") {
+            const p = await (client as unknown as { getCurrentPeriod: () => Promise<Period | null> }).getCurrentPeriod();
+            if (p?.name) return p;
+          }
+        } catch {
+          continue;
+        }
+      }
+    } catch {
+      // best-effort
+    }
+    return null;
   }
 
   async getEvaluationsForPeriod(
@@ -417,16 +441,21 @@ export class AccountManager {
     );
   }
 
-  async getChats(): Promise<Chat[]> {
+  async getChats(onlyUnread?: boolean): Promise<Chat[]> {
+    const wantUnreadOnly = onlyUnread === true;
     return await this.fetchData(
       Capabilities.CHAT_READ,
-      async client => (client.getChats ? await client.getChats() : []),
+      async client => (client.getChats ? await client.getChats(wantUnreadOnly ? true : undefined) : []),
       {
         multiple: true,
         fallback: async () => getChatsFromCache(),
-        saveToCache: async (data: Chat[]) => {
-          await addChatsToDatabase(data);
-        },
+        ...(wantUnreadOnly
+          ? {}
+          : {
+              saveToCache: async (data: Chat[]) => {
+                await addChatsToDatabase(data);
+              },
+            }),
       }
     );
   }
@@ -513,13 +542,23 @@ export class AccountManager {
     );
   }
 
-  async sendMessageInChat(chat: Chat, content: string): Promise<void> {
+  async getWeekContents(from: Date, to: Date): Promise<WeekLessonContent[]> {
+    const out = await this.fetchData(
+      Capabilities.TIMETABLE,
+      async client =>
+        client.getWeekContents ? await client.getWeekContents(from, to) : [],
+      { multiple: true }
+    );
+    return Array.isArray(out) ? (out as WeekLessonContent[]) : [];
+  }
+
+  async sendMessageInChat(chat: Chat, content: string, messageId?: string): Promise<void> {
     try {
       return await this.fetchData(
         Capabilities.CHAT_REPLY,
         async client => {
           if (client.sendMessageInChat) {
-            await client.sendMessageInChat(chat, content);
+            await client.sendMessageInChat(chat, content, messageId);
           }
         },
         { clientId: chat.createdByAccount }
@@ -610,6 +649,97 @@ export class AccountManager {
       },
       { multiple: false, clientId: accountId }
     );
+  }
+
+  async getChatParticipants(chat: Chat): Promise<string[]> {
+    return await this.fetchData(
+      Capabilities.CHAT_READ,
+      async client =>
+        (client as any).getChatParticipants ? await (client as any).getChatParticipants(chat) : [],
+      { multiple: true, clientId: chat.createdByAccount }
+    );
+  }
+
+  async markChatAsRead(chat: Chat, read = true): Promise<void> {
+    await this.fetchData(
+      Capabilities.CHAT_READ,
+      async client => {
+        if ((client as any).markChatAsRead) await (client as any).markChatAsRead(chat, read);
+      },
+      { clientId: chat.createdByAccount }
+    );
+  }
+
+  async deleteChat(chat: Chat): Promise<void> {
+    await this.fetchData(
+      Capabilities.CHAT_READ,
+      async client => {
+        if ((client as any).deleteChat) await (client as any).deleteChat(chat);
+      },
+      { clientId: chat.createdByAccount }
+    );
+  }
+
+  async getProfile(): Promise<import("./profile").StudentProfile | null> {
+    const out = await this.fetchData(
+      Capabilities.PROFILE,
+      async client => ((client as any).getProfile ? await (client as any).getProfile() : null),
+      { multiple: true }
+    );
+    if (Array.isArray(out)) {
+      return ((out as unknown[]).find(v => v != null) as import("./profile").StudentProfile | undefined) ?? null;
+    }
+    return (out as any) ?? null;
+  }
+
+  async getProfilePicture(): Promise<{ picture: string | null; mime?: string } | null> {
+    const out = await this.fetchData(
+      Capabilities.PROFILE,
+      async client => ((client as any).getProfilePicture ? await (client as any).getProfilePicture() : null),
+      { multiple: true }
+    );
+    if (Array.isArray(out)) {
+      const withPicture = (out as unknown[]).find(
+        v => v != null && typeof v === "object" && (v as any).picture
+      ) as { picture: string | null; mime?: string } | undefined;
+      if (withPicture) return withPicture;
+      return ((out as unknown[]).find(v => v != null) as { picture: string | null; mime?: string } | undefined) ?? null;
+    }
+    return (out as any) ?? null;
+  }
+
+  async requestQrCode(pin: string): Promise<{ qr: any }> {
+    const clients = this.getAvailableClients(Capabilities.PROFILE);
+    if (clients.length === 0) {
+      throw new Error("No clients available for capability: PROFILE");
+    }
+    const client = clients[0];
+    if (!(client as any).requestQrCode) {
+      throw new Error("requestQrCode not supported by client");
+    }
+    return await (client as any).requestQrCode(pin);
+  }
+
+  async getSessionInfo(): Promise<{ start_day: string; week: number; logged_in: boolean; last_connection: string | null } | null> {
+    const clients = this.getAvailableClients(Capabilities.PROFILE);
+    if (clients.length === 0) return null;
+    const client = clients[0];
+    if (!(client as any).getSessionInfo) return null;
+    try {
+      return await (client as any).getSessionInfo();
+    } catch {
+      return null;
+    }
+  }
+
+  async getTimetablePdf(day?: Date, portrait?: boolean, overflow?: number): Promise<string | null> {
+    const out = await this.fetchData(
+      Capabilities.TIMETABLE_PDF,
+      async client =>
+        (client as any).getTimetablePdf ? await (client as any).getTimetablePdf(day, portrait, overflow) : null,
+      { multiple: true }
+    );
+    return (out as any) ?? null;
   }
 
   async getCanteenBalances(): Promise<Balance[]> {

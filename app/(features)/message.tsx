@@ -32,6 +32,12 @@ import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
 import Typography from "@/ui/new/Typography";
 import { getInitials } from "@/utils/chats/initials";
 
+function snippet(content: string, max = 80): string {
+  const clean = String(content ?? "").replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max - 1).trimEnd()}…`;
+}
+
 export default function MessageThreadView() {
   const theme = useTheme();
   const isDark = theme.dark;
@@ -61,8 +67,15 @@ export default function MessageThreadView() {
   const [sending, setSending] = useState(false);
   const [isUsingMock, setIsUsingMock] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [remoteParticipants, setRemoteParticipants] = useState<string[] | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    setReplyTo(null);
+    setRemoteParticipants(null);
+  }, [chatId]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -135,11 +148,36 @@ export default function MessageThreadView() {
     load().finally(() => setLoading(false));
   }, [load]);
 
+  useEffect(() => {
+    if (!chat || isUsingMock) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const manager = getManager();
+        if (!manager) return;
+        const parts = await manager.getChatParticipants(chat);
+        if (!cancelled && Array.isArray(parts) && parts.length > 0) {
+          setRemoteParticipants(parts);
+        }
+      } catch {
+        // best-effort : repli sur [creator, recipient]
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [chat, isUsingMock]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
   }, [load]);
+
+  const handleReply = useCallback((message: Message) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setReplyTo(message);
+  }, []);
 
   const send = useCallback(async () => {
     const content = draft.trim();
@@ -150,6 +188,7 @@ export default function MessageThreadView() {
       return;
     }
 
+    const replyId = replyTo?.id;
     setSending(true);
     try {
       const manager = getManager();
@@ -162,9 +201,11 @@ export default function MessageThreadView() {
           author: account ? `${account.firstName} ${account.lastName}` : "Moi",
           date: new Date(),
           attachments: [],
+          replyingTo: replyId ?? null,
         };
         setMessages(prev => [...prev, newMsg]);
         setDraft("");
+        setReplyTo(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -172,8 +213,9 @@ export default function MessageThreadView() {
         return;
       }
 
-      await manager.sendMessageInChat(chat, content);
+      await manager.sendMessageInChat(chat, content, replyId);
       setDraft("");
+      setReplyTo(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await load();
       setTimeout(() => {
@@ -185,13 +227,29 @@ export default function MessageThreadView() {
     } finally {
       setSending(false);
     }
-  }, [draft, chat, sending, isUsingMock, load, account]);
+  }, [draft, chat, sending, isUsingMock, load, account, replyTo]);
 
   const correspondent = chat?.recipient || chat?.creator || "Discussion";
   const isClosed = Boolean((chat as { closed?: unknown } | undefined)?.closed);
-  const participants = [chat?.creator, chat?.recipient]
-    .map(p => (p ?? "").trim())
-    .filter((p, idx, arr) => p.length > 0 && arr.indexOf(p) === idx);
+  const fallbackParticipants = useMemo(
+    () =>
+      [chat?.creator, chat?.recipient]
+        .map(p => (p ?? "").trim())
+        .filter((p, idx, arr) => p.length > 0 && arr.indexOf(p) === idx),
+    [chat?.creator, chat?.recipient]
+  );
+  const participants = useMemo(
+    () =>
+      remoteParticipants && remoteParticipants.length > 0
+        ? remoteParticipants
+        : fallbackParticipants,
+    [remoteParticipants, fallbackParticipants]
+  );
+
+  const messageById = useMemo(
+    () => new Map(messages.map(m => [m.id, m] as const)),
+    [messages]
+  );
 
   const dayLabel = useCallback((date: Date) => {
     if (isToday(date)) return "Aujourd'hui";
@@ -302,7 +360,7 @@ export default function MessageThreadView() {
                   numberOfLines={2}
                   style={{ flex: 1 }}
                 >
-                  {t("Messages_Participants")} · {participants.join(" · ")}
+                  {t("Messages_Participants", "Participants")} · {participants.join(" · ")}
                 </Typography>
               </View>
             )}
@@ -349,6 +407,7 @@ export default function MessageThreadView() {
                     : false;
 
                 const initials = getInitials(message.author);
+                const quoted = message.replyingTo ? messageById.get(message.replyingTo) : undefined;
 
                 return (
                   <View
@@ -367,7 +426,9 @@ export default function MessageThreadView() {
                       />
                     )}
 
-                    <View
+                    <Pressable
+                      onLongPress={isClosed ? undefined : () => handleReply(message)}
+                      delayLongPress={380}
                       style={[
                         styles.bubble,
                         mine
@@ -383,6 +444,43 @@ export default function MessageThreadView() {
                         >
                           {message.author}
                         </Typography>
+                      )}
+
+                      {message.replyingTo && (
+                        <View
+                          style={[
+                            styles.quotedBox,
+                            {
+                              borderLeftColor: mine
+                                ? "rgba(255,255,255,0.7)"
+                                : String(theme.colors.primary),
+                              backgroundColor: mine
+                                ? "rgba(255,255,255,0.14)"
+                                : isDark
+                                  ? "rgba(255,255,255,0.06)"
+                                  : "rgba(0,0,0,0.04)",
+                            },
+                          ]}
+                        >
+                          <Typography
+                            variant="caption"
+                            weight="bold"
+                            numberOfLines={1}
+                            style={{
+                              color: mine ? "#FFFFFF" : String(theme.colors.primary),
+                            }}
+                          >
+                            {quoted?.author ?? t("Messages_Reply_Unknown", "Message")}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color={mine ? undefined : "textSecondary"}
+                            numberOfLines={2}
+                            style={mine ? { color: "rgba(255,255,255,0.85)" } : undefined}
+                          >
+                            {quoted ? snippet(quoted.content) : t("Messages_Reply_Unavailable", "Message indisponible")}
+                          </Typography>
+                        </View>
                       )}
 
                       <Typography
@@ -405,8 +503,9 @@ export default function MessageThreadView() {
                         }}
                       >
                         {format(new Date(message.date), "d MMM · HH:mm", { locale: fr })}
+                        {mine && message.seen ? ` · ${t("Messages_Seen", "Vu")}` : ""}
                       </Typography>
-                    </View>
+                    </Pressable>
                   </View>
                 );
               })
@@ -433,7 +532,7 @@ export default function MessageThreadView() {
               >
                 <Papicons name="Info" size={16} opacity={0.6} />
                 <Typography variant="body1" color="textSecondary" align="center">
-                  {t("Messages_Closed_Notice")}
+                  {t("Messages_Closed_Notice", "Discussion fermée — réponse impossible.")}
                 </Typography>
               </View>
             </View>
@@ -450,50 +549,90 @@ export default function MessageThreadView() {
               },
             ]}
           >
-            <View
-              style={[
-                styles.textInputWrapper,
-                {
-                  backgroundColor: theme.colors.card,
-                },
-              ]}
-            >
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="Écrire un message…"
-                placeholderTextColor={String(theme.colors.text) + "60"}
-                multiline
-                editable={!sending}
-                style={[
-                  styles.textInput,
-                  {
-                    color: theme.colors.text,
-                  },
-                ]}
-              />
-            </View>
-
-            <Pressable
-              onPress={send}
-              disabled={sending || draft.trim().length === 0}
-              style={({ pressed }) => [
-                styles.sendButton,
-                {
-                  backgroundColor: theme.colors.primary,
-                  opacity: sending || draft.trim().length === 0 ? 0.4 : pressed ? 0.8 : 1,
-                  transform: [{ scale: pressed ? 0.94 : 1 }],
-                },
-              ]}
-              hitSlop={8}
-            >
-              {sending ? (
-                <ActivityIndicator size={18} color="#FFFFFF" />
-              ) : (
-                /* "Send" n'existe pas dans papicons — ArrowUp (style iOS) */
-                <Papicons name="ArrowUp" size={18} color="#FFFFFF" />
+            <View style={styles.inputColumn}>
+              {replyTo && (
+                <View
+                  style={[
+                    styles.replyBar,
+                    {
+                      backgroundColor: theme.colors.card,
+                      borderLeftColor: String(theme.colors.primary),
+                    },
+                  ]}
+                >
+                  <View style={styles.replyText}>
+                    <Typography
+                      variant="caption"
+                      weight="bold"
+                      numberOfLines={1}
+                      style={{ color: theme.colors.primary }}
+                    >
+                      {replyTo.author}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      numberOfLines={1}
+                    >
+                      {snippet(replyTo.content)}
+                    </Typography>
+                  </View>
+                  <Pressable
+                    onPress={() => setReplyTo(null)}
+                    hitSlop={10}
+                    style={styles.replyCancel}
+                  >
+                    <Papicons name="Cross" size={16} opacity={0.6} />
+                  </Pressable>
+                </View>
               )}
-            </Pressable>
+              <View style={styles.inputRow}>
+                <View
+                  style={[
+                    styles.textInputWrapper,
+                    {
+                      backgroundColor: theme.colors.card,
+                    },
+                  ]}
+                >
+                  <TextInput
+                    value={draft}
+                    onChangeText={setDraft}
+                    placeholder="Écrire un message…"
+                    placeholderTextColor={String(theme.colors.text) + "60"}
+                    multiline
+                    editable={!sending}
+                    style={[
+                      styles.textInput,
+                      {
+                        color: theme.colors.text,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <Pressable
+                  onPress={send}
+                  disabled={sending || draft.trim().length === 0}
+                  style={({ pressed }) => [
+                    styles.sendButton,
+                    {
+                      backgroundColor: theme.colors.primary,
+                      opacity: sending || draft.trim().length === 0 ? 0.4 : pressed ? 0.8 : 1,
+                      transform: [{ scale: pressed ? 0.94 : 1 }],
+                    },
+                  ]}
+                  hitSlop={8}
+                >
+                  {sending ? (
+                    <ActivityIndicator size={18} color="#FFFFFF" />
+                  ) : (
+                    /* "Send" n'existe pas dans papicons — ArrowUp (style iOS) */
+                    <Papicons name="ArrowUp" size={18} color="#FFFFFF" />
+                  )}
+                </Pressable>
+              </View>
+            </View>
           </View>
           )}
         </>
@@ -565,6 +704,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 1 },
   },
+  quotedBox: {
+    borderLeftWidth: 2,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 6,
+    gap: 1,
+  },
   myBubble: {
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
@@ -578,12 +725,35 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   inputBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
     paddingHorizontal: 16,
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  inputColumn: {
+    gap: 8,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  replyBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderLeftWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  replyText: {
+    flex: 1,
+    gap: 1,
+  },
+  replyCancel: {
+    padding: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   textInputWrapper: {
     flex: 1,

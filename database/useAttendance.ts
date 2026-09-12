@@ -41,6 +41,7 @@ export async function addAttendanceToDatabase(attendances: SharedAttendance[], p
               reason: delay.reason,
               justified: delay.justified,
               duration: delay.duration,
+              justification: delay.justification,
               attendanceId: id,
               kidName: delay.kidName
             });
@@ -54,6 +55,8 @@ export async function addAttendanceToDatabase(attendances: SharedAttendance[], p
               to: absence.to.getTime(),
               reason: absence.reason,
               justified: absence.justified,
+              days: absence.days,
+              hours: (absence as { hours?: unknown }).hours as string | undefined,
               attendanceId: id,
               kidName: absence.kidName
             });
@@ -88,6 +91,9 @@ export async function addAttendanceToDatabase(attendances: SharedAttendance[], p
               homeworkText: punishment.homework.text,
               reasonText: punishment.reason.text,
               reasonCircumstances: punishment.reason.circumstances,
+              schedulable: punishment.schedulable,
+              requiresParent: punishment.requiresParent ?? undefined,
+              scheduleRaw: punishment.schedule ? JSON.stringify(punishment.schedule) : undefined,
               attendanceId: id
             });
           });
@@ -107,6 +113,7 @@ export async function addAttendanceToDatabase(attendances: SharedAttendance[], p
               reason: delay.reason,
               justified: delay.justified,
               duration: delay.duration,
+              justification: delay.justification,
               attendanceId: id
             });
           });
@@ -119,6 +126,8 @@ export async function addAttendanceToDatabase(attendances: SharedAttendance[], p
               to: absence.to.getTime(),
               reason: absence.reason,
               justified: absence.justified,
+              days: absence.days,
+              hours: (absence as { hours?: unknown }).hours as string | undefined,
               attendanceId: id
             });
           });
@@ -152,6 +161,9 @@ export async function addAttendanceToDatabase(attendances: SharedAttendance[], p
               homeworkText: punishment.homework.text,
               reasonText: punishment.reason.text,
               reasonCircumstances: punishment.reason.circumstances,
+              schedulable: punishment.schedulable,
+              requiresParent: punishment.requiresParent ?? undefined,
+              scheduleRaw: punishment.schedule ? JSON.stringify(punishment.schedule) : undefined,
               attendanceId: id
             });
           });

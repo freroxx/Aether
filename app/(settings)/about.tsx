@@ -1,11 +1,14 @@
 import { Papicons } from "@getpapillon/papicons";
 import { useTheme } from "expo-router/react-navigation";
 import { Github, ShieldCheck } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import packageJson from "@/package.json";
+import { PronoteApiClient } from "@/services/pronote/api-client";
+import { getManager } from "@/services/shared";
 import { useSettingsStore } from "@/stores/settings";
 import { useAlert } from "@/ui/components/AlertProvider";
 import Avatar from "@/ui/components/Avatar";
@@ -14,6 +17,7 @@ import Typography from "@/ui/new/Typography";
 
 export default function SettingsAbout() {
   const theme = useTheme();
+  const { t } = useTranslation();
   const { colors, dark } = theme;
   const insets = useSafeAreaInsets();
 
@@ -22,6 +26,9 @@ export default function SettingsAbout() {
 
   const [tapCount, setTapCount] = useState(0);
   const alert = useAlert();
+  const [meta, setMeta] = useState<{ pronotepy_version: string; entsCount: number } | null>(null);
+  const [session, setSession] = useState<{ start_day: string; week: number } | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
 
   const handleVersionTap = () => {
     setTapCount(prev => prev + 1);
@@ -37,6 +44,34 @@ export default function SettingsAbout() {
       }
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setDiagLoading(true);
+        const m = await PronoteApiClient.getMeta().catch(() => null);
+        if (mounted && m) {
+          setMeta({
+            pronotepy_version: m.pronotepy_version ?? "—",
+            entsCount: Array.isArray(m.ents) ? m.ents.length : 0,
+          });
+        }
+        const manager = getManager();
+        const s = manager ? await manager.getSessionInfo().catch(() => null) : null;
+        if (mounted && s) {
+          setSession({ start_day: s.start_day, week: s.week });
+        }
+      } catch {
+        // best-effort : section reste subtile
+      } finally {
+        if (mounted) setDiagLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <List
@@ -159,6 +194,50 @@ export default function SettingsAbout() {
             React Native {packageJson.dependencies?.["react-native"]} · Expo {packageJson.dependencies?.expo}
           </Typography>
         </List.Item>
+      </List.Section>
+
+      {/* Diagnostic Pronote — subtil, best-effort */}
+      <List.Section>
+        <List.SectionTitle>
+          <List.Label>{t("Settings_About_Diagnostic_Title", "Diagnostic Pronote")}</List.Label>
+        </List.SectionTitle>
+
+        <List.Item>
+          <List.Leading>
+            <View style={styles.iconCircle}>
+              <Papicons name="Info" size={20} opacity={0.6} />
+            </View>
+          </List.Leading>
+          <Typography variant="title" weight="bold">
+            {t("Settings_About_Diagnostic_Api", "API Pronote")}
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            {diagLoading && !meta
+              ? "…"
+              : meta
+                ? `pronotepy ${meta.pronotepy_version} · ${meta.entsCount} ENTs`
+                : t("Settings_About_Diagnostic_Unavailable", "Indisponible")}
+          </Typography>
+        </List.Item>
+
+        {session && (
+          <List.Item>
+            <List.Leading>
+              <View style={styles.iconCircle}>
+                <Papicons name="Calendar" size={20} opacity={0.6} />
+              </View>
+            </List.Leading>
+            <Typography variant="title" weight="bold">
+              {t("Settings_About_Diagnostic_Session", "Session")}
+            </Typography>
+            <Typography variant="body1" color="textSecondary">
+              {t("Settings_About_Diagnostic_Session_Value", "Début {{date}} · Semaine {{week}}", {
+                date: session.start_day,
+                week: session.week,
+              })}
+            </Typography>
+          </List.Item>
+        )}
       </List.Section>
     </List>
   );

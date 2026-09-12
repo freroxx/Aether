@@ -29,6 +29,7 @@ export async function addPeriodsToDatabase(periods: SharedPeriod[]) {
             createdByAccount: item.createdByAccount,
             start: item.start.getTime(),
             end: item.end.getTime(),
+            isCurrent: (item as { isCurrent?: unknown }).isCurrent as boolean | undefined ?? false,
           });
         });
       }
@@ -61,6 +62,8 @@ export async function addGradesToDatabase(grades: SharedGrade[], subject: string
     const id = generateId(item.createdByAccount + item.description + item.givenAt)
 
     const existing = await db.get('grades').query(Q.where('gradeId', id)).fetch();
+    const statusCode = item.statusCode ?? (item as { status_code?: unknown }).status_code as string | undefined ?? item.studentScore?.status;
+    const rawGrade = item.rawGrade ?? (item as { raw_grade?: unknown }).raw_grade as string | undefined;
 
     if(existing.length === 0) {
       await safeWrite(db, async () => {
@@ -82,10 +85,24 @@ export async function addGradesToDatabase(grades: SharedGrade[], subject: string
             studentScore: JSON.stringify(item.studentScore),
             averageScore: JSON.stringify(item.averageScore),
             minScore: JSON.stringify(item.minScore),
-            maxScore: JSON.stringify(item.maxScore)
+            maxScore: JSON.stringify(item.maxScore),
+            statusCode,
+            rawGrade
           })
         })
       }, 10000, 'addGradesToDatabase')
+    } else if (statusCode || rawGrade || item.studentScore) {
+      // Rafraîchit le statut localisé sans dupliquer (ancien cache "Abs/Non noté").
+      await safeWrite(db, async () => {
+        await (existing[0] as Grade).update((record: Model) => {
+          const grade = record as Grade;
+          Object.assign(grade, {
+            studentScore: JSON.stringify(item.studentScore),
+            ...(statusCode !== undefined ? { statusCode } : {}),
+            ...(rawGrade !== undefined ? { rawGrade } : {}),
+          });
+        });
+      }, 10000, 'updateGradeStatus');
     }
   }
 }

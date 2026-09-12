@@ -60,8 +60,11 @@ export interface Punishment {
     circumstances: string;
     documents: Attachment[];
   };
+  reasons?: string[];
   nature: string;
   duration: number;
   durationMinutes?: number | null;
   schedulable?: boolean;
+  requiresParent?: string | null;
+  schedule?: Array<{ id?: string | null; start?: Date | null; durationMinutes?: number | null }>;
 }

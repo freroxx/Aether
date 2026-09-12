@@ -32,7 +32,10 @@ function mapHomeworkToShared(homework: Homework): SharedHomework {
     createdByAccount: homework.createdByAccount,
     kidName: homework.kidName,
     fromCache: true,
-  };
+    ...(typeof (homework as unknown as { backgroundColor?: unknown }).backgroundColor === "string"
+      ? { backgroundColor: (homework as unknown as { backgroundColor: string }).backgroundColor }
+      : {}),
+  } as SharedHomework;
 }
 
 export function getHomeworkRouteId(homework: SharedHomework): string {
@@ -204,6 +207,7 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
               custom: hw.custom,
               createdByAccount: hw.createdByAccount,
               kidName: hw.kidName,
+              backgroundColor: (hw as { backgroundColor?: unknown }).backgroundColor as string | undefined,
               fromCache: true,
             });
           });
@@ -232,6 +236,7 @@ export async function addHomeworkToDatabase(homeworks: SharedHomework[]) {
               custom: hw.custom,
               createdByAccount: hw.createdByAccount,
               kidName: hw.kidName,
+              backgroundColor: (hw as { backgroundColor?: unknown }).backgroundColor as string | undefined ?? homework.backgroundColor,
               fromCache: true,
             });
           });

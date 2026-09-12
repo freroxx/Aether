@@ -37,6 +37,7 @@ export class Delay extends Model {
   @field('reason') reason?: string;
   @field('justified') justified: boolean;
   @field('duration') duration: number;
+  @field('justification') justification?: string;
   @field('attendanceId') attendanceId: string;
 	@field('kidName') kidName: string;
   @relation('attendance', 'attendanceId') attendance: Attendance;
@@ -70,6 +71,8 @@ export class Absence extends Model {
   @field('to') to: number;
   @field('reason') reason?: string;
   @field('justified') justified: boolean;
+  @field('days') days?: number;
+  @field('hours') hours?: string;
   @field('attendanceId') attendanceId: string;
 	@field('kidName') kidName: string;
   @relation('attendance', 'attendanceId') attendance: Attendance;
@@ -94,8 +97,19 @@ export class Punishment extends Model {
   @field('homeworkText') homeworkText: string;
   @field('reasonText') reasonText: string;
   @field('reasonCircumstances') reasonCircumstances: string;
+  @field('schedulable') schedulable?: boolean;
+  @field('requiresParent') requiresParent?: string;
+  @field('scheduleRaw') scheduleRaw?: string;
   @field('attendanceId') attendanceId: string;
   @relation('attendance', 'attendanceId') attendance: Attendance;
+
+  get schedule(): Array<{ id?: string | null; start?: number | null; durationMinutes?: number | null }> {
+    try {
+      return JSON.parse(this.scheduleRaw || '[]');
+    } catch {
+      return [];
+    }
+  }
 
   get homeworkDocuments(): Attachment[] {
     return JSON.parse(this.homeworkDocumentsRaw);

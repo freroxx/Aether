@@ -49,7 +49,7 @@ export interface Account {
   schoolName?: string;
   className?: string;
   accountType?: "eleve" | "parent";
-  children?: Array<{ name: string; grade?: string }>;
+  children?: Array<{ id?: string; name: string; grade?: string }>;
   selectedChild?: string;
   customisation?: CustomisationStorage;
   services: ServiceAccount[];

@@ -107,6 +107,12 @@ export default function SettingsIndex() {
           icon: <Bell size={20} color={theme.colors.primary} />,
           onPress: () => router.push("/(settings)/rappels"),
         },
+        {
+          title: t("Settings_QrShare_Title", "Partager via QR"),
+          description: t("Settings_QrShare_Description", "Générer un QR de connexion"),
+          icon: <Papicons name="QrCode" />,
+          onPress: () => router.push("/(settings)/qr-share"),
+        },
       ],
     },
     {

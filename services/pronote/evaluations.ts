@@ -14,6 +14,8 @@ export async function fetchPronoteEvaluations(
       id: String(e.id ?? `${e.name ?? ""}_${e.date ?? ""}`),
       name: e.name ?? "",
       subject: e.subject ?? "",
+      subjectId: e.subject_id ?? null,
+      domain: e.domain ?? null,
       teacher: e.teacher ?? "",
       coefficient: typeof e.coefficient === "number" ? e.coefficient : Number(e.coefficient) || 1,
       description: e.description ?? "",
@@ -21,13 +23,19 @@ export async function fetchPronoteEvaluations(
       paliers: Array.isArray(e.paliers) ? e.paliers.map((p: unknown) => String(p)) : [],
       acquisitions: Array.isArray(e.acquisitions)
         ? e.acquisitions.map((a: any) => ({
+          id: a.id ?? null,
           name: a.name ?? "",
           abbreviation: a.abbreviation ?? "",
           level: a.level ?? "",
           coefficient:
             typeof a.coefficient === "number" ? a.coefficient : Number(a.coefficient) || 1,
           domain: a.domain ?? "",
+          domainId: a.domain_id ?? null,
+          nameId: a.name_id ?? null,
+          order: typeof a.order === "number" ? a.order : null,
           pillar: a.pillar ?? "",
+          pillarId: a.pillar_id ?? null,
+          pillarPrefix: a.pillar_prefix ?? null,
         }))
         : [],
       createdByAccount: accountId,

@@ -17,6 +17,7 @@ import { GenericInterface } from "@/services/shared/types";
 export interface Homework extends GenericInterface{
   id: string;
   subject: string;
+  subjectId?: string | null;
   content: string;
   dueDate: Date;
   isDone: boolean;
@@ -28,6 +29,8 @@ export interface Homework extends GenericInterface{
 	ref?: unknown;
   /** Vrai id Pronote (absent pour les lignes cache historiques). */
   pronoteId?: string;
+  /** Couleur de fond pronotepy (Homework.background_color). */
+  backgroundColor?: string | null;
 }
 
 export enum ReturnFormat {

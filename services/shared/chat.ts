@@ -7,6 +7,10 @@ export interface Chat extends GenericInterface {
   recipient?: string;
   creator?: string;
   date: Date;
+  unread?: number;
+  closed?: boolean;
+  replyable?: boolean;
+  labels?: string[];
   ref?: any;
 }
 
@@ -14,6 +18,10 @@ export interface Recipient {
   id: string;
   name: string;
   class?: string;
+  type?: string;
+  email?: string;
+  functions?: string[];
+  withDiscussion?: boolean;
   ref?: any;
 }
 
@@ -23,5 +31,7 @@ export interface Message {
   author: string;
   subject: string;
   date: Date;
+  seen?: boolean;
+  replyingTo?: string | null;
   attachments: Attachment[]
 }

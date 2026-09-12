@@ -89,9 +89,93 @@ export default function NewMessageView() {
     if (!q) return recipients;
     return recipients.filter(r =>
       (r.name ?? "").toLowerCase().includes(q) ||
-      (r.class ?? "").toLowerCase().includes(q)
+      (r.class ?? "").toLowerCase().includes(q) ||
+      (r.email ?? "").toLowerCase().includes(q) ||
+      (r.type ?? "").toLowerCase().includes(q) ||
+      (Array.isArray(r.functions) ? r.functions.join(" ").toLowerCase().includes(q) : false)
     );
   }, [recipients, searchText]);
+
+  const toggleRecipient = useCallback((r: Recipient) => {
+    setSelected(prev =>
+      prev.some(s => s.id === r.id)
+        ? prev.filter(s => s.id !== r.id)
+        : [...prev, r]
+    );
+  }, []);
+
+  const isTeacherRecipient = useCallback((r: Recipient) => {
+    const type = (r.type ?? "").toLowerCase().trim();
+    if (!type) return false;
+    return type.includes("teach") || type.includes("prof") || type.includes("ens");
+  }, []);
+
+  const getRecipientSubtitle = useCallback((r: Recipient): string | undefined => {
+    const parts: string[] = [];
+    if (Array.isArray(r.functions) && r.functions.length > 0) {
+      parts.push(r.functions.join(", "));
+    }
+    if (r.class) {
+      parts.push(r.class);
+    }
+    if (parts.length > 0) return parts.join(" · ");
+    return r.email || undefined;
+  }, []);
+
+  const hasRecipientTypeInfo = useMemo(
+    () => filtered.some(r => (r.type ?? "").trim().length > 0),
+    [filtered]
+  );
+
+  const teacherRecipients = useMemo(
+    () => (hasRecipientTypeInfo ? filtered.filter(r => isTeacherRecipient(r)) : []),
+    [filtered, hasRecipientTypeInfo, isTeacherRecipient]
+  );
+
+  const staffRecipients = useMemo(
+    () => (hasRecipientTypeInfo ? filtered.filter(r => !isTeacherRecipient(r)) : []),
+    [filtered, hasRecipientTypeInfo, isTeacherRecipient]
+  );
+
+  const renderRecipientRow = useCallback((r: Recipient) => {
+    const isSelected = selected.some(s => s.id === r.id);
+    const subtitle = getRecipientSubtitle(r);
+    return (
+      <List.Item key={r.id} onPress={() => toggleRecipient(r)}>
+        <List.Leading>
+          <Avatar
+            size={36}
+            initials={getInitials(r.name ?? "")}
+            shape="circle"
+          />
+        </List.Leading>
+        <Typography variant="title" numberOfLines={1}>
+          {r.name}
+        </Typography>
+        {!!subtitle && (
+          <Typography color="textSecondary" numberOfLines={1}>
+            {subtitle}
+          </Typography>
+        )}
+        <List.Trailing>
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: isSelected ? theme.colors.primary : "transparent",
+              borderWidth: isSelected ? 0 : 1.5,
+              borderColor: String(theme.colors.text) + "40",
+            }}
+          >
+            {isSelected && <Papicons name="Check" size={14} color="#FFFFFF" />}
+          </View>
+        </List.Trailing>
+      </List.Item>
+    );
+  }, [selected, getRecipientSubtitle, toggleRecipient, theme.colors.primary, theme.colors.text]);
 
   const filteredStaff = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -101,14 +185,6 @@ export default function NewMessageView() {
       (s.subject ?? "").toLowerCase().includes(q)
     );
   }, [staff, searchText]);
-
-  const toggleRecipient = useCallback((r: Recipient) => {
-    setSelected(prev =>
-      prev.some(s => s.id === r.id)
-        ? prev.filter(s => s.id !== r.id)
-        : [...prev, r]
-    );
-  }, []);
 
   const canSend = selected.length > 0 && subject.trim().length > 0 && content.trim().length > 0 && !sending;
 
@@ -252,46 +328,32 @@ export default function NewMessageView() {
           <Typography color="textSecondary" align="center">
             Aucun destinataire trouvé.
           </Typography>
+        ) : hasRecipientTypeInfo ? (
+          <View style={{ gap: 12 }}>
+            {teacherRecipients.length > 0 && (
+              <View style={{ gap: 8 }}>
+                <Typography variant="caption" weight="bold" color="textSecondary" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
+                  Enseignants
+                </Typography>
+                <List style={{ backgroundColor: "transparent" }}>
+                  {teacherRecipients.map(renderRecipientRow)}
+                </List>
+              </View>
+            )}
+            {staffRecipients.length > 0 && (
+              <View style={{ gap: 8 }}>
+                <Typography variant="caption" weight="bold" color="textSecondary" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
+                  Personnel
+                </Typography>
+                <List style={{ backgroundColor: "transparent" }}>
+                  {staffRecipients.map(renderRecipientRow)}
+                </List>
+              </View>
+            )}
+          </View>
         ) : (
           <List style={{ backgroundColor: "transparent" }}>
-            {filtered.map(r => {
-              const isSelected = selected.some(s => s.id === r.id);
-              return (
-                <List.Item key={r.id} onPress={() => toggleRecipient(r)}>
-                  <List.Leading>
-                    <Avatar
-                      size={36}
-                      initials={getInitials(r.name ?? "")}
-                      shape="circle"
-                    />
-                  </List.Leading>
-                  <Typography variant="title" numberOfLines={1}>
-                    {r.name}
-                  </Typography>
-                  {!!r.class && (
-                    <Typography color="textSecondary" numberOfLines={1}>
-                      {r.class}
-                    </Typography>
-                  )}
-                  <List.Trailing>
-                    <View
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 12,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: isSelected ? theme.colors.primary : "transparent",
-                        borderWidth: isSelected ? 0 : 1.5,
-                        borderColor: String(theme.colors.text) + "40",
-                      }}
-                    >
-                      {isSelected && <Papicons name="Check" size={14} color="#FFFFFF" />}
-                    </View>
-                  </List.Trailing>
-                </List.Item>
-              );
-            })}
+            {filtered.map(renderRecipientRow)}
           </List>
         )}
 

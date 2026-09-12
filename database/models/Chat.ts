@@ -17,6 +17,9 @@ export class Chat extends Model {
 	@field('recipient') recipient?: string;
 	@field('creator') creator?: string;
 	@field('date') date: number;
+	@field('unread') unread?: number;
+	@field('closed') closed?: boolean;
+	@field('labelsRaw') labelsRaw?: string;
 	@children('recipients') recipients?: Relation<Recipient>;
 	@children('messages') messages?: Relation<Message>;
 }
@@ -31,6 +34,10 @@ export class Recipient extends Model {
 	@field('recipientId') recipientId: string;
 	@field('name') name: string;
 	@field('class') class?: string;
+	@field('type') type?: string;
+	@field('email') email?: string;
+	@field('functionsRaw') functionsRaw?: string;
+	@field('withDiscussion') withDiscussion?: boolean;
 	@field('chatId') chatId: string;
 	@relation('chats', 'chatId') chat: Chat;
 }
@@ -47,6 +54,8 @@ export class Message extends Model {
 	@field('author') author: string;
 	@field('subject') subject: string;
 	@field('date') date: number;
+	@field('seen') seen?: boolean;
+	@field('replyingTo') replyingTo?: string;
 	@field('attachments') attachments: string;
 	@field('chatId') chatId: string;
 	@relation('chats', 'chatId') chat: Chat;

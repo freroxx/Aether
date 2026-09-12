@@ -8,6 +8,8 @@ export interface CourseDay {
 
 export interface Course extends GenericInterface {
   subject: string;
+  subjectId?: string | null;
+  subjectGroups?: boolean;
   id: string;
   type: CourseType;
   from: Date;
@@ -15,7 +17,17 @@ export interface Course extends GenericInterface {
   additionalInfo?: string;
   room?: string;
   teacher?: string;
+  teacherNames?: string[];
+  classrooms?: string[];
   group?: string;
+  groupNames?: string[];
+  num?: number;
+  normal?: boolean;
+  detention?: boolean;
+  outing?: boolean;
+  isTest?: boolean;
+  exempted?: boolean;
+  virtualClassrooms?: string[];
   backgroundColor?: string;
   status?: CourseStatus;
   customStatus?: string;
@@ -30,6 +42,16 @@ export interface CourseResource {
   description?: string;
   category: number | string;
   attachments: Attachment[]
+}
+
+/** Contenu du cahier de textes rattaché à un créneau (ids Pronote tournants :
+ *  le rattachement à un Course se fait par heure de début + matière). */
+export interface WeekLessonContent {
+  lessonId?: string;
+  /** Début du créneau (heure murale établissement, même référentiel que Course.from). */
+  lessonStart: Date | null;
+  subject: string;
+  resources: CourseResource[];
 }
 
 export enum CourseType {

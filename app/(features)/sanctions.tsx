@@ -335,16 +335,34 @@ const SanctionsView: React.FC = () => {
 
 const PunishmentCard: React.FC<{ punishment: Punishment; dangerColor: string; dangerBg: string }> = ({ punishment, dangerColor, dangerBg }) => {
   const givenDate = new Date(punishment.givenAt);
+  const locale = DateLocale[i18n.language as keyof typeof DateLocale] || DateLocale.enUS;
   const dateString = formatDistanceToNowStrict(givenDate, {
-    locale: DateLocale[i18n.language as keyof typeof DateLocale] || DateLocale.enUS,
+    locale,
     addSuffix: true,
   });
   const dayString = formatDate(givenDate, "eeee d MMMM", {
-    locale: DateLocale[i18n.language as keyof typeof DateLocale] || DateLocale.enUS,
+    locale,
   });
 
   const durationMinutes = punishment.durationMinutes ?? punishment.duration ?? 0;
   const documentCount = punishment.homework.documents.length + punishment.reason.documents.length;
+  const requiresParent = (punishment.requiresParent ?? "").toString().trim();
+  const scheduleItems = Array.isArray(punishment.schedule)
+    ? punishment.schedule.filter(s => s?.start instanceof Date && !isNaN(s.start.getTime()))
+    : [];
+  const scheduleLabel = scheduleItems.length > 0
+    ? scheduleItems
+        .map(s => {
+          const d = s.start as Date;
+          const day = formatDate(d, "EEE d MMM", { locale });
+          const hour = d.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit" });
+          const dur = typeof s.durationMinutes === "number" && s.durationMinutes > 0
+            ? ` · ${formatDuration(s.durationMinutes, false)}`
+            : "";
+          return `${day} · ${hour}${dur}`;
+        })
+        .join(" · ")
+    : null;
 
   return (
     <List.Section>
@@ -362,6 +380,13 @@ const PunishmentCard: React.FC<{ punishment: Punishment; dangerColor: string; da
             </Typography>
           </View>
         )}
+        {requiresParent ? (
+          <View style={[styles.badge, { backgroundColor: dangerColor + "1A" }]}>
+            <Typography variant="caption" weight="bold" style={{ color: dangerColor }} numberOfLines={1}>
+              {t("Sanctions_RequiresParent", "Convocation parent / AR")}
+            </Typography>
+          </View>
+        ) : null}
       </List.SectionTitle>
 
       <List.Item>
@@ -418,6 +443,28 @@ const PunishmentCard: React.FC<{ punishment: Punishment; dangerColor: string; da
           </Typography>
         </List.Item>
       )}
+
+      {requiresParent ? (
+        <List.Item>
+          <Typography variant="action">
+            {t("Sanctions_RequiresParent", "Convocation parent / AR")}
+          </Typography>
+          <Typography color="textSecondary" numberOfLines={2}>
+            {requiresParent}
+          </Typography>
+        </List.Item>
+      ) : null}
+
+      {scheduleLabel ? (
+        <List.Item>
+          <Typography variant="action">
+            {t("Sanctions_Schedule", "Dates")}
+          </Typography>
+          <Typography color="textSecondary" numberOfLines={3}>
+            {scheduleLabel}
+          </Typography>
+        </List.Item>
+      ) : null}
     </List.Section>
   );
 };

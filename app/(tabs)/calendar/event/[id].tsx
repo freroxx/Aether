@@ -31,6 +31,7 @@ import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectName } from "@/utils/subjects/name";
 import { warn } from "@/utils/logger/logger";
 import { getStatusText } from "../components/CalendarDay";
+import * as WebBrowser from "expo-web-browser";
 
 export default function EventDetailsScreen() {
   const { id, title } = useLocalSearchParams();
@@ -340,6 +341,15 @@ const CourseSheet: React.FC<{ course: SharedCourse; topInset: number }> = ({ cou
   const endTime = Math.floor(course.to.getTime() / 1000);
   const isCanceled = course.status === CourseStatus.CANCELED;
 
+  const flags: Array<{ label: string; color: string }> = [];
+  if (course.detention) flags.push({ label: t("Course_Flag_Detention", "Retenue"), color: "#B91C1C" });
+  if (course.outing) flags.push({ label: t("Course_Flag_Outing", "Sortie"), color: "#15803D" });
+  if (course.isTest) flags.push({ label: t("Course_Flag_Test", "Contrôle"), color: "#7C3AED" });
+  const virtualUrls = Array.isArray(course.virtualClassrooms)
+    ? course.virtualClassrooms.filter(u => typeof u === "string" && u.trim().length > 0)
+    : [];
+  const virtualUrl = virtualUrls[0] ?? (typeof course.url === "string" && course.url.startsWith("http") ? course.url : null);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {Platform.OS !== "android" && (
@@ -384,6 +394,17 @@ const CourseSheet: React.FC<{ course: SharedCourse; topInset: number }> = ({ cou
         style={{ backgroundColor: "transparent", zIndex: 2 }}
         contentContainerStyle={{ padding: 16 }}
       >
+        {flags.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {flags.map(f => (
+              <View key={f.label} style={{ backgroundColor: f.color + "1A", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
+                <Typography variant="caption" weight="bold" style={{ color: f.color }}>
+                  {f.label}
+                </Typography>
+              </View>
+            ))}
+          </View>
+        )}
         {(getStatusText(course.status) || isCanceled) && (
           <List.Section>
             <List.Item>
@@ -499,6 +520,39 @@ const CourseSheet: React.FC<{ course: SharedCourse; topInset: number }> = ({ cou
               </List.Leading>
               <Typography variant="body1" color="textSecondary">
                 {course.additionalInfo}
+              </Typography>
+            </List.Item>
+          ) : null}
+
+          {course.exempted ? (
+            <List.Item>
+              <List.Leading>
+                <Icon>
+                  <Papicons name="Info" />
+                </Icon>
+              </List.Leading>
+              <Typography variant="body1" color="textSecondary">
+                {t("Course_Exempted_Note", "Dispensé de ce cours")}
+              </Typography>
+            </List.Item>
+          ) : null}
+
+          {virtualUrl ? (
+            <List.Item
+              onPress={() => {
+                void WebBrowser.openBrowserAsync(virtualUrl);
+              }}
+            >
+              <List.Leading>
+                <Icon>
+                  <Papicons name="link" />
+                </Icon>
+              </List.Leading>
+              <Typography variant="title">
+                {t("Course_Virtual_Classroom", "Classe virtuelle")}
+              </Typography>
+              <Typography variant="body1" color="textSecondary" numberOfLines={1}>
+                {t("Course_Virtual_Join", "Rejoindre")}
               </Typography>
             </List.Item>
           ) : null}

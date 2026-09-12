@@ -1,8 +1,7 @@
 import { Period } from "@/services/shared/grade";
 import { error, warn } from "@/utils/logger/logger";
 
-export function getCurrentPeriod(periods: Period[]): Period | undefined {
-  const now = new Date().getTime();
+export function getCurrentPeriod(periods: Period[]): Period | undefined {  const now = new Date().getTime();
   const excludedNames = [
     "Bac blanc",
     "Brevet blanc",
@@ -46,4 +45,32 @@ export function getCurrentPeriod(periods: Period[]): Period | undefined {
 
   error("Unable to find the current period and unable to fallback...");
   return periods[0];
+}
+
+/**
+ * Période courante backend d'abord (Pronote /periods/current), fallback heuristique locale.
+ * Best-effort : jamais de throw, jamais de jank (appel court, catch silencieux).
+ */
+export async function resolveBackendCurrentPeriod(
+  manager: { getCurrentPeriod?: () => Promise<Period | null> } | null | undefined,
+  periods: Period[]
+): Promise<Period | undefined> {
+  if (Array.isArray(periods) && periods.length > 0) {
+    try {
+      const backend = await manager?.getCurrentPeriod?.();
+      if (backend?.name) {
+        const match =
+          periods.find(p => p.id && backend.id && String(p.id) === String(backend.id)) ??
+          periods.find(p => p.name === backend.name);
+        if (match) return match;
+      }
+    } catch {
+      // fallback local ci-dessous
+    }
+  }
+  try {
+    return getCurrentPeriod(periods);
+  } catch {
+    return periods[0];
+  }
 }

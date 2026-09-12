@@ -19,6 +19,7 @@ import { GradeDisplayScale, formatDenominator, formatScoreForDisplay } from '@/u
 import { getSubjectAverage } from '@/utils/grades/algorithms/subject';
 import { Grade as ServiceGrade } from '@/services/shared/grade';
 import { SkillChip } from "@/ui/components/SkillChip";
+import { getGradeStatusMeta, isZeroCountedStatus, resolveGradeStatusCode } from "@/utils/grades/status";
 
 const GradeItem = React.memo(({ grade, subjectName, subjectColor }: { grade: Grade, subjectName: string, subjectColor: string }) => {
   const dateString = useMemo(() => {
@@ -28,9 +29,34 @@ const GradeItem = React.memo(({ grade, subjectName, subjectColor }: { grade: Gra
 
   const theme = useTheme();
 
+  const statusMeta = useMemo(() => {
+    const g = grade as unknown as { statusCode?: string | null; rawGrade?: string | null };
+    return getGradeStatusMeta(g.statusCode, g.rawGrade, grade.studentScore?.status);
+  }, [grade]);
+
+  const statusCode = useMemo(() => {
+    const g = grade as unknown as { statusCode?: string | null; rawGrade?: string | null };
+    return resolveGradeStatusCode(g.statusCode, g.rawGrade, grade.studentScore?.status);
+  }, [grade]);
+
+  const isZeroCounted = isZeroCountedStatus(statusCode) && !grade.studentScore?.disabled;
+
+  const dateCaption = useMemo(() => {
+    if (isZeroCounted && statusMeta) return `${dateString} · ${statusMeta.label}`;
+    return dateString;
+  }, [dateString, isZeroCounted, statusMeta]);
+
   const hasMaxScore = (grade.studentScore?.value ?? 0) === (grade.maxScore?.value ?? 1) && !grade.studentScore.disabled;
-  const trailingBackground = hasMaxScore ? adjust(subjectColor, theme.dark ? -0.2 : 0) : subjectColor + "15";
-  const trailingForeground = hasMaxScore ? "#FFFFFF" : subjectColor;
+  const statusColor = statusMeta?.color;
+  // Statut non noté : teinte du statut, sinon couleur matière (wash habituel).
+  const useStatusTint = Boolean(grade.studentScore?.disabled && statusColor);
+  const trailingBackground = hasMaxScore
+    ? adjust(subjectColor, theme.dark ? -0.2 : 0)
+    : useStatusTint
+      ? statusColor + "1A"
+      : subjectColor + "15";
+  const trailingForeground = hasMaxScore ? "#FFFFFF" : useStatusTint ? statusColor! : subjectColor;
+  const statusLabel = statusMeta?.label ?? grade.studentScore?.status;
 
   return (
     <List.Item href={{ pathname: "/(tabs)/grades/[id]", params: { id: grade.id } }}>
@@ -40,7 +66,7 @@ const GradeItem = React.memo(({ grade, subjectName, subjectColor }: { grade: Gra
           : t("Grade_NoDescription", { subject: subjectName })}
       </Typography>
       <Typography variant="body1" color="textSecondary">
-        {dateString}
+        {dateCaption}
       </Typography>
 
       <List.Trailing>
@@ -94,7 +120,7 @@ const GradeItem = React.memo(({ grade, subjectName, subjectColor }: { grade: Gra
                   color={trailingForeground}
                   variant="navigation"
                 >
-                  {grade.studentScore.status}
+                  {statusLabel}
                 </LegacyTypography>
               )}
             </>

@@ -23,6 +23,7 @@ export async function fetchPronoteReport(
       comments: Array.isArray(r.comments) ? r.comments.map((c: unknown) => String(c)) : [],
       subjects: Array.isArray(r.subjects)
         ? r.subjects.map((s: any) => ({
+          id: s.id ?? null,
           name: s.name ?? "",
           color: s.color ?? null,
           comments: Array.isArray(s.comments)

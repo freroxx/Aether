@@ -18,8 +18,9 @@ export async function addKidToDatabase(kids: SharedKid[]) {
         await db.get('kids').create((record: Model) => {
           const kidsModel = record as Kid
           Object.assign(kidsModel, {
-            createByAccount: kid.createdByAccount,
+            createdByAccount: kid.createdByAccount,
             kidId: kid.id,
+            externalId: (kid as { externalId?: unknown }).externalId as string | undefined ?? kid.id,
             firstName: kid.firstName,
             lastName: kid.lastName,
             class: kid.class,

@@ -38,9 +38,16 @@ import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
 import { error as logError } from "@/utils/logger/logger";
 import { hapticFor } from "@/utils/haptics";
 import uuid from "@/utils/uuid/uuid";
+import {
+  buildPronoteAdditionals,
+  isExpiredQrError,
+  isMfaRequiredError,
+  isQrDecryptError,
+  normalizeChildren,
+} from "./postLogin";
 
 function describeQRError(e: unknown): string {
-  const raw = String((e as any)?.message || e || "");
+  const raw = String((e as any)?.detail || (e as any)?.message || e || "");
   const msg = raw.toLowerCase();
   if (
     msg.includes("404") ||
@@ -49,11 +56,12 @@ function describeQRError(e: unknown): string {
   ) {
     return "Serveur API Aether injoignable (404). Vérifie l'URL dans Personnalisation > Serveur API Pronote ou redéploie le backend, puis réessaie.";
   }
-  if (msg.includes("pin") || msg.includes("code")) {
-    return "Code PIN incorrect. Vérifie les 4 chiffres affichés dans Pronote.";
+  // PIN incorrect (QR indéchiffrable) : message distinct du QR expiré.
+  if (isQrDecryptError(e) || msg.includes("pin") || msg.includes("code")) {
+    return "Code PIN incorrect (QR indéchiffrable). Vérifie les 4 chiffres affichés dans Pronote.";
   }
   if (
-    msg.includes("expir") ||
+    isExpiredQrError(e) ||
     msg.includes("jeton") ||
     msg.includes("token") ||
     msg.includes("datasec")
@@ -77,6 +85,12 @@ export default function PronoteLoginWithQR() {
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
   const initialAccountType = route.params?.accountType;
+  // Champs MFA éventuels (retour de l'écran 2fa ou deep-link).
+  const mfaParams = (route.params ?? {}) as {
+    accountPin?: string;
+    deviceName?: string;
+    clientIdentifier?: string;
+  };
 
   const { colors } = theme;
   const [permission, requestPermission] = useCameraPermissions();
@@ -170,6 +184,17 @@ export default function PronoteLoginWithQR() {
         initialAccountType ||
         (decodedJSON?.url?.includes("parent") ? "parent" : "eleve");
 
+      const mfa =
+        mfaParams.accountPin || mfaParams.deviceName || mfaParams.clientIdentifier
+          ? {
+              ...(mfaParams.accountPin ? { accountPin: mfaParams.accountPin } : {}),
+              ...(mfaParams.deviceName ? { deviceName: mfaParams.deviceName } : {}),
+              ...(mfaParams.clientIdentifier
+                ? { clientIdentifier: mfaParams.clientIdentifier }
+                : {}),
+            }
+          : undefined;
+
       const res = await PronoteApiClient.qrCodeLogin(
         {
           jeton: decodedJSON.jeton,
@@ -178,7 +203,8 @@ export default function PronoteLoginWithQR() {
         },
         QRValidationCode,
         deviceUuid,
-        detectedAccountType
+        detectedAccountType,
+        mfa
       );
 
       if (!res.success) {
@@ -194,7 +220,7 @@ export default function PronoteLoginWithQR() {
         res.user?.account_type === "parent" ||
         (res.children && res.children.length > 0);
       const accountType = isParent ? "parent" : "eleve";
-      const children = res.children || [];
+      const children = normalizeChildren(res.children);
       const selectedChild = children.length > 0 ? children[0].name : undefined;
 
       // Le backend renvoie aussi `credentials` = payload brut {url, username, token, uuid}.
@@ -226,17 +252,22 @@ export default function PronoteLoginWithQR() {
             auth: {
               accessToken: res.auth_token,
               refreshToken: res.auth_token,
-              additionals: {
-                instanceURL: rawUrl,
-                url: rawUrl,
-                username: rawUsername,
-                deviceUUID: deviceUuid,
-                uuid: rawUuid,
-                token: rawToken,
-                authToken: res.auth_token,
-                accountType,
-                account_type: accountType,
-              },
+              additionals: buildPronoteAdditionals(
+                {
+                  instanceURL: rawUrl,
+                  url: rawUrl,
+                  username: rawUsername,
+                  deviceUUID: deviceUuid,
+                  uuid: rawUuid,
+                  token: rawToken,
+                  authToken: res.auth_token,
+                  auth_token: res.auth_token,
+                  accountType,
+                  account_type: accountType,
+                },
+                res,
+                mfa
+              ),
             },
             serviceId: Services.PRONOTE,
             createdAt: new Date().toISOString(),
@@ -287,6 +318,24 @@ export default function PronoteLoginWithQR() {
       );
       setLoadingModalVisible(false);
       loginInFlight.current = false;
+      // 428 MFAError : bascule vers l'écran 2FA en conservant le QR + PIN.
+      if (isMfaRequiredError(error) && QRData) {
+        await hapticFor("error");
+        router.push({
+          pathname: "/(onboarding)/services/pronote/2fa",
+          params: {
+            mode: "qrcode",
+            qrData: QRData,
+            pin: QRValidationCode,
+            uuid: deviceUuid,
+            accountType: initialAccountType || "eleve",
+            ...(mfaParams.clientIdentifier
+              ? { clientIdentifier: mfaParams.clientIdentifier }
+              : {}),
+          },
+        } as any);
+        return;
+      }
       await hapticFor("error");
       alert.showAlert({
         title: "Erreur de connexion",

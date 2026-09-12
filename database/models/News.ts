@@ -16,4 +16,10 @@ export default class News extends Model {
   @text('author') author!: string;
   @text('category') category!: string;
   @field('question') question!: boolean;
+  @field('survey') survey?: boolean;
+  @field('anonymousResponse') anonymousResponse?: boolean;
+  @field('template') template?: boolean;
+  @field('sharedTemplate') sharedTemplate?: boolean;
+  @field('creationDate') creationDate?: number;
+  @field('endDate') endDate?: number;
 }

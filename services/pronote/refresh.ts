@@ -42,6 +42,9 @@ export async function refreshPronoteAccount(
   let token = (creds.token ?? undefined) as string | undefined;
   let uuid = (creds.uuid ?? creds.deviceUUID) as string | undefined;
   const password = creds.password as string | undefined;
+  const accountPin = (creds.account_pin ?? creds.accountPin) as string | undefined;
+  const clientIdentifier = (creds.client_identifier ?? creds.clientIdentifier) as string | undefined;
+  const deviceName = (creds.device_name ?? creds.deviceName) as string | undefined;
   let accountType =
     ((creds.account_type ?? creds.accountType) as string | undefined) || "eleve";
 
@@ -81,6 +84,9 @@ export async function refreshPronoteAccount(
 
   // 3) Rotation via /auth/token avec le token BRUT.
   if (url && username && token && uuid) {
+    const mfa = accountPin || clientIdentifier || deviceName
+      ? { accountPin, clientIdentifier, deviceName }
+      : undefined;
     let res;
     let rotated = false;
     try {
@@ -89,7 +95,8 @@ export async function refreshPronoteAccount(
         String(username),
         String(token),
         String(uuid),
-        accountType as any
+        accountType as any,
+        mfa
       );
       rotated = true;
     } catch (e) {
@@ -110,7 +117,8 @@ export async function refreshPronoteAccount(
             String(username),
             String(blobToken),
             String(uuid),
-            accountType as any
+            accountType as any,
+            mfa
           );
           token = blobToken;
           rotated = true;
@@ -153,6 +161,9 @@ export async function refreshPronoteAccount(
           deviceUUID: uuid,
           account_type: accountType,
           accountType,
+          ...(accountPin ? { account_pin: accountPin } : {}),
+          ...((res as any).client_identifier ? { client_identifier: (res as any).client_identifier } : {}),
+          ...(deviceName ? { device_name: deviceName } : {}),
         },
       };
 

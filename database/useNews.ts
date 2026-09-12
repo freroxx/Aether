@@ -100,7 +100,13 @@ export async function addNewsToDatabase(news: SharedNews[]) {
             newsModel.author = item.author ?? "";
             newsModel.category = item.category ?? "";
             newsModel.createdByAccount = item.createdByAccount ?? "";
-            newsModel.question = item.question ?? false;
+            newsModel.question = item.question ?? item.survey ?? false;
+            newsModel.survey = item.survey ?? false;
+            newsModel.anonymousResponse = item.anonymousResponse ?? false;
+            newsModel.template = item.template ?? false;
+            newsModel.sharedTemplate = item.sharedTemplate ?? false;
+            newsModel.creationDate = item.creationDate?.getTime();
+            newsModel.endDate = item.endDate instanceof Date ? item.endDate.getTime() : undefined;
           })
         );
 
@@ -115,7 +121,13 @@ export async function addNewsToDatabase(news: SharedNews[]) {
             newsModel.author = item.author ?? newsModel.author;
             newsModel.category = item.category ?? newsModel.category;
             newsModel.createdByAccount = item.createdByAccount ?? newsModel.createdByAccount;
-            newsModel.question = item.question ?? newsModel.question;
+            newsModel.question = item.question ?? item.survey ?? newsModel.question;
+            newsModel.survey = item.survey ?? newsModel.survey;
+            newsModel.anonymousResponse = item.anonymousResponse ?? newsModel.anonymousResponse;
+            newsModel.template = item.template ?? newsModel.template;
+            newsModel.sharedTemplate = item.sharedTemplate ?? newsModel.sharedTemplate;
+            if (item.creationDate) newsModel.creationDate = item.creationDate.getTime();
+            if (item.endDate instanceof Date) newsModel.endDate = item.endDate.getTime();
           })
         );
 
@@ -193,5 +205,11 @@ function mapNewsToShared(news: News): SharedNews {
     createdByAccount: news.createdByAccount,
     fromCache: true,
     question: news.question,
+    survey: news.survey,
+    anonymousResponse: news.anonymousResponse,
+    template: news.template,
+    sharedTemplate: news.sharedTemplate,
+    creationDate: news.creationDate ? new Date(news.creationDate) : undefined,
+    endDate: news.endDate ? new Date(news.endDate) : undefined,
   };
 }

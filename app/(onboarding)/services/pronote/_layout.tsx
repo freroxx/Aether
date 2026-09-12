@@ -45,6 +45,10 @@ export default function OnboardingLayout() {
           name="qrcode"
           options={{ ...newScreenOptions, title: t("ONBOARDING_HEADER_QRCODE_LOGIN") }}
         />
+        <Stack.Screen
+          name="2fa"
+          options={{ ...newScreenOptions, title: "Double authentification" }}
+        />
       </Stack>
     </View>
   );

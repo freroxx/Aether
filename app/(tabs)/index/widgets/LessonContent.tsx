@@ -81,33 +81,48 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
   }, [courses, prefetched]);
   const nextCourse = useMemo(() => findNextCourse(courses as any[]), [courses]);
 
-  // Pré-charge le contenu des 3 prochains cours (1 PageCahierDeTexte / cours,
-  // en arrière-plan, best-effort) pour que le widget affiche les ressources
-  // sans ouvrir chaque fiche cours.
+  // Pré-charge les contenus en UNE requête batchée (GET /timetable/contents :
+  // 1 PageCahierDeTexte / semaine) au lieu de N POST /timetable/lesson-content
+  // (1 login + scan chacun -> lent, timeouts, carte toujours vide).
   useEffect(() => {
     let cancelled = false;
     const upcoming = ((courses as any[]) ?? [])
       .filter(c => c && new Date(c.to ?? c.from).getTime() > Date.now())
       .sort((a, b) => new Date(a.from).getTime() - new Date(b.from).getTime())
-      .slice(0, 3)
+      .slice(0, 10)
       .filter(c => !Array.isArray(c.content) || c.content.length === 0);
     if (upcoming.length === 0) return;
     (async () => {
       try {
         const { getManager } = await import("@/services/shared");
+        const { matchContentForCourse } = await import("@/services/pronote/timetable");
+        const { getCourseRouteId: routeIdOf, saveCourseContentRaw } = await import("@/database/useTimetable");
         const manager = getManager();
         if (!manager || cancelled) return;
+        const first = new Date(upcoming[0].from);
+        const last = new Date(upcoming[upcoming.length - 1].from);
+        const from = new Date(first.getTime() - 86400000);
+        const to = new Date(last.getTime() + 86400000);
+        // Fenêtre bornée (backend max 62 j).
+        const spanDays = Math.round((to.getTime() - from.getTime()) / 86400000);
+        if (spanDays > 60) to.setTime(from.getTime() + 60 * 86400000);
+        const batch = await (manager as any).getWeekContents(from, to);
+        if (cancelled || !Array.isArray(batch) || batch.length === 0) return;
+        const filled: Record<string, any[]> = {};
         for (const c of upcoming) {
           if (cancelled) break;
           try {
-            const id = getCourseRouteId(c as any);
+            const id = routeIdOf(c as any);
             if (prefetched[id]) continue;
-            const fresh = await (manager as any).getCourseResources(c);
-            if (cancelled) break;
-            if (Array.isArray(fresh) && fresh.length > 0) {
-              setPrefetched(prev => ({ ...prev, [id]: fresh }));
+            const matched = matchContentForCourse(batch, c as any);
+            if (Array.isArray(matched) && matched.length > 0) {
+              filled[id] = matched;
+              void saveCourseContentRaw(id, matched);
             }
           } catch {}
+        }
+        if (!cancelled && Object.keys(filled).length > 0) {
+          setPrefetched(prev => ({ ...prev, ...filled }));
         }
       } catch {}
     })();

@@ -80,11 +80,13 @@ export class MockData implements SchoolServicePlugin {
     return { ...homework, isDone: state };
   }
 
-  async getNews(): Promise<News[]> {
-    return generateMockNews(this.accountId).map(news => ({
+  async getNews(opts?: { onlyUnread?: boolean }): Promise<News[]> {
+    const all = generateMockNews(this.accountId).map(news => ({
       ...news,
       acknowledged: this.newsState.get(news.id) ?? news.acknowledged,
     }));
+    if (opts?.onlyUnread) return all.filter(n => !n.acknowledged);
+    return all;
   }
 
   async setNewsAsAcknowledged(news: News): Promise<News> {
@@ -124,8 +126,12 @@ export class MockData implements SchoolServicePlugin {
     return generateMockCanteenMenu(this.accountId, startDate);
   }
 
-  async getChats(): Promise<Chat[]> {
-    return generateMockChats(this.accountId);
+  async getChats(onlyUnread?: boolean): Promise<Chat[]> {
+    const chats = generateMockChats(this.accountId);
+    if (onlyUnread) {
+      return chats.filter(c => Number((c as { unread?: unknown }).unread ?? 0) > 0);
+    }
+    return chats;
   }
 
   async getChatRecipients(): Promise<Recipient[]> {
@@ -143,7 +149,7 @@ export class MockData implements SchoolServicePlugin {
     return generateMockChatRecipients(this.accountId);
   }
 
-  async sendMessageInChat(chat: Chat, content: string): Promise<void> {
+  async sendMessageInChat(chat: Chat, content: string, messageId?: string): Promise<void> {
     const existing = this.sentMessages.get(chat.id) ?? [];
     existing.push({
       id: `mock-message-${chat.id}-sent-${existing.length}`,
@@ -152,6 +158,7 @@ export class MockData implements SchoolServicePlugin {
       author: "Camille Martin",
       date: new Date(),
       attachments: [],
+      replyingTo: messageId ?? null,
     });
     this.sentMessages.set(chat.id, existing);
   }

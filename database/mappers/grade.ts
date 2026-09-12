@@ -11,8 +11,11 @@ export function mapPeriodToShared(period: Period): SharedPeriod {
     end: new Date(period.end),
     createdByAccount: period.createdByAccount,
     kidName: period.kidName,
-    fromCache: true
-  }
+    fromCache: true,
+    ...(((period as unknown as { isCurrent?: unknown }).isCurrent !== undefined)
+      ? { isCurrent: (period as unknown as { isCurrent: boolean }).isCurrent }
+      : {}),
+  } as SharedPeriod
 }
 
 export function mapGradeToShared(grade: Grade): SharedGrade {
@@ -37,8 +40,10 @@ export function mapGradeToShared(grade: Grade): SharedGrade {
     minScore: grade.minScore,
     maxScore: grade.maxScore,
     fromCache: true,
-    createdByAccount: grade.createdByAccount
-  }
+    createdByAccount: grade.createdByAccount,
+    statusCode: (grade as unknown as { statusCode?: string }).statusCode,
+    rawGrade: (grade as unknown as { rawGrade?: string }).rawGrade,
+  } as SharedGrade
 }
 
 export function mapPeriodGradesToShared(data: PeriodGrades): SharedPeriodGrades {

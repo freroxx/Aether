@@ -9,7 +9,7 @@ import { Evaluation, Period } from "@/services/shared/grade";
 import Icon from "@/ui/components/Icon";
 import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
-import { getCurrentPeriod } from "@/utils/grades/helper/period";
+import { resolveBackendCurrentPeriod } from "@/utils/grades/helper/period";
 import { scoreAcquisitionLevel } from "@/utils/evaluations";
 import { error } from "@/utils/logger/logger";
 
@@ -33,7 +33,7 @@ const EvaluationsWidget = React.memo(({ onEmptyStateChange }: EvaluationsWidgetP
       if (periods.length === 0) {
         return;
       }
-      const current = getCurrentPeriod(periods);
+      const current = await resolveBackendCurrentPeriod(managerToUse, periods);
       if (!current) {
         return;
       }

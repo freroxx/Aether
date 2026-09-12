@@ -8,6 +8,7 @@ export default class Kid extends Model {
 
   @field('createdByAccount') createdByAccount: string;
   @field('kidId') kidId: string;
+  @field('externalId') externalId?: string;
 	@field('firstName') firstName: string;
 	@field('lastName') lastName: string;
 	@field('class') class: string;

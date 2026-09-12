@@ -20,6 +20,7 @@ import { useSettingsStore } from "@/stores/settings";
 import { formatScoreForDisplay, getGradeDisplayScale } from "@/utils/grades/scale";
 import { getSubjectAverage } from "@/utils/grades/algorithms/subject";
 import { Grade, GradeScore } from "@/services/shared/grade";
+import { getGradeStatusLabel, getGradeStatusMeta, normalizeGradeStatus } from "@/utils/grades/status";
 
 const SubjectInfo = () => {
   const { params } = useRoute();
@@ -67,6 +68,21 @@ const SubjectInfo = () => {
       ? fallbackDisplayedDenominator.slice(1)
       : fallbackDisplayedDenominator;
   }, [fallbackDisplayedDenominator]);
+
+  const formatAverageStatus = (status?: string) => {
+    if (!status) return "—";
+    const code = normalizeGradeStatus(status);
+    if (code) return getGradeStatusLabel(code, status);
+    if (String(status).trim().toLowerCase() === "unknown") return "—";
+    return status;
+  };
+
+  // Notes sans valeur chiffrée : pill subtile localisée (moyennes inchangées, exclues du calcul).
+  const statusGrades = useMemo(() => {
+    return (subjectGrades as unknown as Array<Grade & { statusCode?: string | null; rawGrade?: string | null }>).filter(
+      g => g?.studentScore?.disabled
+    );
+  }, [subjectGrades]);
 
   const averagesData = [
     {
@@ -132,7 +148,7 @@ const SubjectInfo = () => {
                     studentAverage.disabled
                       ? isUnknownSubjectAverage && computedSubjectAverage
                         ? String(computedSubjectAverage.value.toFixed(2))
-                        : String(studentAverage.status ?? "—")
+                        : String(formatAverageStatus(studentAverage.status))
                       : String(displayedSubjectAverage.value.toFixed(2))
                   }
                   outOf={fallbackOutOf}
@@ -219,7 +235,7 @@ const SubjectInfo = () => {
                 >
                   <TypographyLegacy variant="header" weight="semibold" inline>
                     {average.disabled
-                      ? average.status
+                      ? formatAverageStatus(average.status)
                       : average.value.toFixed(2)}
                   </TypographyLegacy>
                   <TypographyLegacy variant="body2" inline color="secondary">
@@ -230,6 +246,49 @@ const SubjectInfo = () => {
             </List.Item>
           ))}
         </List.Section>
+
+        {statusGrades.length > 0 && (
+          <List.Section>
+            <List.SectionTitle>
+              <List.Label>{i18n.t("Grades_Status_Title", "Statuts")}</List.Label>
+            </List.SectionTitle>
+            {statusGrades.slice(0, 8).map((g) => {
+              const meta = getGradeStatusMeta(
+                (g as { statusCode?: string | null }).statusCode,
+                (g as { rawGrade?: string | null }).rawGrade,
+                g.studentScore?.status
+              );
+              if (!meta) return null;
+              return (
+                <List.Item key={String((g as { id?: string }).id ?? g.description)}>
+                  <Typography variant="title" numberOfLines={1}>
+                    {(g as { description?: string }).description || subjectName}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary" numberOfLines={1}>
+                    {g.givenAt ? new Date(g.givenAt as unknown as Date).toLocaleDateString(i18n.language, { day: "numeric", month: "short" }) : ""}
+                  </Typography>
+                  <List.Trailing>
+                    <Stack
+                      direction="horizontal"
+                      gap={4}
+                      vAlign="center"
+                      hAlign="end"
+                      padding={[9, 3]}
+                      radius={32}
+                      card
+                      noShadow
+                      backgroundColor={meta.color + "1A"}
+                    >
+                      <TypographyLegacy variant="body2" color={meta.color}>
+                        {meta.label}
+                      </TypographyLegacy>
+                    </Stack>
+                  </List.Trailing>
+                </List.Item>
+              );
+            })}
+          </List.Section>
+        )}
       </List>
     </>
   );

@@ -20,6 +20,7 @@ export class Period extends Model {
   @field('periodId') periodId: string;
   @field('start') start: number;
   @field('end') end: number;
+  @field('isCurrent') isCurrent?: boolean;
   @children('periodgrades') grades: PeriodGrades[];
 }
 
@@ -47,6 +48,8 @@ export class Grade extends Model {
 	@field('averageScore') averageScoreRaw?: string;
 	@field('minScore') minScoreRaw?: string;
 	@field('maxScore') maxScoreRaw?: string;
+  @field('statusCode') statusCode?: string;
+  @field('rawGrade') rawGrade?: string;
   @field('skills') skillsRaw?: string;
 
 	get outOf(): GradeScore {

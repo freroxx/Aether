@@ -6,5 +6,7 @@ export interface Kid extends GenericInterface {
 	lastName: string,
 	class: string,
 	dateOfBirth: Date,
+	/** Id interne pronotepy ClientInfo.id (stable par session, utile au debug). */
+	externalId?: string | null,
 	ref?: unknown
 }

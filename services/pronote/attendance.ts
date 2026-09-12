@@ -62,10 +62,17 @@ export async function fetchPronoteAttendance(
         duringLesson: Boolean(p.during_lesson ?? false),
         homework: { text: p.homework ?? "", documents: mapDocs(p.homework_documents) },
         reason: { text: p.reason || "", circumstances: p.circumstances ?? "", documents: mapDocs(p.circumstance_documents) },
+        reasons: Array.isArray(p.reasons) ? p.reasons : undefined,
         nature: p.nature || "",
         duration: durationMinutes,
         durationMinutes,
         schedulable: Boolean(p.schedulable ?? false),
+        requiresParent: p.requires_parent ?? null,
+        schedule: Array.isArray(p.schedule) ? p.schedule.map((s: any) => ({
+          id: s?.id ?? null,
+          start: s?.start ? new Date(s.start) : null,
+          durationMinutes: typeof s?.duration_minutes === "number" ? s.duration_minutes : null,
+        })) : undefined,
       };
     });
 

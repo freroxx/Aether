@@ -1,5 +1,5 @@
 # Politique de Confidentialité — Aether
-*Dernière mise à jour : 5 septembre 2026*
+*Dernière mise à jour : 12 septembre 2026 (parité pronotepy 2.15.7 v1.2.0)*
 
 La protection de votre vie privée et de vos données scolaires est au cœur de la conception d'**Aether**. Cette politique de confidentialité explique en toute transparence quelles données sont utilisées par l'application, comment elles sont traitées, et pourquoi vos informations personnelles restent sous votre contrôle exclusif.
 
@@ -15,7 +15,7 @@ La protection de votre vie privée et de vos données scolaires est au cœur de 
 ## 2. Quelles données sont traitées et où sont-elles stockées ?
 
 ### A. Données d'authentification et identifiants
-- **Ce qui est utilisé** : Votre identifiant Pronote/ENT, jetons d'accès de session (tokens d'authentification générés par Pronote), et un identifiant unique d'appareil (UUID) généré localement pour sécuriser la session mobile.
+- **Ce qui est utilisé** : Votre identifiant Pronote/ENT, jetons d'accès de session (tokens d'authentification générés par Pronote et renouvelés à chaque connexion — rotation `jetonConnexionAppliMobile`), identifiant d'appareil (`client_identifier` fourni par Pronote pour reconnaître l'appareil + UUID généré localement), et — uniquement si votre établissement l'exige (double authentification) — un code PIN saisi par vous et un nom d'appareil. Le PIN n'est jamais conservé après la connexion.
 - **Où sont-elles stockées** : **Exclusivement sur votre appareil**, dans un stockage local chiffré via le moteur haute performance **MMKV** (`react-native-mmkv`).
 - **Mots de passe** : Vos mots de passe saisis lors d'une connexion par navigateur (ENT) sont directement transmis au portail d'authentification officiel de votre établissement/académie et ne sont jamais enregistrés en clair par Aether.
 
@@ -28,10 +28,11 @@ La protection de votre vie privée et de vos données scolaires est au cœur de 
 
 ## 3. Rôle du microservice d'API et hébergement
 
-Aether utilise un microservice open-source basé sur la bibliothèque reconnue [**`pronotepy`**](https://github.com/bain3/pronotepy) pour dialoguer avec les serveurs Pronote.
+Aether utilise un microservice open-source basé sur la bibliothèque reconnue [**`pronotepy 2.15.7`**](https://github.com/bain3/pronotepy) pour dialoguer avec les serveurs Pronote.
 
 - **Nature du serveur** : Le microservice agit comme un simple relais sécurisé (passerelle de protocole / reverse-proxy chiffré en HTTPS) pour convertir les protocoles de Pronote en requêtes JSON exploitables par l'application mobile.
-- **Cache transitoire (Upstash Redis)** : Pour éviter d'interroger Pronote inutilement à chaque interaction et respecter les serveurs de votre établissement, un cache de session à durée limitée (TTL court) peut conserver temporairement votre jeton de session chiffré.
+- **Cache transitoire (Upstash Redis)** : Pour éviter d'interroger Pronote inutilement à chaque interaction et respecter les serveurs de votre établissement, un cache à durée limitée conserve temporairement les réponses (30 s discussions, 60 s EDT/devoirs/cantine, 120 s actualités, 300 s notes/assiduité). La clé de cache est un hash SHA-256 sans secret (jamais de token/mot de passe dedans) ; les fichiers sont limités à 4 Mo (413 au-delà).
+- **Comptes supportés** : Élève et Parent (multi-enfants) uniquement. Les comptes Vie Scolaire / Professeur sont explicitement refusés (501).
 - **Aucune persistance de profil** : Le serveur ne possède aucune base de données relationnelle d'utilisateurs, aucun compte utilisateur Aether, et n'enregistre aucun historique de vos notes ou messages.
 - **Auto-hébergement total** : Vous n'êtes pas obligé d'utiliser le serveur cloud par défaut. Vous pouvez déployer votre propre instance du dossier `backend/` sur votre propre infrastructure (Vercel, VPS, Docker) et saisir son URL dans **Paramètres > Apparence > Serveur API Pronote**.
 

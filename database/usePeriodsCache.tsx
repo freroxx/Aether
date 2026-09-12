@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react"
-import { Grade, Period } from "./models/Grades"
+import { useEffect, useState } from "react"
+import { Period } from "./models/Grades"
 import { getDatabaseInstance, useDatabase } from "./DatabaseProvider";
 import { useAccountStore } from "@/stores/account";
 import { Q } from "@nozbe/watermelondb";
+import { safeWrite } from "./utils/safeTransaction";
 
 export function usePeriods() {
   const database = useDatabase()
@@ -45,4 +46,20 @@ export function usePeriods() {
   }, [database])
 
   return periods;
+}
+
+export async function setPeriodIsCurrent(periodId: string, isCurrent: boolean): Promise<void> {
+  const db = getDatabaseInstance();
+  const recs = await db.get<Period>("periods").query(Q.where("periodId", periodId)).fetch();
+  if (recs.length === 0) return;
+  await safeWrite(
+    db,
+    async () => {
+      await Promise.all(recs.map(r => r.update(record => {
+        (record as Period).isCurrent = isCurrent;
+      })));
+    },
+    10000,
+    `set_period_current_${periodId}`
+  );
 }

@@ -14,6 +14,8 @@ import Typography from "./Typography";
 import { SkillChip } from "@/ui/components/SkillChip";
 import { ListTouchable } from "../new/List";
 import { Link } from "expo-router";
+import { getGradeStatusMeta } from "@/utils/grades/status";
+import { useMemo } from "react";
 import { LiquidGlassView } from "@sbaiahmed1/react-native-blur";
 
 interface CompactGradeProps {
@@ -26,6 +28,8 @@ interface CompactGradeProps {
   date: Date | undefined;
   disabled?: boolean;
   status?: string;
+  statusCode?: string | null;
+  rawGrade?: string | null;
   onPress?: () => void,
   hasMaxScore?: boolean,
   color?: string;
@@ -43,6 +47,8 @@ export const CompactGrade = ({
   date,
   disabled,
   status,
+  statusCode,
+  rawGrade,
   onPress,
   hasMaxScore,
   variant,
@@ -52,7 +58,13 @@ export const CompactGrade = ({
   const theme = useTheme();
   const { colors } = theme;
 
-  const trailingBase = adjust(color, theme.dark ? 0.2 : -0.4);
+  const statusMeta = useMemo(
+    () => getGradeStatusMeta(statusCode, rawGrade, status),
+    [statusCode, rawGrade, status]
+  );
+  const statusLabel = statusMeta?.label ?? status;
+  const statusTint = disabled && statusMeta ? statusMeta.color : null;
+  const trailingBase = statusTint ?? adjust(color, theme.dark ? 0.2 : -0.4);
   const trailingBackground = hasMaxScore ? trailingBase : trailingBase + "15";
   const trailingForeground = hasMaxScore ? "#FFFFFF" : trailingBase;
 
@@ -234,7 +246,7 @@ export const CompactGrade = ({
                     </Stack>
                   ) : (
                     <Typography color={trailingForeground} variant="navigation">
-                      {status}
+                      {statusLabel}
                     </Typography>
                   )}
                 </>

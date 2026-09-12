@@ -2,7 +2,7 @@ import { useHeaderHeight, useRoute, useTheme } from "expo-router/react-navigatio
 import { router, useNavigation } from "expo-router";
 import React, { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { KeyboardAvoidingView, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatSchoolName } from "@/utils/format/formatSchoolName";
 
@@ -17,7 +17,9 @@ import List from "@/ui/new/List";
 import TextInput from "@/ui/new/TextInput";
 import Typography from "@/ui/new/Typography";
 import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
+import { describeEntError, fetchEntList, isUnknownEntError } from "@/utils/pronote/ents";
 import uuid from "@/utils/uuid/uuid";
+import { buildPronoteAdditionals, isMfaRequiredError, normalizeChildren } from "./postLogin";
 
 export type PronoteCredentialsAccountType = "eleve" | "parent";
 
@@ -39,10 +41,16 @@ const PronoteCredentialsForm = memo(({
   baseUrl,
   schoolName,
   accountType,
+  mfaAccountPin,
+  mfaDeviceName,
+  mfaClientIdentifier,
 }: {
   baseUrl: string;
   schoolName: string;
   accountType: PronoteCredentialsAccountType;
+  mfaAccountPin?: string;
+  mfaDeviceName?: string;
+  mfaClientIdentifier?: string;
 }) => {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -52,7 +60,27 @@ const PronoteCredentialsForm = memo(({
   const [ent, setEnt] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [entList, setEntList] = React.useState<string[]>([]);
+  const [entListFallback, setEntListFallback] = React.useState(false);
   const alert = useAlert();
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchEntList()
+      .then(({ ents, fromFallback }) => {
+        if (cancelled) return;
+        setEntList(ents);
+        setEntListFallback(fromFallback);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const entSuggestions = React.useMemo(() => {
+    const q = ent.trim().toLowerCase();
+    if (q.length < 2 || entList.length === 0) return [];
+    return entList.filter(e => e.toLowerCase().includes(q) && e.toLowerCase() !== q).slice(0, 5);
+  }, [ent, entList]);
 
   const isParent = accountType === "parent";
   const canSubmit = username.trim().length > 0 && password.length > 0 && !loading;
@@ -72,13 +100,22 @@ const PronoteCredentialsForm = memo(({
 
     try {
       const normalized = normalizePronoteUrl(baseUrl, isParent ? "parent" : "eleve");
+      const mfa =
+        mfaAccountPin || mfaDeviceName || mfaClientIdentifier
+          ? {
+              ...(mfaAccountPin ? { accountPin: mfaAccountPin } : {}),
+              ...(mfaDeviceName ? { deviceName: mfaDeviceName } : {}),
+              ...(mfaClientIdentifier ? { clientIdentifier: mfaClientIdentifier } : {}),
+            }
+          : undefined;
 
       const res = await PronoteApiClient.directLogin(
         normalized,
         username.trim(),
         password,
         ent.trim() || undefined,
-        isParent ? "parent" : "eleve"
+        isParent ? "parent" : "eleve",
+        mfa
       );
 
       if (!res.success) {
@@ -90,7 +127,7 @@ const PronoteCredentialsForm = memo(({
       const className = res.user?.class_name || "";
       const finalIsParent = res.user?.account_type === "parent" || (res.children && res.children.length > 0);
       const finalAccountType = finalIsParent ? "parent" : "eleve";
-      const children = res.children || [];
+      const children = normalizeChildren(res.children);
       const selectedChild = children.length > 0 ? children[0].name : undefined;
 
       useAccountStore.getState().addAccount({
@@ -111,20 +148,25 @@ const PronoteCredentialsForm = memo(({
           auth: {
             accessToken: res.auth_token,
             refreshToken: res.auth_token,
-            additionals: {
-              instanceURL: normalized,
-              url: normalized,
-              username: username.trim(),
-              deviceUUID: accountID,
-              uuid: accountID,
-              // Identifiants bruts : le login direct n'a pas de token rotatif,
-              // les routes data rejouent username+password via le backend.
-              password,
-              ...(ent.trim() ? { ent: ent.trim() } : {}),
-              authToken: res.auth_token,
-              accountType: finalAccountType,
-              account_type: finalAccountType,
-            }
+            additionals: buildPronoteAdditionals(
+              {
+                instanceURL: normalized,
+                url: normalized,
+                username: username.trim(),
+                deviceUUID: accountID,
+                uuid: accountID,
+                // Identifiants bruts : le login direct n'a pas de token rotatif,
+                // les routes data rejouent username+password via le backend.
+                password,
+                ...(ent.trim() ? { ent: ent.trim() } : {}),
+                authToken: res.auth_token,
+                auth_token: res.auth_token,
+                accountType: finalAccountType,
+                account_type: finalAccountType,
+              },
+              res,
+              mfa
+            ),
           },
           serviceId: Services.PRONOTE,
           createdAt: (new Date()).toISOString(),
@@ -145,6 +187,31 @@ const PronoteCredentialsForm = memo(({
       finishAuthNavigation();
       return;
     } catch (e: any) {
+      // 428 MFAError : bascule vers l'écran 2FA en conservant la tentative.
+      if (isMfaRequiredError(e)) {
+        const normalized = (() => {
+          try { return normalizePronoteUrl(baseUrl, isParent ? "parent" : "eleve"); }
+          catch { return baseUrl; }
+        })();
+        setLoading(false);
+        (navigation.navigate as (...args: any[]) => void)("2fa", {
+          mode: "direct",
+          url: normalized,
+          username: username.trim(),
+          password,
+          ...(ent.trim() ? { ent: ent.trim() } : {}),
+          accountType: isParent ? "parent" : "eleve",
+          schoolName,
+          ...(mfaClientIdentifier ? { clientIdentifier: mfaClientIdentifier } : {}),
+        });
+        return;
+      }
+      if (isUnknownEntError(e)) {
+        const message = describeEntError(ent.trim());
+        setError(message);
+        alert.showAlert({ title: "ENT inconnu", description: message, icon: "UserCross", color: "#E05D34" });
+        return;
+      }
       const rawMessage = e?.message || "Identifiants incorrects. Vérifie ton identifiant et ton mot de passe.";
       const low = String(rawMessage).toLowerCase();
       const message =
@@ -205,6 +272,20 @@ const PronoteCredentialsForm = memo(({
         returnKeyType="done"
         onSubmitEditing={submit}
       />
+      {entSuggestions.length > 0 && (
+        <View style={{ gap: 4, paddingTop: 6 }}>
+          {entSuggestions.map(s => (
+            <Pressable key={s} onPress={() => setEnt(s)} style={{ paddingVertical: 6 }}>
+              <Typography variant="body1" color="primary">{s}</Typography>
+            </Pressable>
+          ))}
+          {entListFallback && (
+            <Typography variant="caption" color="textSecondary">
+              Liste ENT locale (backend injoignable) — vérifie l'orthographe exacte.
+            </Typography>
+          )}
+        </View>
+      )}
       {error && (
         <>
           <Divider height={3} ghost />
@@ -230,7 +311,7 @@ export default function PronoteLoginCredentials() {
   const route = useRoute<any>();
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const { url = "", school, accountType = "eleve" } = (route.params as any) || {};
+  const { url = "", school, accountType = "eleve", accountPin, deviceName, clientIdentifier } = (route.params as any) || {};
   const schoolName = typeof school === "string" ? school : (school?.name || "");
 
   React.useEffect(() => {
@@ -247,6 +328,9 @@ export default function PronoteLoginCredentials() {
             baseUrl={url}
             schoolName={schoolName}
             accountType={accountType}
+            mfaAccountPin={typeof accountPin === "string" ? accountPin : undefined}
+            mfaDeviceName={typeof deviceName === "string" ? deviceName : undefined}
+            mfaClientIdentifier={typeof clientIdentifier === "string" ? clientIdentifier : undefined}
           />
         }
         contentContainerStyle={{

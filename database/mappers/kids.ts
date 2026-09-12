@@ -9,6 +9,7 @@ export function mapKidsToShared(kid: Kid): SharedKid {
     firstName: kid.firstName,
     lastName: kid.lastName,
     class: kid.class,
-    dateOfBirth: new Date(kid.dateOfBirth)
-  }
+    dateOfBirth: new Date(kid.dateOfBirth),
+    externalId: (kid as unknown as { externalId?: string }).externalId ?? kid.kidId,
+  } as SharedKid
 }

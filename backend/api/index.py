@@ -84,8 +84,8 @@ def clamp_window(start_d: date, end_d: date, max_days: int = 62) -> tuple:
 
 app = FastAPI(
     title="Aether Pronotepy API",
-    version="1.1.0",
-    description="Microservice serverless reliant Aether Mobile à Pronote via pronotepy avec support des comptes parents."
+    version="1.2.0",
+    description="Microservice serverless reliant Aether Mobile à Pronote via pronotepy 2.15.7 avec support des comptes parents, MFA/2FA, et parité complète des entités."
 )
 
 cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
@@ -107,13 +107,20 @@ class DirectLoginRequest(BaseModel):
     username: str
     password: str
     ent: Optional[str] = None
-    account_type: str = "eleve" # "eleve" or "parent"
+    account_type: str = "eleve" # "eleve" or "parent" (vie-scolaire explicit unsupported, see init_client)
+    account_pin: Optional[str] = None
+    client_identifier: Optional[str] = None
+    device_name: Optional[str] = None
 
 class QrCodeLoginRequest(BaseModel):
     qr_data: Any # JSON dict or string
     pin: str
     uuid: str
     account_type: str = "eleve"
+    account_pin: Optional[str] = None
+    client_identifier: Optional[str] = None
+    device_name: Optional[str] = None
+    skip_2fa: bool = False
 
 class TokenLoginRequest(BaseModel):
     url: str
@@ -121,6 +128,13 @@ class TokenLoginRequest(BaseModel):
     token: str
     uuid: str
     account_type: str = "eleve"
+    account_pin: Optional[str] = None
+    client_identifier: Optional[str] = None
+    device_name: Optional[str] = None
+
+class QrCodeRequestData(BaseModel):
+    pin: str
+    child_name: Optional[str] = None
 
 class HomeworkDoneRequest(BaseModel):
     homework_id: str
@@ -131,6 +145,16 @@ class HomeworkDoneRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     chat_id: str
     content: str
+    child_name: Optional[str] = None
+    message_id: Optional[str] = None  # reply to a specific message (Message.reply), else Discussion.reply
+
+class ChatMarkRequest(BaseModel):
+    chat_id: str
+    read: bool = True
+    child_name: Optional[str] = None
+
+class ChatDeleteRequest(BaseModel):
+    chat_id: str
     child_name: Optional[str] = None
 
 class CreateChatRequest(BaseModel):
@@ -165,9 +189,29 @@ def get_session_header(x_pronote_auth: Optional[str] = Header(None)) -> Dict[str
         raise HTTPException(status_code=401, detail=f"Header X-Pronote-Auth invalide: {str(e)}")
 
 def _classify_pronote_error(e: Exception) -> HTTPException:
-    """401 auth réelle / 429 throttling / 504 timeout — jamais de 401 générique."""
+    """Mappe les 13 exceptions pronotepy vers des HTTP précis — jamais de 401 générique."""
+    tname = type(e).__name__
     msg = str(e)
     low = msg.lower()
+    # --- pronotepy typed errors first (exact match, robust to message wording) ---
+    if tname == "QRCodeDecryptError" or "invalid confirmation code" in low:
+        return HTTPException(status_code=401, detail=f"Code PIN incorrect (QR indéchiffrable): {msg}")
+    if tname == "MFAError" or "doubleauth" in low or "2fa" in low or "pin is required" in low or "invalid pin" in low:
+        return HTTPException(status_code=428, detail=f"Double authentification requise (code PIN / appareil à valider): {msg}")
+    if tname == "ChildNotFound" or "child" in tname.lower() and "not found" in low:
+        return HTTPException(status_code=404, detail=f"Enfant introuvable: {msg}")
+    if tname == "ExpiredObject" or "unknown object reference" in low or "error 22" in low:
+        return HTTPException(status_code=409, detail=f"Objet Pronote expiré (session renouvelée, rouvrez la liste): {msg}")
+    if tname == "DiscussionClosed":
+        return HTTPException(status_code=403, detail=f"Discussion fermée, réponse impossible: {msg}")
+    if tname == "UnsupportedOperation":
+        return HTTPException(status_code=501, detail=f"Fonction non supportée par cet établissement: {msg}")
+    if tname == "ENTLoginError":
+        return HTTPException(status_code=502, detail=f"Échec de connexion ENT: {msg}")
+    if tname in ("ParsingError", "DateParsingError", "ICalExportError"):
+        return HTTPException(status_code=502, detail=f"Réponse Pronote inattendue ({tname}): {msg}")
+    if tname == "CryptoError":
+        return HTTPException(status_code=401, detail=f"Identifiants incorrects (échec chiffrement): {msg}")
     if any(k in low for k in ("429", "too many", "trop de requ", "rate limit", "rate-limit", "ratelimit")):
         return HTTPException(status_code=429, detail=f"Pronote surchargé, réessayez dans un instant: {msg}")
     if any(k in low for k in ("timeout", "timed out", "délai", "connectionerror", "connection error", "max retries", "temporarily", "temporaire", "503", "502", "504", "bad gateway", "service unavailable")):
@@ -175,11 +219,62 @@ def _classify_pronote_error(e: Exception) -> HTTPException:
     return HTTPException(status_code=401, detail=f"Erreur d'initialisation Pronote: {msg}")
 
 
+# pronotepy Util.grade_translate parity — must stay in sync with pronotepy/dataClasses.py
+GRADE_TRANSLATE = [
+    "Absent",
+    "Dispense",
+    "NonNote",
+    "Inapte",
+    "NonRendu",
+    "AbsentZero",
+    "NonRenduZero",
+    "Felicitations",
+]
+
+def grade_parse(raw: Any) -> tuple:
+    """Retourne (float_value|None, status_code|None, raw_str). Parité Util.grade_parse."""
+    if raw is None:
+        return None, None, ""
+    s = str(raw).strip()
+    if not s:
+        return None, None, s
+    if "|" in s:
+        try:
+            idx = int(s[1]) - 1
+            if 0 <= idx < len(GRADE_TRANSLATE):
+                return None, GRADE_TRANSLATE[idx], s
+        except Exception:
+            pass
+        return None, "NonNote", s
+    try:
+        return float(s.replace(",", ".")), None, s
+    except Exception:
+        return None, s or "NonNote", s
+
+
+def _serialize_attachment(f: Any) -> Dict[str, Any]:
+    return {
+        "id": getattr(f, "id", None),
+        "name": getattr(f, "name", "Fichier"),
+        "url": getattr(f, "url", None),
+        "type": getattr(f, "type", 1),
+    }
+
+
 def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
     import pronotepy  # lazy : cold start
-    account_type = auth.get("account_type", "eleve").lower()
+    account_type = str(auth.get("account_type", "eleve")).lower()
+    if account_type in ("vie-scolaire", "viescolaire", "vie_scolaire", "staff", "professeur", "teacher"):
+        raise HTTPException(
+            status_code=501,
+            detail="Comptes Vie Scolaire / Professeur non supportés par Aether (élève et parent uniquement).",
+        )
     is_parent = account_type == "parent"
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
+    # MFA / device identity (parité pronotepy ClientBase): jamais loggés, juste forwardés.
+    _account_pin = auth.get("account_pin") or None
+    _client_id = auth.get("client_identifier") or None
+    _device_name = auth.get("device_name") or None
 
     try:
         if "token" in auth and "uuid" in auth:
@@ -187,7 +282,10 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
                 auth["url"],
                 auth["username"],
                 auth["token"],
-                auth["uuid"]
+                auth["uuid"],
+                account_pin=_account_pin,
+                client_identifier=_client_id,
+                device_name=_device_name,
             )
         elif "username" in auth and "password" in auth:
             ent = getattr(pronotepy.ent, auth["ent"]) if auth.get("ent") and hasattr(pronotepy.ent, auth["ent"]) else None
@@ -195,7 +293,10 @@ def init_client(auth: Dict[str, Any], child_name: Optional[str] = None):
                 auth["url"],
                 username=auth["username"],
                 password=auth["password"],
-                ent=ent
+                ent=ent,
+                account_pin=_account_pin,
+                client_identifier=_client_id,
+                device_name=_device_name,
             )
         else:
             raise HTTPException(status_code=401, detail="Données d'authentification incomplètes")
@@ -275,31 +376,47 @@ def health():
 @app.post("/auth/login")
 def login_direct(req: DirectLoginRequest):
     import pronotepy  # lazy : cold start
-    req_url = req.url.lower()
-    is_parent = ("parent" in req_url) or (req.account_type.lower() == "parent")
+    if req.account_type.lower() in ("vie-scolaire", "viescolaire", "vie_scolaire", "staff", "professeur", "teacher"):
+        raise HTTPException(status_code=501, detail="Comptes Vie Scolaire / Professeur non supportés (élève et parent uniquement).")
+    # Compte explicite prioritaire, URL en indice secondaire (parité init_client).
+    if req.account_type.lower() in ("eleve", "parent"):
+        is_parent = req.account_type.lower() == "parent"
+    else:
+        is_parent = "parent" in req.url.lower()
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
 
     ent = getattr(pronotepy.ent, req.ent) if req.ent and hasattr(pronotepy.ent, req.ent) else None
+    if req.ent and ent is None:
+        raise HTTPException(status_code=400, detail=f"ENT « {req.ent} » inconnu de pronotepy. Vérifiez le nom (voir /meta/ents).")
     client = None
     try:
         client = ClientClass(
             req.url,
             username=req.username,
             password=req.password,
-            ent=ent
+            ent=ent,
+            account_pin=req.account_pin,
+            client_identifier=req.client_identifier,
+            device_name=req.device_name,
         )
     except Exception as e:
+        # MFA → remonte 428 directement, pas de fallback aveugle.
+        if type(e).__name__ == "MFAError":
+            raise _classify_pronote_error(e)
         AltClass = pronotepy.Client if is_parent else pronotepy.ParentClient
         try:
             client = AltClass(
                 req.url,
                 username=req.username,
                 password=req.password,
-                ent=ent
+                ent=ent,
+                account_pin=req.account_pin,
+                client_identifier=req.client_identifier,
+                device_name=req.device_name,
             )
             is_parent = not is_parent
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Erreur de connexion Pronote: {str(e)}")
+        except Exception as e2:
+            raise _classify_pronote_error(e2)
 
     if not client or not client.logged_in:
         raise HTTPException(status_code=401, detail="Identifiants incorrects ou établissement injoignable")
@@ -314,7 +431,10 @@ def login_direct(req: DirectLoginRequest):
 
     children = []
     if is_parent and hasattr(client, "children"):
-        children = [{"name": c.name, "grade": getattr(c, "grade", "")} for c in client.children]
+        children = [
+            {"id": getattr(c, "id", c.name), "name": c.name, "grade": getattr(c, "grade", getattr(c, "class_name", ""))}
+            for c in client.children
+        ]
 
     auth_payload = {
         "url": req.url,
@@ -323,14 +443,23 @@ def login_direct(req: DirectLoginRequest):
         "ent": req.ent,
         "account_type": final_account_type,
     }
+    if req.account_pin:
+        auth_payload["account_pin"] = req.account_pin
+    if getattr(client, "client_identifier", None):
+        auth_payload["client_identifier"] = getattr(client, "client_identifier")
+    if req.device_name:
+        auth_payload["device_name"] = req.device_name
     encoded_token = base64.b64encode(json.dumps(auth_payload).encode("utf-8")).decode("utf-8")
 
-    return {
+    out: Dict[str, Any] = {
         "success": True,
         "user": user_info,
         "children": children,
-        "auth_token": encoded_token
+        "auth_token": encoded_token,
     }
+    if getattr(client, "client_identifier", None):
+        out["client_identifier"] = getattr(client, "client_identifier")
+    return out
 
 @app.post("/auth/qrcode")
 def login_qrcode(req: QrCodeLoginRequest):
@@ -339,28 +468,56 @@ def login_qrcode(req: QrCodeLoginRequest):
         qr_dict = req.qr_data if isinstance(req.qr_data, dict) else json.loads(req.qr_data)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Données QR Code invalides: {str(e)}")
+    if not all(k in qr_dict for k in ("login", "jeton", "url")):
+        raise HTTPException(status_code=400, detail="QR Code incomplet (attendu: login, jeton, url). Scannez le QR « Application mobile » de Pronote.")
 
     qr_url = str(qr_dict.get("url", "")).lower()
-    is_parent = ("parent" in qr_url) or (req.account_type.lower() == "parent")
+    if req.account_type.lower() in ("eleve", "parent"):
+        is_parent = req.account_type.lower() == "parent"
+    else:
+        is_parent = "parent" in qr_url
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
+
+    def _do_qr(cls):
+        return cls.qrcode_login(
+            qr_dict, req.pin, req.uuid,
+            account_pin=req.account_pin,
+            client_identifier=req.client_identifier,
+            device_name=req.device_name,
+            skip_2fa=req.skip_2fa,
+        )
 
     client = None
     last_error: Optional[str] = None
+    last_exc: Optional[Exception] = None
     try:
-        client = ClientClass.qrcode_login(qr_dict, req.pin, req.uuid)
+        client = _do_qr(ClientClass)
     except Exception as e:
         last_error = f"{type(e).__name__}: {str(e)}"
+        last_exc = e
+        if type(e).__name__ in ("QRCodeDecryptError", "MFAError"):
+            raise _classify_pronote_error(e)
         AltClass = pronotepy.Client if is_parent else pronotepy.ParentClient
         try:
-            client = AltClass.qrcode_login(qr_dict, req.pin, req.uuid)
+            client = _do_qr(AltClass)
             is_parent = not is_parent
         except Exception as e2:
             last_error = f"{type(e2).__name__}: {str(e2)}"
+            last_exc = e2
+            if type(e2).__name__ in ("QRCodeDecryptError", "MFAError"):
+                raise _classify_pronote_error(e2)
             client = None
     if client is None:
         # 'dataSec' manquant = handshake refusé par Pronote : PIN incorrect,
         # QR expiré/déjà utilisé, ou protocole inattendu. Log serveur pour diag.
         logger.warning(f"[auth/qrcode] handshake failed uuid={req.uuid} error={last_error}")
+        if last_exc is not None:
+            # Garde le mapping précis quand disponible (CryptoError→401 etc.)
+            try:
+                raise _classify_pronote_error(last_exc)
+            except HTTPException as he:
+                if he.status_code in (428, 404, 409, 501, 502):
+                    raise he
         raise HTTPException(
             status_code=401,
             detail="Code PIN incorrect ou QR Code expiré ou déjà utilisé. Génère un nouveau QR Code dans Pronote puis réessaie.",
@@ -379,7 +536,10 @@ def login_qrcode(req: QrCodeLoginRequest):
 
     children = []
     if is_parent and hasattr(client, "children"):
-        children = [{"name": c.name, "grade": getattr(c, "grade", "")} for c in client.children]
+        children = [
+            {"id": getattr(c, "id", c.name), "name": c.name, "grade": getattr(c, "grade", getattr(c, "class_name", ""))}
+            for c in client.children
+        ]
 
     new_token = getattr(client, "password", "")
     auth_payload = {
@@ -389,6 +549,10 @@ def login_qrcode(req: QrCodeLoginRequest):
         "uuid": req.uuid,
         "account_type": final_account_type,
     }
+    if getattr(client, "client_identifier", None):
+        auth_payload["client_identifier"] = getattr(client, "client_identifier")
+    if req.device_name:
+        auth_payload["device_name"] = req.device_name
     encoded_token = base64.b64encode(json.dumps(auth_payload).encode("utf-8")).decode("utf-8")
 
     return {
@@ -396,26 +560,39 @@ def login_qrcode(req: QrCodeLoginRequest):
         "user": user_info,
         "children": children,
         "auth_token": encoded_token,
-        "credentials": auth_payload
+        "credentials": auth_payload,
+        "client_identifier": getattr(client, "client_identifier", None),
     }
 
 @app.post("/auth/token")
 def login_token(req: TokenLoginRequest):
     import pronotepy  # lazy : cold start
-    req_url = req.url.lower()
-    is_parent = ("parent" in req_url) or (req.account_type.lower() == "parent")
+    if req.account_type.lower() in ("eleve", "parent"):
+        is_parent = req.account_type.lower() == "parent"
+    else:
+        is_parent = "parent" in req.url.lower()
     ClientClass = pronotepy.ParentClient if is_parent else pronotepy.Client
+
+    def _do_token(cls):
+        return cls.token_login(
+            req.url, req.username, req.token, req.uuid,
+            account_pin=req.account_pin,
+            client_identifier=req.client_identifier,
+            device_name=req.device_name,
+        )
 
     client = None
     try:
-        client = ClientClass.token_login(req.url, req.username, req.token, req.uuid)
+        client = _do_token(ClientClass)
     except Exception as e:
+        if type(e).__name__ == "MFAError":
+            raise _classify_pronote_error(e)
         AltClass = pronotepy.Client if is_parent else pronotepy.ParentClient
         try:
-            client = AltClass.token_login(req.url, req.username, req.token, req.uuid)
+            client = _do_token(AltClass)
             is_parent = not is_parent
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Erreur token login: {str(e)}")
+        except Exception as e2:
+            raise _classify_pronote_error(e2)
 
     if not client or not client.logged_in:
         raise HTTPException(status_code=401, detail="Token expiré ou révoqué")
@@ -430,7 +607,10 @@ def login_token(req: TokenLoginRequest):
 
     children = []
     if is_parent and hasattr(client, "children"):
-        children = [{"name": c.name, "grade": getattr(c, "grade", "")} for c in client.children]
+        children = [
+            {"id": getattr(c, "id", c.name), "name": c.name, "grade": getattr(c, "grade", getattr(c, "class_name", ""))}
+            for c in client.children
+        ]
 
     new_token = getattr(client, "password", req.token)
     auth_payload = {
@@ -440,6 +620,10 @@ def login_token(req: TokenLoginRequest):
         "uuid": req.uuid,
         "account_type": final_account_type,
     }
+    if getattr(client, "client_identifier", None):
+        auth_payload["client_identifier"] = getattr(client, "client_identifier")
+    if req.device_name:
+        auth_payload["device_name"] = req.device_name
     encoded_token = base64.b64encode(json.dumps(auth_payload).encode("utf-8")).decode("utf-8")
 
     return {
@@ -447,8 +631,98 @@ def login_token(req: TokenLoginRequest):
         "user": user_info,
         "children": children,
         "auth_token": encoded_token,
-        "credentials": auth_payload
+        "credentials": auth_payload,
+        "client_identifier": getattr(client, "client_identifier", None),
     }
+
+
+@app.post("/auth/request-qr")
+def request_qr_code(req: QrCodeRequestData, auth: Dict[str, Any] = Depends(get_session_header)):
+    """Génère un nouveau QR de connexion via pronotepy request_qr_code_data(pin)."""
+    if not req.pin or len(str(req.pin)) != 4 or not str(req.pin).isdigit():
+        raise HTTPException(status_code=422, detail="PIN à 4 chiffres requis pour générer un QR Code.")
+    client = init_client(auth, child_name=req.child_name)
+    try:
+        data = client.request_qr_code_data(str(req.pin))
+        return {"qr": data}
+    except Exception as e:
+        raise _classify_pronote_error(e)
+
+
+@app.get("/periods/current")
+def get_current_period(
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header),
+):
+    """Période courante pronotepy (onglet G==198, fallback premier onglet) — parité Client.current_period."""
+    key = _cache_key("current_period", auth, child)
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
+    client = init_client(auth, child_name=child)
+    try:
+        current = client.current_period
+        payload = {
+            "period": {
+                "id": getattr(current, "id", current.name),
+                "name": current.name,
+                "start": current.start.isoformat() if hasattr(current, "start") and current.start else None,
+                "end": current.end.isoformat() if hasattr(current, "end") and current.end else None,
+            }
+        }
+    except Exception as e:
+        raise _classify_pronote_error(e)
+    cache_set(key, payload, 300)
+    return payload
+
+
+@app.get("/meta")
+def get_meta(
+    child: Optional[str] = Query(None),
+    auth: Optional[Dict[str, Any]] = None,
+):
+    """Métadonnées non-authentifiées + (si header fourni) start_day/week pronotepy."""
+    import pronotepy as _pn
+    ents: List[str] = []
+    try:
+        ents = sorted([n for n in dir(_pn.ent) if not n.startswith("_")])
+    except Exception:
+        ents = []
+    out: Dict[str, Any] = {
+        "pronotepy_version": getattr(_pn, "__version__", "2.15.7"),
+        "grade_translate": GRADE_TRANSLATE,
+        "ents": ents,
+        "supported_account_types": ["eleve", "parent"],
+    }
+    return out
+
+
+@app.get("/meta/ents")
+def list_ents():
+    import pronotepy as _pn
+    try:
+        return {"ents": sorted([n for n in dir(_pn.ent) if not n.startswith("_")])}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Liste ENT indisponible: {e}")
+
+
+@app.get("/session/info")
+def get_session_info(
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header),
+):
+    """start_day/week/periods — parité ClientBase (utile au rattachement heure murale)."""
+    client = init_client(auth, child_name=child)
+    try:
+        return {
+            "start_day": client.start_day.isoformat() if hasattr(client.start_day, "isoformat") else str(client.start_day),
+            "week": getattr(client, "week", None),
+            "logged_in": bool(getattr(client, "logged_in", False)),
+            "last_connection": client.last_connection.isoformat() if getattr(client, "last_connection", None) else None,
+        }
+    except Exception as e:
+        raise _classify_pronote_error(e)
+
 
 @app.get("/parent/children")
 def get_parent_children(auth: Dict[str, Any] = Depends(get_session_header)):
@@ -456,7 +730,10 @@ def get_parent_children(auth: Dict[str, Any] = Depends(get_session_header)):
     if not hasattr(client, "children"):
         return {"children": []}
     return {
-        "children": [{"name": c.name, "grade": getattr(c, "grade", "")} for c in client.children]
+        "children": [
+            {"id": getattr(c, "id", c.name), "name": c.name, "grade": getattr(c, "grade", getattr(c, "class_name", ""))}
+            for c in client.children
+        ]
     }
 
 @app.get("/timetable")
@@ -539,19 +816,29 @@ def get_timetable(
             "id": lesson_id,
             "resource_id": lesson_id,
             "subject": getattr(l.subject, "name", "Matière") if hasattr(l, "subject") and l.subject else "Matière",
+            "subject_id": getattr(l.subject, "id", None) if hasattr(l, "subject") and l.subject else None,
+            "subject_groups": bool(getattr(l.subject, "groups", False)) if hasattr(l, "subject") and l.subject else False,
             "teacher": teacher,
+            "teacher_names": list(getattr(l, "teacher_names", None) or []),
             "room": room,
+            "classrooms": list(getattr(l, "classrooms", None) or []),
             "group": group,
+            "group_names": list(getattr(l, "group_names", None) or []),
             "start": l.start.isoformat(),
             "end": end_iso,
             "canceled": getattr(l, "canceled", False),
             "status": status_str,
+            "num": getattr(l, "num", 0),
+            "normal": bool(not getattr(l, "detention", False) and not getattr(l, "outing", False)),
             "color": getattr(l.subject, "color", None) if hasattr(l, "subject") and l.subject else None,
             "background_color": getattr(l, "background_color", None),
             "memo": getattr(l, "memo", None),
             "is_outing": getattr(l, "outing", False),
+            "outing": getattr(l, "outing", False),
             "is_detention": getattr(l, "detention", False),
+            "detention": getattr(l, "detention", False),
             "is_test": getattr(l, "test", False),
+            "test": getattr(l, "test", False),
             "exempted": getattr(l, "exempted", False),
             "virtual_classrooms": getattr(l, "virtual_classrooms", []) or [],
             # Contenu rempli à la demande (voir /timetable/lesson-content).
@@ -575,12 +862,11 @@ class LessonContentRequest(BaseModel):
 def _serialize_lesson_content(c) -> Dict[str, Any]:
     files = []
     try:
-        for f in (getattr(c, "files", None) or []):
-            files.append({
-                "name": getattr(f, "name", "Fichier"),
-                "url": getattr(f, "url", None),
-                "type": getattr(f, "type", 1),
-            })
+        raw_files = getattr(c, "files", None) or []
+        if callable(raw_files):
+            raw_files = raw_files()
+        for f in (raw_files or []):
+            files.append(_serialize_attachment(f))
     except Exception:
         pass
     return {
@@ -625,12 +911,28 @@ def get_lesson_content(
     client = init_client(auth, child_name=req.child_name)
 
     # Résout la date pivot (semaine scolaire) : lesson_start > date > aujourd'hui.
+    # Le frontend envoie l'heure MURALE locale (sans offset, ex. "2026-09-12T08:00:00")
+    # car pronotepy expose des datetimes naïfs en heure de l'établissement.
+    # Compat : les anciens clients envoyaient de l'UTC ("...Z") -> on teste les
+    # deux interprétations (UTC brut + mur Paris) pour le matching ci-dessous.
     pivot: Optional[datetime] = None
+    pivot_paris_wall: Optional[datetime] = None
     if req.lesson_start:
         try:
-            pivot = datetime.fromisoformat(str(req.lesson_start).replace("Z", "+00:00"))
-            if pivot.tzinfo is not None:
-                pivot = pivot.replace(tzinfo=None)
+            raw_ls = str(req.lesson_start)
+            if raw_ls.endswith("Z") or ("+" in raw_ls[10:] or raw_ls[10:].count("-") > 2):
+                aware = datetime.fromisoformat(raw_ls.replace("Z", "+00:00"))
+                if aware.tzinfo is not None:
+                    pivot = aware.replace(tzinfo=None)
+                    try:
+                        from zoneinfo import ZoneInfo
+                        pivot_paris_wall = aware.astimezone(ZoneInfo("Europe/Paris")).replace(tzinfo=None)
+                    except Exception:
+                        pivot_paris_wall = None
+                else:
+                    pivot = aware
+            else:
+                pivot = datetime.fromisoformat(raw_ls)
         except Exception:
             pivot = None
     anchor_d: Optional[date] = None
@@ -682,27 +984,37 @@ def get_lesson_content(
     except Exception as e:
         raise _classify_pronote_error(e)
     target = None
+    # Candidats pivots : heure murale directe + (compat anciens clients UTC)
+    # interprétation mur Paris. Le 1er qui matche gagne.
+    pivots = [p for p in (pivot, pivot_paris_wall) if p is not None]
     if pivot is not None:
-        # Match exact à la minute, sinon ±30min + matière.
-        for l in (lessons or []):
-            try:
-                ls = getattr(l, "start", None)
-                if ls and abs((ls.replace(tzinfo=None) - pivot).total_seconds()) < 60:
-                    target = l
-                    break
-            except Exception:
-                continue
-        if target is None and req.subject:
-            want = str(req.subject).lower().strip()
+        # Match exact à la minute (tolérance 5 min : troncatures de secondes),
+        # sinon matière + proximité (90 min : couvre DST et arrondis).
+        for pv in pivots:
             for l in (lessons or []):
                 try:
                     ls = getattr(l, "start", None)
-                    subj = getattr(getattr(l, "subject", None), "name", "") or ""
-                    if ls and abs((ls.replace(tzinfo=None) - pivot).total_seconds()) < 1800 and want in str(subj).lower():
+                    if ls and abs((ls.replace(tzinfo=None) - pv).total_seconds()) < 300:
                         target = l
                         break
                 except Exception:
                     continue
+            if target is not None:
+                break
+        if target is None and req.subject:
+            want = str(req.subject).lower().strip()
+            for pv in pivots:
+                for l in (lessons or []):
+                    try:
+                        ls = getattr(l, "start", None)
+                        subj = getattr(getattr(l, "subject", None), "name", "") or ""
+                        if ls and abs((ls.replace(tzinfo=None) - pv).total_seconds()) < 5400 and want in str(subj).lower():
+                            target = l
+                            break
+                    except Exception:
+                        continue
+                if target is not None:
+                    break
     if target is None and lessons:
         # Dernier recours : cours le plus proche du pivot.
         try:
@@ -759,7 +1071,30 @@ def get_timetable_contents(
                 by_lesson[str(lid)] = _serialize_lesson_content(_pn.LessonContent(client, raw))
             except Exception:
                 continue
-    payload = {"contents": [{"lesson_id": k, **v} for k, v in by_lesson.items()]}
+    # Les ids Pronote tournent à chaque session : le frontend ne peut pas les
+    # recroiser avec son EDT. On joint donc heure de début + matière (1 seul
+    # appel lessons() sur la fenêtre) pour un matching par date/matière.
+    try:
+        _lessons = client.lessons(start_d, end_d) or []
+    except Exception:
+        _lessons = []
+    _meta: Dict[str, Dict[str, Any]] = {}
+    for _l in _lessons:
+        try:
+            _lid = str(getattr(_l, "id", ""))
+            _st = getattr(_l, "start", None)
+            _subj = getattr(getattr(_l, "subject", None), "name", "") or ""
+            if _lid:
+                _meta[_lid] = {
+                    "lesson_start": _st.isoformat() if _st else None,
+                    "subject": _subj,
+                }
+        except Exception:
+            continue
+    payload = {"contents": [
+        {"lesson_id": k, "lesson_start": _meta.get(k, {}).get("lesson_start"), "subject": _meta.get(k, {}).get("subject"), **v}
+        for k, v in by_lesson.items()
+    ]}
     cache_set(key, payload, 60)
     _set_cache_header(response, False)
     return payload
@@ -790,19 +1125,33 @@ def get_grades(
 
     grades_list = []
     for g in target_period.grades:
+        val, status_code, raw_grade = grade_parse(getattr(g, "grade", None))
+        out_of_val, out_status, raw_out = grade_parse(getattr(g, "out_of", None))
+        avg_val, _, _ = grade_parse(getattr(g, "average", None))
+        max_val, _, _ = grade_parse(getattr(g, "max", None))
+        min_val, _, _ = grade_parse(getattr(g, "min", None))
+        try:
+            coef = float(str(getattr(g, "coefficient", 1.0)).replace(",", ".").strip())
+        except Exception:
+            coef = 1.0
         grades_list.append({
             "id": getattr(g, "id", f"{g.date}_{getattr(g.subject, 'name', '')}"),
             "subject": getattr(g.subject, "name", "Matière"),
+            "subject_id": getattr(g.subject, "id", None) if hasattr(g, "subject") and g.subject else None,
+            "subject_groups": bool(getattr(g.subject, "groups", False)) if hasattr(g, "subject") and g.subject else False,
             "description": getattr(g, "comment", "") or getattr(g, "description", ""),
             "comment": getattr(g, "comment", "") or "",
             "date": g.date.isoformat(),
-            "value": float(g.grade.replace(",", ".")) if getattr(g, "grade", None) and g.grade.replace(",", ".").replace(".", "", 1).isdigit() else None,
-            "out_of": float(g.out_of.replace(",", ".")) if getattr(g, "out_of", None) and g.out_of.replace(",", ".").replace(".", "", 1).isdigit() else 20.0,
-            "average": float(g.average.replace(",", ".")) if getattr(g, "average", None) and g.average.replace(",", ".").replace(".", "", 1).isdigit() else None,
-            "max": float(g.max.replace(",", ".")) if getattr(g, "max", None) and g.max.replace(",", ".").replace(".", "", 1).isdigit() else None,
-            "min": float(g.min.replace(",", ".")) if getattr(g, "min", None) and g.min.replace(",", ".").replace(".", "", 1).isdigit() else None,
-            "coefficient": float(g.coefficient.replace(",", ".")) if getattr(g, "coefficient", None) and g.coefficient.replace(",", ".").replace(".", "", 1).isdigit() else 1.0,
-            "is_significant": getattr(g, "is_significant", True),
+            "value": val,
+            "status_code": status_code,
+            "raw_grade": raw_grade,
+            "out_of": out_of_val if out_of_val is not None else 20.0,
+            "raw_out_of": raw_out,
+            "default_out_of": getattr(g, "default_out_of", None),
+            "average": avg_val,
+            "max": max_val,
+            "min": min_val,
+            "coefficient": coef,
             "is_bonus": bool(getattr(g, "is_bonus", False)),
             "is_optionnal": bool(getattr(g, "is_optionnal", False)),
             "is_out_of_20": bool(getattr(g, "is_out_of_20", False)),
@@ -813,22 +1162,25 @@ def get_grades(
             return None
         if isinstance(v, (int, float)):
             return float(v)
-        try:
-            return float(str(v).replace(",", ".").strip())
-        except Exception:
-            return None
+        fv, _, _ = grade_parse(v)
+        return fv
 
     subject_averages = {}
     if hasattr(target_period, "averages"):
         for avg in target_period.averages:
             s_name = getattr(avg.subject, "name", "") if hasattr(avg, "subject") else ""
             if s_name:
+                stu_val, stu_status, _ = grade_parse(getattr(avg, "student", None))
                 subject_averages[s_name] = {
-                    "student": parse_float_safe(getattr(avg, "student", None)),
+                    "student": stu_val,
+                    "student_status": stu_status,
                     "class_average": parse_float_safe(getattr(avg, "class_average", None)),
                     "max": parse_float_safe(getattr(avg, "max", None)),
                     "min": parse_float_safe(getattr(avg, "min", None)),
                     "out_of": parse_float_safe(getattr(avg, "out_of", 20.0)) or 20.0,
+                    "default_out_of": getattr(avg, "default_out_of", None),
+                    "background_color": getattr(avg, "background_color", None),
+                    "subject_id": getattr(avg.subject, "id", None) if hasattr(avg, "subject") and avg.subject else None,
                 }
 
     period_averages = {
@@ -894,21 +1246,18 @@ def get_homework(
             if callable(raw_files):
                 raw_files = raw_files()
             for f in (raw_files or []):
-                files.append({
-                    "name": getattr(f, "name", "Fichier"),
-                    "url": getattr(f, "url", ""),
-                    "type": getattr(f, "type", 1),
-                })
+                files.append(_serialize_attachment(f))
         except Exception:
             files = []
 
         result.append({
             "id": getattr(h, "id", f"{h.date}_{getattr(h.subject, 'name', '')}"),
             "subject": getattr(h.subject, "name", "Matière"),
+            "subject_id": getattr(h.subject, "id", None) if hasattr(h, "subject") and h.subject else None,
             "description": getattr(h, "description", ""),
             "date": h.date.isoformat(),
-            "given_at": getattr(h, "given_at", h.date).isoformat() if hasattr(h, "given_at") else h.date.isoformat(),
             "done": getattr(h, "done", False),
+            "background_color": getattr(h, "background_color", None),
             "files": files,
         })
 
@@ -1073,18 +1422,31 @@ def get_attendance(
                     out = []
                     try:
                         for f in (raw or []):
-                            out.append({
-                                "name": getattr(f, "name", "Fichier"),
-                                "url": getattr(f, "url", ""),
-                                "type": getattr(f, "type", 1),
-                            })
+                            out.append(_serialize_attachment(f))
                     except Exception:
                         pass
                     return out
+                sched = []
+                try:
+                    for s in (getattr(pun, "schedule", None) or []):
+                        st = getattr(s, "start", None)
+                        dur = getattr(s, "duration", None)
+                        try:
+                            dur_min = float(dur.total_seconds() / 60) if hasattr(dur, "total_seconds") else (float(dur) if dur is not None else None)
+                        except Exception:
+                            dur_min = None
+                        sched.append({
+                            "id": getattr(s, "id", None),
+                            "start": st.isoformat() if st is not None and hasattr(st, "isoformat") else None,
+                            "duration_minutes": dur_min,
+                        })
+                except Exception:
+                    sched = []
                 punishments.append({
                     "id": getattr(pun, "id", str(given_iso or "")),
                     "date": given_iso,
                     "reason": pun_reason,
+                    "reasons": list(getattr(pun, "reasons", None) or []),
                     "giver": getattr(pun, "giver", ""),
                     "nature": getattr(pun, "nature", ""),
                     "exclusion": bool(getattr(pun, "exclusion", False)),
@@ -1095,6 +1457,8 @@ def get_attendance(
                     "circumstance_documents": _att_list(getattr(pun, "circumstance_documents", None)),
                     "duration_minutes": _parse_float_safe(getattr(pun, "duration", None), None),
                     "schedulable": bool(getattr(pun, "schedulable", False)),
+                    "requires_parent": getattr(pun, "requires_parent", None),
+                    "schedule": sched,
                 })
 
     apayload = {
@@ -1110,9 +1474,12 @@ def get_attendance(
 def get_news(
     response: Response,
     child: Optional[str] = Query(None),
+    only_unread: bool = Query(False),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
-    nkey = _cache_key("news", auth, child)
+    nkey = _cache_key("news", auth, child, only_unread, date_from, date_to)
     nhit = cache_get(nkey)
     if nhit is not None:
         _set_cache_header(response, True)
@@ -1120,9 +1487,23 @@ def get_news(
     client = init_client(auth, child_name=child)
     news_list = []
     if hasattr(client, "information_and_surveys"):
-        items = client.information_and_surveys() if callable(client.information_and_surveys) else client.information_and_surveys
+        try:
+            items = client.information_and_surveys() if callable(client.information_and_surveys) else client.information_and_surveys
+        except Exception as e:
+            raise _classify_pronote_error(e)
+        # Filtres côté bridge (parité information_and_surveys args).
+        df = parse_ymd(date_from, "date_from").isoformat() if date_from else None
+        dt = parse_ymd(date_to, "date_to").isoformat() if date_to else None
         for item in items:
+            if only_unread and bool(getattr(item, "read", True)):
+                continue
             start_d = getattr(item, "start_date", None) or getattr(item, "creation_date", None)
+            creation_d = getattr(item, "creation_date", None)
+            end_d = getattr(item, "end_date", None)
+            if df and start_d and hasattr(start_d, "isoformat") and start_d.isoformat() < df:
+                continue
+            if dt and start_d and hasattr(start_d, "isoformat") and start_d.isoformat() >= dt:
+                continue
             # pronotepy: `content` et `attachments` sont des MÉTHODES
             # (requête PageActualites par actu). `getattr(item, "content")`
             # renverrait la méthode elle-même, pas le texte !
@@ -1137,21 +1518,25 @@ def get_news(
                 a = getattr(item, "attachments", None)
                 raw_atts = a() if callable(a) else (a or [])
                 for f in (raw_atts or []):
-                    atts.append({
-                        "name": getattr(f, "name", "Fichier"),
-                        "url": getattr(f, "url", ""),
-                        "type": getattr(f, "type", 1),
-                    })
+                    atts.append(_serialize_attachment(f))
             except Exception:
                 atts = []
+            is_survey = bool(getattr(item, "survey", False))
             news_list.append({
                 "id": getattr(item, "id", str(start_d or "")),
                 "title": getattr(item, "title", "Actualité"),
                 "author": getattr(item, "author", ""),
                 "content": content_str,
                 "date": start_d.isoformat() if start_d and hasattr(start_d, "isoformat") else None,
+                "creation_date": creation_d.isoformat() if creation_d and hasattr(creation_d, "isoformat") else None,
+                "end_date": end_d.isoformat() if end_d and hasattr(end_d, "isoformat") else None,
                 "acknowledged": getattr(item, "read", True),
                 "category": getattr(item, "category", "Information") or "Information",
+                "survey": is_survey,
+                "anonymous_response": bool(getattr(item, "anonymous_response", False)),
+                "template": bool(getattr(item, "template", False)),
+                "shared_template": bool(getattr(item, "shared_template", False)),
+                "question": is_survey,
                 "attachments": atts,
             })
     npayload = {"news": news_list}
@@ -1208,8 +1593,8 @@ def get_canteen(
                 res = []
                 for f in food_list:
                     name = getattr(f, "name", str(f))
-                    labels = [{"name": getattr(l, "name", str(l)), "color": getattr(l, "color", None)} for l in getattr(f, "labels", [])] if hasattr(f, "labels") else []
-                    res.append({"name": name, "labels": labels})
+                    labels = [{"id": getattr(l, "id", None), "name": getattr(l, "name", str(l)), "color": getattr(l, "color", None)} for l in getattr(f, "labels", [])] if hasattr(f, "labels") else []
+                    res.append({"id": getattr(f, "id", None), "name": name, "labels": labels})
                 return res
 
             first_meal = extract_foods(getattr(m, "first_meal", []))
@@ -1240,6 +1625,8 @@ def get_canteen(
                 meals.append({"name": "Repas", "items": all_items})
 
             menus.append({
+                "id": getattr(m, "id", None),
+                "name": getattr(m, "name", None),
                 "date": m.date.isoformat() if hasattr(m, "date") else from_date,
                 "is_lunch": getattr(m, "is_lunch", True),
                 "is_dinner": getattr(m, "is_dinner", False),
@@ -1255,10 +1642,11 @@ def get_canteen(
 def get_chats(
     response: Response,
     child: Optional[str] = Query(None),
+    only_unread: bool = Query(False),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
     # Phase 6 quick win: short cache 30s (liste sensible, TTL court).
-    lkey = _cache_key("chats", auth, child)
+    lkey = _cache_key("chats", auth, child, only_unread)
     lhit = cache_get(lkey)
     if lhit is not None:
         _set_cache_header(response, True)
@@ -1267,9 +1655,12 @@ def get_chats(
     discussions = []
     if hasattr(client, "discussions"):
         try:
-            disc_list = client.discussions() if callable(client.discussions) else client.discussions
+            disc_list = client.discussions(only_unread=only_unread) if callable(client.discussions) else client.discussions
             for d in disc_list:
-                msgs = getattr(d, "messages", [])
+                try:
+                    msgs = getattr(d, "messages", [])
+                except Exception:
+                    msgs = []
                 latest_date = msgs[-1].created.isoformat() if msgs and hasattr(msgs[-1], "created") else datetime.now().isoformat()
                 discussions.append({
                     "id": getattr(d, "id", f"disc_{getattr(d, 'subject', '')}"),
@@ -1278,10 +1669,12 @@ def get_chats(
                     "recipient": getattr(d, "recipient", ""),
                     "unread": getattr(d, "unread", 0),
                     "closed": getattr(d, "closed", False),
+                    "replyable": getattr(d, "replyable", True),
+                    "labels": list(getattr(d, "labels", None) or []),
                     "date": latest_date,
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            raise _classify_pronote_error(e)
     chat_payload = {"chats": discussions}
     cache_set(lkey, chat_payload, 30)
     _set_cache_header(response, False)
@@ -1301,16 +1694,83 @@ def get_chat_messages(
             d = next((x for x in disc_list if getattr(x, "id", None) == chat_id), None)
             if d and hasattr(d, "messages"):
                 for m in d.messages:
+                    reply_to = getattr(m, "replying_to", None)
                     messages.append({
                         "id": getattr(m, "id", str(getattr(m, "created", ""))),
                         "author": getattr(m, "author", "") or "Moi",
                         "content": getattr(m, "content", ""),
                         "date": m.created.isoformat() if hasattr(m, "created") and m.created else datetime.now().isoformat(),
                         "seen": getattr(m, "seen", True),
+                        "replying_to": getattr(reply_to, "id", None) if reply_to else None,
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            raise _classify_pronote_error(e)
     return {"messages": messages}
+
+
+@app.get("/chats/{chat_id}/participants")
+def get_chat_participants(
+    chat_id: str,
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Parité Discussion.participants() (SaisiePublicMessage)."""
+    client = init_client(auth, child_name=child)
+    try:
+        disc_list = client.discussions() if callable(client.discussions) else client.discussions
+        d = next((x for x in disc_list if getattr(x, "id", None) == chat_id), None)
+        if not d:
+            raise HTTPException(status_code=404, detail="[chats] Discussion introuvable")
+        parts = d.participants() if hasattr(d, "participants") and callable(d.participants) else []
+        return {"participants": list(parts or [])}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _classify_pronote_error(e)
+
+
+@app.post("/chats/{chat_id}/read")
+def mark_chat_read(
+    chat_id: str,
+    req: ChatMarkRequest,
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Parité Discussion.mark_as(read)."""
+    client = init_client(auth, child_name=req.child_name)
+    try:
+        disc_list = client.discussions() if callable(client.discussions) else client.discussions
+        d = next((x for x in disc_list if getattr(x, "id", None) == chat_id), None)
+        if not d:
+            raise HTTPException(status_code=404, detail="[chats] Discussion introuvable")
+        if hasattr(d, "mark_as") and callable(d.mark_as):
+            d.mark_as(bool(req.read))
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _classify_pronote_error(e)
+
+
+@app.post("/chats/{chat_id}/delete")
+def delete_chat(
+    chat_id: str,
+    req: ChatDeleteRequest,
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Parité Discussion.delete() (corbeille)."""
+    client = init_client(auth, child_name=req.child_name)
+    try:
+        disc_list = client.discussions() if callable(client.discussions) else client.discussions
+        d = next((x for x in disc_list if getattr(x, "id", None) == chat_id), None)
+        if not d:
+            raise HTTPException(status_code=404, detail="[chats] Discussion introuvable")
+        if hasattr(d, "delete") and callable(d.delete):
+            d.delete()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _classify_pronote_error(e)
 
 @app.post("/chats/send")
 def send_chat_message(
@@ -1319,15 +1779,44 @@ def send_chat_message(
 ):
     client = init_client(auth, child_name=req.child_name)
     if hasattr(client, "discussions"):
-        disc_list = client.discussions() if callable(client.discussions) else client.discussions
-        d = next((x for x in disc_list if getattr(x, "id", None) == req.chat_id), None)
-        if not d:
-            raise HTTPException(status_code=404, detail="[chats] Discussion introuvable")
-        if hasattr(d, "reply") and callable(d.reply):
-            d.reply(req.content)
-        elif hasattr(d, "messages") and d.messages and hasattr(d.messages[-1], "reply"):
-            d.messages[-1].reply(req.content)
-        return {"success": True}
+        try:
+            disc_list = client.discussions() if callable(client.discussions) else client.discussions
+            d = next((x for x in disc_list if getattr(x, "id", None) == req.chat_id), None)
+            if not d:
+                raise HTTPException(status_code=404, detail="[chats] Discussion introuvable")
+            # Reply ciblé par message_id (Message.reply) — parité pronotepy.
+            if req.message_id:
+                target_msg = None
+                try:
+                    for m in (d.messages or []):
+                        if str(getattr(m, "id", "")) == str(req.message_id):
+                            target_msg = m
+                            break
+                except Exception:
+                    target_msg = None
+                if target_msg is None:
+                    raise HTTPException(status_code=404, detail="[chats] Message introuvable pour réponse ciblée")
+                try:
+                    target_msg.reply(req.content)
+                except Exception as e:
+                    raise _classify_pronote_error(e)
+                return {"success": True}
+            try:
+                if hasattr(d, "reply") and callable(d.reply):
+                    d.reply(req.content)
+                elif hasattr(d, "messages") and d.messages and hasattr(d.messages[-1], "reply"):
+                    d.messages[-1].reply(req.content)
+                else:
+                    raise HTTPException(status_code=400, detail="Réponse impossible sur cette discussion")
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise _classify_pronote_error(e)
+            return {"success": True}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise _classify_pronote_error(e)
     raise HTTPException(status_code=400, detail="Messagerie non disponible")
 
 @app.get("/chats/recipients")
@@ -1345,11 +1834,12 @@ def get_chat_recipients(
                     "id": getattr(r, "id", r.name),
                     "name": getattr(r, "name", "Destinataire"),
                     "type": getattr(r, "type", ""),
-                    "email": getattr(r, "email", ""),
-                    "with_discussion": getattr(r, "with_discussion", True),
+                    "email": getattr(r, "email", "") or "",
+                    "functions": list(getattr(r, "functions", None) or []),
+                    "with_discussion": bool(getattr(r, "with_discussion", True)),
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            raise _classify_pronote_error(e)
     return {"recipients": recipients}
 
 @app.post("/chats/new")
@@ -1427,6 +1917,7 @@ def get_evaluations(
     result = []
     for e in (raw_evaluations or []):
         e_subject = getattr(e.subject, "name", "") if hasattr(e, "subject") and getattr(e, "subject", None) else ""
+        e_subject_id = getattr(e.subject, "id", None) if hasattr(e, "subject") and getattr(e, "subject", None) else None
         e_date = getattr(e, "date", None)
         try:
             date_iso = e_date.isoformat() if e_date and hasattr(e_date, "isoformat") else None
@@ -1441,17 +1932,25 @@ def get_evaluations(
         acquisitions = []
         for ac in (getattr(e, "acquisitions", []) or []):
             acquisitions.append({
+                "id": getattr(ac, "id", None),
                 "name": getattr(ac, "name", "") or "",
                 "abbreviation": getattr(ac, "abbreviation", "") or "",
                 "level": getattr(ac, "level", "") or "",
                 "coefficient": parse_float_safe(getattr(ac, "coefficient", 1.0), 1.0),
                 "domain": getattr(ac, "domain", "") or "",
+                "domain_id": getattr(ac, "domain_id", None),
+                "name_id": getattr(ac, "name_id", None),
+                "order": getattr(ac, "order", None),
                 "pillar": getattr(ac, "pillar", "") or "",
+                "pillar_id": getattr(ac, "pillar_id", None),
+                "pillar_prefix": getattr(ac, "pillar_prefix", None),
             })
         result.append({
             "id": getattr(e, "id", f"{getattr(e, 'name', '')}"),
             "name": getattr(e, "name", "") or "",
             "subject": e_subject or "",
+            "subject_id": e_subject_id,
+            "domain": getattr(e, "domain", None),
             "teacher": getattr(e, "teacher", "") or "",
             "coefficient": parse_float_safe(getattr(e, "coefficient", 1.0), 1.0),
             "description": getattr(e, "description", "") or "",
@@ -1512,6 +2011,7 @@ def get_report(
             except Exception:
                 teachers = []
         subjects.append({
+            "id": getattr(s, "id", None),
             "name": getattr(s, "name", "") or "",
             "color": getattr(s, "color", None),
             "comments": comments,
@@ -1547,29 +2047,32 @@ def get_teaching_staff(
             raw_staff = client.get_teaching_staff()
         else:
             raw_staff = []
-    except Exception:
-        raw_staff = []
+    except Exception as e:
+        raise _classify_pronote_error(e)
 
     for s in (raw_staff or []):
-        subjects = getattr(s, "subjects", []) or []
+        subjects = getattr(s, "subjects", None) or []
+        subj_list = []
         subject_str = ""
         try:
-            if subjects and isinstance(subjects, list):
-                subject_str = getattr(subjects[0], "name", "") or ""
-            else:
-                fallback = getattr(s, "subject", "") or ""
-                subject_str = fallback if isinstance(fallback, str) else str(fallback)
+            for sub in (subjects if isinstance(subjects, list) else []):
+                subj_list.append({
+                    "id": getattr(sub, "id", None),
+                    "name": getattr(sub, "name", "") or "",
+                    "parent_subject_id": getattr(sub, "parent_subject_id", None),
+                    "parent_subject_name": getattr(sub, "parent_subject_name", None),
+                })
+            if subj_list:
+                subject_str = subj_list[0].get("name", "") or ""
         except Exception:
-            subject_str = ""
-        try:
-            email_raw = getattr(s, "email", "") or ""
-            email_str = email_raw if isinstance(email_raw, str) else str(email_raw)
-        except Exception:
-            email_str = ""
+            subj_list = []
         staff.append({
+            "id": getattr(s, "id", None),
             "name": getattr(s, "name", "") or "",
+            "type": getattr(s, "type", None),
             "subject": subject_str or "",
-            "email": email_str or "",
+            "subjects": subj_list,
+            "email": "",
         })
 
     return {"staff": staff}
@@ -1628,6 +2131,7 @@ def get_profile(
     except Exception:
         address = ("", "", "", "", "", "", "", "")
     return {
+        "id": getattr(info, "id", None),
         "name": getattr(info, "name", "") or "",
         "class_name": getattr(info, "class_name", "") or "",
         "establishment": getattr(info, "establishment", "") or "",
@@ -1636,22 +2140,54 @@ def get_profile(
         "phone": _safe(lambda: info.phone),
         "ine_number": _safe(lambda: info.ine_number),
         "delegue": _safe(lambda: info.delegue, []),
+        "has_profile_picture": bool(getattr(info, "profile_picture", None) is not None),
     }
+
+
+@app.get("/profile/picture")
+def get_profile_picture(
+    child: Optional[str] = Query(None),
+    auth: Dict[str, Any] = Depends(get_session_header)
+):
+    """Photo de profil pronotepy (ClientInfo.profile_picture Attachment → base64, max 4 Mo)."""
+    client = init_client(auth, child_name=child)
+    info = getattr(client, "info", None)
+    if info is None:
+        raise HTTPException(status_code=404, detail="Profil indisponible.")
+    try:
+        pic = getattr(info, "profile_picture", None)
+        if pic is None:
+            return {"picture": None}
+        data = pic.data
+        if not data:
+            return {"picture": None}
+        raw = bytes(data)
+        if len(raw) > 4 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Photo trop volumineuse (max 4 Mo).")
+        import mimetypes as _mt
+        mime, _ = _mt.guess_type(getattr(pic, "name", "photo.jpg") or "photo.jpg")
+        return {"picture": base64.b64encode(raw).decode("ascii"), "mime": mime or "image/jpeg", "name": getattr(pic, "name", "photo.jpg")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _classify_pronote_error(e)
 
 
 @app.get("/timetable/pdf")
 def get_timetable_pdf(
     day: Optional[str] = Query(None, description="Jour YYYY-MM-DD (semaine générée, défaut: année)"),
+    portrait: bool = Query(False),
+    overflow: int = Query(0, ge=0, le=2),
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
-    """URL du PDF EDT via pronotepy `generate_timetable_pdf` (non-critique)."""
+    """URL du PDF EDT via pronotepy `generate_timetable_pdf` (parité day/portrait/overflow)."""
     client = init_client(auth, child_name=child)
     if not hasattr(client, "generate_timetable_pdf"):
         raise HTTPException(status_code=400, detail="Export PDF non supporté par ce compte.")
     try:
         d = parse_ymd(day, "day") if day else None
-        url = client.generate_timetable_pdf(day=d)
+        url = client.generate_timetable_pdf(day=d, portrait=bool(portrait), overflow=int(overflow))
         return {"url": str(url)}
     except HTTPException:
         raise

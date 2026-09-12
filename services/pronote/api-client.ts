@@ -171,9 +171,17 @@ export interface PronoteLoginResult {
     establishment?: string;
     account_type: "eleve" | "parent";
   };
-  children: Array<{ name: string; grade?: string }>;
+  children: Array<{ id?: string; name: string; grade?: string }>;
   auth_token: string;
+  client_identifier?: string | null;
   credentials?: Record<string, any>;
+}
+
+export interface MFALoginOptions {
+  accountPin?: string;
+  clientIdentifier?: string;
+  deviceName?: string;
+  skip2fa?: boolean;
 }
 
 export const PronoteApiClient = {
@@ -182,7 +190,8 @@ export const PronoteApiClient = {
     username: string,
     password: string,
     ent?: string,
-    accountType: "eleve" | "parent" = "eleve"
+    accountType: "eleve" | "parent" = "eleve",
+    mfa?: MFALoginOptions
   ): Promise<PronoteLoginResult> {
     return request<PronoteLoginResult>("/auth/login", {
       method: "POST",
@@ -193,6 +202,9 @@ export const PronoteApiClient = {
         password,
         ent,
         account_type: accountType,
+        account_pin: mfa?.accountPin,
+        client_identifier: mfa?.clientIdentifier,
+        device_name: mfa?.deviceName,
       },
     });
   },
@@ -201,7 +213,8 @@ export const PronoteApiClient = {
     qrData: any,
     pin: string,
     uuid: string,
-    accountType: "eleve" | "parent" = "eleve"
+    accountType: "eleve" | "parent" = "eleve",
+    mfa?: MFALoginOptions
   ): Promise<PronoteLoginResult> {
     return request<PronoteLoginResult>("/auth/qrcode", {
       method: "POST",
@@ -211,6 +224,10 @@ export const PronoteApiClient = {
         pin,
         uuid,
         account_type: accountType,
+        account_pin: mfa?.accountPin,
+        client_identifier: mfa?.clientIdentifier,
+        device_name: mfa?.deviceName,
+        skip_2fa: mfa?.skip2fa ?? false,
       },
     });
   },
@@ -220,7 +237,8 @@ export const PronoteApiClient = {
     username: string,
     token: string,
     uuid: string,
-    accountType: "eleve" | "parent" = "eleve"
+    accountType: "eleve" | "parent" = "eleve",
+    mfa?: MFALoginOptions
   ): Promise<PronoteLoginResult> {
     return request<PronoteLoginResult>("/auth/token", {
       method: "POST",
@@ -231,11 +249,39 @@ export const PronoteApiClient = {
         token,
         uuid,
         account_type: accountType,
+        account_pin: mfa?.accountPin,
+        client_identifier: mfa?.clientIdentifier,
+        device_name: mfa?.deviceName,
       },
     });
   },
 
-  async getParentChildren(authToken: string): Promise<{ children: Array<{ name: string; grade?: string }> }> {
+  async requestQrCode(authToken: string, pin: string, child?: string): Promise<{ qr: any }> {
+    return request("/auth/request-qr", {
+      method: "POST",
+      authToken,
+      retry: false,
+      body: { pin, child_name: child },
+    });
+  },
+
+  async getCurrentPeriod(authToken: string, child?: string): Promise<{ period: any }> {
+    return request("/periods/current", { authToken, params: { child } });
+  },
+
+  async getSessionInfo(authToken: string, child?: string): Promise<{ start_day: string; week: number; logged_in: boolean; last_connection: string | null }> {
+    return request("/session/info", { authToken, params: { child } });
+  },
+
+  async getMeta(): Promise<{ pronotepy_version: string; grade_translate: string[]; ents: string[]; supported_account_types: string[] }> {
+    return request("/meta", {});
+  },
+
+  async getEnts(): Promise<{ ents: string[] }> {
+    return request("/meta/ents", {});
+  },
+
+  async getParentChildren(authToken: string): Promise<{ children: Array<{ id?: string; name: string; grade?: string }> }> {
     return request("/parent/children", { authToken });
   },
 
@@ -338,10 +384,15 @@ export const PronoteApiClient = {
     });
   },
 
-  async getNews(authToken: string, child?: string): Promise<{ news: any[] }> {
+  async getNews(authToken: string, child?: string, opts?: { onlyUnread?: boolean; dateFrom?: string; dateTo?: string }): Promise<{ news: any[] }> {
     return request("/news", {
       authToken,
-      params: { child },
+      params: {
+        child,
+        only_unread: opts?.onlyUnread ? "true" : undefined,
+        date_from: opts?.dateFrom,
+        date_to: opts?.dateTo,
+      },
     });
   },
 
@@ -357,10 +408,10 @@ export const PronoteApiClient = {
     });
   },
 
-  async getChats(authToken: string, child?: string): Promise<{ chats: any[] }> {
+  async getChats(authToken: string, child?: string, onlyUnread?: boolean): Promise<{ chats: any[] }> {
     return request("/chats", {
       authToken,
-      params: { child },
+      params: { child, only_unread: onlyUnread ? "true" : undefined },
     });
   },
 
@@ -371,11 +422,35 @@ export const PronoteApiClient = {
     });
   },
 
+  async getChatParticipants(authToken: string, chatId: string, child?: string): Promise<{ participants: string[] }> {
+    return request(`/chats/${chatId}/participants`, {
+      authToken,
+      params: { child },
+    });
+  },
+
+  async markChatRead(authToken: string, chatId: string, read = true, child?: string): Promise<{ success: boolean }> {
+    return request(`/chats/${chatId}/read`, {
+      method: "POST",
+      authToken,
+      body: { chat_id: chatId, read, child_name: child },
+    });
+  },
+
+  async deleteChat(authToken: string, chatId: string, child?: string): Promise<{ success: boolean }> {
+    return request(`/chats/${chatId}/delete`, {
+      method: "POST",
+      authToken,
+      body: { chat_id: chatId, child_name: child },
+    });
+  },
+
   async sendChatMessage(
     authToken: string,
     chatId: string,
     content: string,
-    child?: string
+    child?: string,
+    messageId?: string
   ): Promise<{ success: boolean }> {
     return request("/chats/send", {
       method: "POST",
@@ -384,6 +459,7 @@ export const PronoteApiClient = {
         chat_id: chatId,
         content,
         child_name: child,
+        message_id: messageId,
       },
     });
   },
@@ -454,6 +530,30 @@ export const PronoteApiClient = {
     return request("/teaching-staff", {
       authToken,
       params: { child },
+    });
+  },
+
+  async getProfile(authToken: string, child?: string): Promise<{
+    id?: string | null; name: string; class_name: string; establishment: string;
+    address: string[]; email: string; phone: string; ine_number: string;
+    delegue: string[]; has_profile_picture?: boolean;
+  }> {
+    return request("/profile", { authToken, params: { child } });
+  },
+
+  async getProfilePicture(authToken: string, child?: string): Promise<{ picture: string | null; mime?: string; name?: string }> {
+    return request("/profile/picture", { authToken, params: { child } });
+  },
+
+  async getTimetablePdf(authToken: string, opts?: { day?: string; portrait?: boolean; overflow?: number; child?: string }): Promise<{ url: string }> {
+    return request("/timetable/pdf", {
+      authToken,
+      params: {
+        day: opts?.day,
+        portrait: opts?.portrait ? "true" : undefined,
+        overflow: opts?.overflow !== undefined ? String(opts.overflow) : undefined,
+        child: opts?.child,
+      },
     });
   },
 

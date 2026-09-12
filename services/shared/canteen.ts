@@ -12,12 +12,15 @@ export interface Meal {
   side?: Food[];
   cheese?: Food[];
   dessert?: Food[];
+  other?: Food[];
   drink?: Food[];
 }
 
 export interface Food {
+  id?: string | null;
   name: string;
   allergens?: string[];
+  labels?: Array<{ id?: string | null; name: string; color?: string | null }>;
 }
 
 export interface CanteenHistoryItem extends GenericInterface {

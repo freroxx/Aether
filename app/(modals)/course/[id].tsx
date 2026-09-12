@@ -21,6 +21,8 @@ import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 import { getSubjectName } from '@/utils/subjects/name';
 import { getSubjectColor } from '@/utils/subjects/colors';
 import { getSubjectEmoji } from '@/utils/subjects/emoji';
+import { warn } from "@/utils/logger/logger";
+import * as WebBrowser from "expo-web-browser";
 
 import { getStatusText } from "../../(tabs)/calendar/components/CalendarDay";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +55,9 @@ export default function CourseModal() {
     getCourseById(id)
       .then(result => {
         if (cancelled) return;
+        if (!result) {
+          warn(`CourseModal: cours introuvable pour id=${String(id)} (lien obsolète après resync ?)`);
+        }
         setCourse(result);
         // Contenu à la demande : l'EDT rapide ne l'inclut plus.
         // Si vide, on interroge le backend (1 seul PageCahierDeTexte).
@@ -90,7 +95,16 @@ export default function CourseModal() {
   }
 
   if (!course) {
-    return <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Typography variant="title">{t("Tab_Calendar")}</Typography></View>;
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 8 }}>
+        <Typography variant="title">
+          {t("Modal_Course_NotFound", "Cours introuvable")}
+        </Typography>
+        <Typography variant="body1" color="textSecondary" style={{ textAlign: "center" }}>
+          {t("Modal_Course_NotFound_Desc", "Ce cours a peut-être été modifié depuis. Reviens à l'emploi du temps pour le rouvrir.")}
+        </Typography>
+      </View>
+    );
   }
 
   const subjectInfo: SubjectInfo = {
@@ -102,6 +116,14 @@ export default function CourseModal() {
   const item = course;
   const startTime = Math.floor(course.from.getTime() / 1000);
   const endTime = Math.floor(course.to.getTime() / 1000);
+  const flags: Array<{ label: string; color: string }> = [];
+  if (course.detention) flags.push({ label: t("Course_Flag_Detention", "Retenue"), color: "#B91C1C" });
+  if (course.outing) flags.push({ label: t("Course_Flag_Outing", "Sortie"), color: "#15803D" });
+  if (course.isTest) flags.push({ label: t("Course_Flag_Test", "Contrôle"), color: "#7C3AED" });
+  const virtualUrls = Array.isArray(course.virtualClassrooms)
+    ? course.virtualClassrooms.filter(u => typeof u === "string" && u.trim().length > 0)
+    : [];
+  const virtualUrl = virtualUrls[0] ?? (typeof course.url === "string" && course.url.startsWith("http") ? course.url : null);
 
   return (
     <View style={{ flex: 1 }}>
@@ -147,6 +169,17 @@ export default function CourseModal() {
         style={{ backgroundColor: "transparent", zIndex: 2 }}
         contentContainerStyle={{ padding: 16 }}
       >
+        {flags.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {flags.map(f => (
+              <View key={f.label} style={{ backgroundColor: f.color + "1A", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
+                <Typography variant="caption" weight="bold" style={{ color: f.color }}>
+                  {f.label}
+                </Typography>
+              </View>
+            ))}
+          </View>
+        )}
         {getStatusText(course.status) ? (
           <List.Section>
             <List.Item>
@@ -256,6 +289,39 @@ export default function CourseModal() {
               })}
             </Typography>
           </List.Item>
+
+          {item.exempted ? (
+            <List.Item>
+              <List.Leading>
+                <Icon>
+                  <Papicons name="Info" />
+                </Icon>
+              </List.Leading>
+              <Typography variant="body1" color="textSecondary">
+                {t("Course_Exempted_Note", "Dispensé de ce cours")}
+              </Typography>
+            </List.Item>
+          ) : null}
+
+          {virtualUrl ? (
+            <List.Item
+              onPress={() => {
+                void WebBrowser.openBrowserAsync(virtualUrl);
+              }}
+            >
+              <List.Leading>
+                <Icon>
+                  <Papicons name="link" />
+                </Icon>
+              </List.Leading>
+              <Typography variant="title">
+                {t("Course_Virtual_Classroom", "Classe virtuelle")}
+              </Typography>
+              <Typography variant="body1" color="textSecondary" numberOfLines={1}>
+                {t("Course_Virtual_Join", "Rejoindre")}
+              </Typography>
+            </List.Item>
+          ) : null}
         </List.Section>
 
         <List.Section>

@@ -3,7 +3,7 @@ import { View } from "react-native";
 
 import { getManager, subscribeManagerUpdate } from "@/services/shared";
 import { Period, Subject as SharedSubject } from "@/services/shared/grade";
-import { getCurrentPeriod } from "@/utils/grades/helper/period";
+import { resolveBackendCurrentPeriod } from "@/utils/grades/helper/period";
 import { error } from "@/utils/logger/logger";
 import Averages from "../../grades/atoms/Averages";
 import { useSettingsStore } from "@/stores/settings";
@@ -107,7 +107,7 @@ const GradesWidget = ({ period, onEmptyStateChange }: GradesWidgetProps) => {
 
         const inFlight = (async () => {
           const result = await managerToUse.getGradesPeriods();
-          return getCurrentPeriod(result);
+          return resolveBackendCurrentPeriod(managerToUse, result);
         })();
 
         periodsCache.set(scopedAccountId, {

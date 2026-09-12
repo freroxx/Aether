@@ -86,6 +86,15 @@ const MEAL_CATEGORIES: MealCategoryConfig[] = [
     badgeTextLight: "#C2185B",
   },
   {
+    key: "other",
+    label: "Autres",
+    iconName: "more-horiz",
+    badgeBgDark: "rgba(158, 163, 178, 0.2)",
+    badgeBgLight: "rgba(158, 163, 178, 0.15)",
+    badgeTextDark: "#B0BEC5",
+    badgeTextLight: "#546E7A",
+  },
+  {
     key: "drink",
     label: "Boisson",
     iconName: "local-cafe",

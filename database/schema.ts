@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 40,
+  version: 41,
   tables: [
     tableSchema({
       name: 'events',
@@ -55,7 +55,8 @@ export const mySchema = appSchema({
         { name: 'custom', type: 'boolean' },
         { name: 'createdByAccount', type: "string" },
         { name: 'kidName', type: "string", isOptional: true },
-        { name: 'pronoteId', type: "string", isOptional: true }
+        { name: 'pronoteId', type: "string", isOptional: true },
+        { name: 'backgroundColor', type: "string", isOptional: true }
       ],
     }),
     tableSchema({
@@ -70,7 +71,13 @@ export const mySchema = appSchema({
         { name: 'author', type: 'string' },
         { name: 'category', type: 'string' },
         { name: 'createdByAccount', type: "string" },
-        { name: 'question', type: 'boolean', isOptional: true }
+        { name: 'question', type: 'boolean', isOptional: true },
+        { name: 'survey', type: 'boolean', isOptional: true },
+        { name: 'anonymousResponse', type: 'boolean', isOptional: true },
+        { name: 'template', type: 'boolean', isOptional: true },
+        { name: 'sharedTemplate', type: 'boolean', isOptional: true },
+        { name: 'creationDate', type: 'number', isOptional: true },
+        { name: 'endDate', type: 'number', isOptional: true }
       ],
     }),
     tableSchema({
@@ -81,7 +88,8 @@ export const mySchema = appSchema({
         { name: 'start', type: 'number' },
         { name: 'end', type: 'number' },
         { name: 'createdByAccount', type: "string" },
-        { name: 'kidName', type: "string", isOptional: true }
+        { name: 'kidName', type: "string", isOptional: true },
+        { name: 'isCurrent', type: 'boolean', isOptional: true }
         
       ],
     }),
@@ -103,7 +111,9 @@ export const mySchema = appSchema({
         { name: 'studentScore', type: 'string' },
         { name: 'averageScore', type: 'string' },
         { name: 'minScore', type: 'string' },
-        { name: 'maxScore', type: 'string' }
+        { name: 'maxScore', type: 'string' },
+        { name: 'statusCode', type: 'string', isOptional: true },
+        { name: 'rawGrade', type: 'string', isOptional: true }
       ],
     }),
     tableSchema({
@@ -132,6 +142,7 @@ export const mySchema = appSchema({
         { name: 'reason', type: 'string', isOptional: true },
         { name: 'justified', type: 'boolean' },
         { name: 'duration', type: 'number' },
+        { name: 'justification', type: 'string', isOptional: true },
         { name: 'attendanceId', type: 'string', isIndexed: true },
         { name: 'kidName', type: 'string', isOptional: true }
       ]
@@ -155,6 +166,8 @@ export const mySchema = appSchema({
         { name: 'to', type: 'number' },
         { name: 'reason', type: 'string', isOptional: true },
         { name: 'justified', type: 'boolean' },
+        { name: 'days', type: 'number', isOptional: true },
+        { name: 'hours', type: 'string', isOptional: true },
         { name: 'attendanceId', type: 'string', isIndexed: true },
         { name: 'kidName', type: 'string', isOptional: true }
       ]
@@ -173,6 +186,9 @@ export const mySchema = appSchema({
         { name: 'homeworkText', type: 'string' },
         { name: 'reasonText', type: 'string' },
         { name: 'reasonCircumstances', type: 'string' },
+        { name: 'schedulable', type: 'boolean', isOptional: true },
+        { name: 'requiresParent', type: 'string', isOptional: true },
+        { name: 'scheduleRaw', type: 'string', isOptional: true },
         { name: 'attendanceId', type: 'string', isIndexed: true }
       ]
     }),
@@ -194,6 +210,9 @@ export const mySchema = appSchema({
         { name: 'recipient', type: 'string', isOptional: true },
         { name: 'creator', type: 'string', isOptional: true },
         { name: 'date', type: 'number' },
+        { name: 'unread', type: 'number', isOptional: true },
+        { name: 'closed', type: 'boolean', isOptional: true },
+        { name: 'labelsRaw', type: 'string', isOptional: true },
         { name: 'createdByAccount', type: 'string' }
       ]
     }),
@@ -203,6 +222,10 @@ export const mySchema = appSchema({
         { name: 'recipientId', type: 'string' },
         { name: 'name', type: 'string' },
         { name: 'class', type: 'string', isOptional: true },
+        { name: 'type', type: 'string', isOptional: true },
+        { name: 'email', type: 'string', isOptional: true },
+        { name: 'functionsRaw', type: 'string', isOptional: true },
+        { name: 'withDiscussion', type: 'boolean', isOptional: true },
         { name: 'chatId', type: 'string', isIndexed: true }
       ]
     }),
@@ -214,6 +237,8 @@ export const mySchema = appSchema({
         { name: 'author', type: 'string' },
         { name: 'subject', type: 'string' },
         { name: 'date', type: 'number' },
+        { name: 'seen', type: 'boolean', isOptional: true },
+        { name: 'replyingTo', type: 'string', isOptional: true },
         { name: 'attachments', type: 'string' },
         { name: 'chatId', type: 'string', isIndexed: true }
       ]
@@ -225,13 +250,23 @@ export const mySchema = appSchema({
         { name: 'kidName', type: 'string', isOptional: true },
         { name: 'courseId', type: 'string' },
         { name: 'subject', type: 'string' },
+        { name: 'subjectId', type: 'string', isOptional: true },
         { name: 'type', type: 'number' },
         { name: 'from', type: 'number' },
         { name: 'to', type: 'number' },
         { name: 'additionalInfo', type: 'string', isOptional: true },
         { name: 'room', type: 'string', isOptional: true },
         { name: 'teacher', type: 'string', isOptional: true },
+        { name: 'teacherNamesRaw', type: 'string', isOptional: true },
+        { name: 'classroomsRaw', type: 'string', isOptional: true },
         { name: 'group', type: 'string', isOptional: true },
+        { name: 'groupNamesRaw', type: 'string', isOptional: true },
+        { name: 'num', type: 'number', isOptional: true },
+        { name: 'detention', type: 'boolean', isOptional: true },
+        { name: 'outing', type: 'boolean', isOptional: true },
+        { name: 'isTest', type: 'boolean', isOptional: true },
+        { name: 'exempted', type: 'boolean', isOptional: true },
+        { name: 'virtualClassroomsRaw', type: 'string', isOptional: true },
         { name: 'backgroundColor', type: 'string', isOptional: true },
         { name: 'status', type: 'number', isOptional: true },
         { name: 'customStatus', type: 'string', isOptional: true },
@@ -245,6 +280,7 @@ export const mySchema = appSchema({
       columns:[
         { name: 'createdByAccount', type: 'string' },
         { name: 'kidId', type: 'string' },
+        { name: 'externalId', type: 'string', isOptional: true },
         { name: 'firstName', type: 'string' },
         { name: 'lastName', type: 'string' },
         { name: 'class', type: 'string' },

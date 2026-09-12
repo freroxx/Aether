@@ -39,8 +39,7 @@ export function getCourseRouteId(course: SharedCourse): string {
   }
 }
 
-export async function getCourseById(id: string): Promise<SharedCourse | undefined> {
-  try {
+export async function getCourseById(id: string): Promise<SharedCourse | undefined> {  try {
     const courses = await getDatabaseInstance()
       .get<Course>('courses')
       .query(Q.where('courseId', id))
@@ -48,6 +47,34 @@ export async function getCourseById(id: string): Promise<SharedCourse | undefine
     return courses[0] ? mapCourseToShared(courses[0]) : await getICalCourseById(id);
   } catch {
     return getICalCourseById(id);
+  }
+}
+
+/** Persiste le contenu/ressources d'un cours (batch cahier de textes ou
+ *  fiche cours) sans toucher au reste. Best-effort : jamais de throw. */
+export async function saveCourseContentRaw(
+  routeId: string,
+  resources: SharedCourse["content"]
+): Promise<boolean> {
+  try {
+    if (!routeId || !Array.isArray(resources) || resources.length === 0) return false;
+    const db = getDatabaseInstance();
+    const recs = await db.get<Course>("courses").query(Q.where("courseId", routeId)).fetch();
+    if (recs.length === 0) return false;
+    const raw = JSON.stringify(resources);
+    await safeWrite(
+      db,
+      async () => {
+        await (recs[0] as Course).update((model: Model) => {
+          (model as Course).contentRaw = raw;
+        });
+      },
+      10000,
+      "save_course_content"
+    );
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -150,13 +177,23 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
                 createdByAccount: item.createdByAccount,
                 courseId: id,
                 subject: item.subject,
+                subjectId: (item as any).subjectId,
                 type: item.type,
                 from: item.from.getTime(),
                 to: item.to.getTime(),
                 additionalInfo: item.additionalInfo,
                 room: item.room,
                 teacher: item.teacher,
+                teacherNamesRaw: (item as any).teacherNames ? JSON.stringify((item as any).teacherNames) : undefined,
+                classroomsRaw: (item as any).classrooms ? JSON.stringify((item as any).classrooms) : undefined,
                 group: item.group,
+                groupNamesRaw: (item as any).groupNames ? JSON.stringify((item as any).groupNames) : undefined,
+                num: (item as any).num,
+                detention: (item as any).detention,
+                outing: (item as any).outing,
+                isTest: (item as any).isTest,
+                exempted: (item as any).exempted,
+                virtualClassroomsRaw: (item as any).virtualClassrooms ? JSON.stringify((item as any).virtualClassrooms) : undefined,
                 backgroundColor: item.backgroundColor,
                 status: item.status,
                 customStatus: item.customStatus,
@@ -172,13 +209,23 @@ export async function addCourseDayToDatabase(courses: SharedCourseDay[]) {
               const course = model as Course;
               Object.assign(course, {
                 subject: item.subject ?? course.subject,
+                subjectId: (item as any).subjectId ?? (course as any).subjectId,
                 type: item.type ?? course.type,
                 from: item.from.getTime(),
                 to: item.to.getTime(),
                 additionalInfo: item.additionalInfo ?? course.additionalInfo,
                 room: item.room ?? course.room,
                 teacher: item.teacher ?? course.teacher,
+                teacherNamesRaw: (item as any).teacherNames ? JSON.stringify((item as any).teacherNames) : (course as any).teacherNamesRaw,
+                classroomsRaw: (item as any).classrooms ? JSON.stringify((item as any).classrooms) : (course as any).classroomsRaw,
                 group: item.group ?? course.group,
+                groupNamesRaw: (item as any).groupNames ? JSON.stringify((item as any).groupNames) : (course as any).groupNamesRaw,
+                num: (item as any).num ?? (course as any).num,
+                detention: (item as any).detention ?? (course as any).detention,
+                outing: (item as any).outing ?? (course as any).outing,
+                isTest: (item as any).isTest ?? (course as any).isTest,
+                exempted: (item as any).exempted ?? (course as any).exempted,
+                virtualClassroomsRaw: (item as any).virtualClassrooms ? JSON.stringify((item as any).virtualClassrooms) : (course as any).virtualClassroomsRaw,
                 backgroundColor: item.backgroundColor ?? course.backgroundColor,
                 status: item.status ?? course.status,
                 customStatus: item.customStatus ?? course.customStatus,

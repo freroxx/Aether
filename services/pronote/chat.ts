@@ -5,10 +5,11 @@ import { error } from "@/utils/logger/logger";
 export async function fetchPronoteChats(
   authToken: string,
   accountId: string,
-  childName?: string
+  childName?: string,
+  onlyUnread?: boolean
 ): Promise<Chat[]> {
   try {
-    const data = await PronoteApiClient.getChats(authToken, childName);
+    const data = await PronoteApiClient.getChats(authToken, childName, onlyUnread);
     return (data.chats || []).map((c: any) => ({
       id: c.id,
       subject: c.subject || "Discussion",
@@ -18,6 +19,8 @@ export async function fetchPronoteChats(
       createdByAccount: accountId,
       unread: typeof c.unread === "number" ? c.unread : 0,
       closed: Boolean(c.closed ?? false),
+      replyable: c.replyable ?? true,
+      labels: Array.isArray(c.labels) ? c.labels : [],
     }) as Chat);
   } catch (err) {
     error(`Failed to fetch chats: ${err}`, "fetchPronoteChats");
@@ -31,12 +34,26 @@ export async function fetchPronoteChatRecipients(
   childName?: string
 ): Promise<Recipient[]> {
   try {
+    // Parité Discussion.participants() si chat précis, sinon liste globale.
+    try {
+      const parts = await PronoteApiClient.getChatParticipants(authToken, chat.id, childName);
+      if (Array.isArray(parts.participants) && parts.participants.length > 0) {
+        return parts.participants.map((name: string, idx: number) => ({
+          id: `participant_${idx}_${name}`,
+          name,
+        }));
+      }
+    } catch {
+      // fallback global ci-dessous
+    }
     const data = await PronoteApiClient.getChatRecipients(authToken, childName);
     return (data.recipients || []).map((r: any) => ({
       id: r.id,
       name: r.name,
       email: r.email,
       type: r.type,
+      functions: Array.isArray(r.functions) ? r.functions : undefined,
+      withDiscussion: typeof r.with_discussion === "boolean" ? r.with_discussion : undefined,
     }));
   } catch (err) {
     error(`Failed to fetch chat recipients: ${err}`, "fetchPronoteChatRecipients");
@@ -58,6 +75,8 @@ export async function fetchPronoteChatMessages(
       content: m.content || "",
       author: m.author || "",
       date: new Date(m.date || Date.now()),
+      seen: typeof m.seen === "boolean" ? m.seen : undefined,
+      replyingTo: m.replying_to ?? null,
       attachments: [],
     }));
   } catch (err) {
@@ -70,9 +89,10 @@ export async function sendPronoteMessageInChat(
   authToken: string,
   chat: Chat,
   content: string,
-  childName?: string
+  childName?: string,
+  messageId?: string
 ): Promise<void> {
-  await PronoteApiClient.sendChatMessage(authToken, chat.id, content, childName);
+  await PronoteApiClient.sendChatMessage(authToken, chat.id, content, childName, messageId);
 }
 
 export async function fetchPronoteRecipients(
@@ -86,6 +106,8 @@ export async function fetchPronoteRecipients(
       name: r.name,
       email: r.email,
       type: r.type,
+      functions: Array.isArray(r.functions) ? r.functions : undefined,
+      withDiscussion: typeof r.with_discussion === "boolean" ? r.with_discussion : undefined,
     }));
   } catch (err) {
     error(`Failed to fetch recipients: ${err}`, "fetchPronoteRecipients");

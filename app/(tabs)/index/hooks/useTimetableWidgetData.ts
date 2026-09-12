@@ -70,7 +70,9 @@ export const useTimetableWidgetData = (options: { showCancelled?: boolean } = {}
     () => Array.from({ length: 53 }, (_, index) => index + 1),
     []
   );
-  const nextYearDate = useMemo(() => new Date(currentYear + 1, 0, 1), [currentYear]);
+  // 1er juillet : l'année ISO vaut toujours l'année civile (le 1er janvier
+  // appartient souvent à l'année ISO précédente -> année+1 jamais chargée).
+  const nextYearDate = useMemo(() => new Date(currentYear + 1, 6, 1), [currentYear]);
 
   const currentYearTimetable = useTimetable(undefined, currentYearWeeks, now);
   const nextYearTimetable = useTimetable(undefined, nextYearWeeks, nextYearDate);

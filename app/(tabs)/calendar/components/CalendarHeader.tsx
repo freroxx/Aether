@@ -1,12 +1,16 @@
-import React from 'react';
-import { Platform } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Platform, View } from 'react-native';
 import { useTheme } from "expo-router/react-navigation";
 import { useRouter } from 'expo-router';
 import { t } from 'i18next';
+import * as WebBrowser from 'expo-web-browser';
 import TabHeader from '@/ui/components/TabHeader';
 import TabHeaderTitle from '@/ui/components/TabHeaderTitle';
 import ChipButton from '@/ui/components/ChipButton';
 import Calendar from "@/ui/components/Calendar";
+import { useAlert } from '@/ui/components/AlertProvider';
+import { getManager } from '@/services/shared';
+import { error as logError } from '@/utils/logger/logger';
 import i18n from '@/utils/i18n';
 
 interface CalendarHeaderProps {
@@ -20,10 +24,39 @@ interface CalendarHeaderProps {
 export const CalendarHeader = React.memo(({ date, onDateChange, onHeaderHeightChange, calendarRef, isLoading }: CalendarHeaderProps) => {
   const { colors } = useTheme();
   const router = useRouter();
+  const alert = useAlert();
+  const [exporting, setExporting] = useState(false);
 
   const toggleDatePicker = () => {
     calendarRef.current?.toggle();
   };
+
+  const handleExportPdf = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const manager = getManager();
+      const url = await manager?.getTimetablePdf(date);
+      if (!url) {
+        throw new Error("PDF indisponible");
+      }
+      await WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+      });
+    } catch (e) {
+      logError(String(e));
+      alert.showAlert({
+        title: "Export PDF impossible",
+        message: "Impossible d'ouvrir l'emploi du temps en PDF. Réessaie.",
+        description: "Impossible d'ouvrir l'emploi du temps en PDF. Réessaie.",
+        icon: "Cross",
+        color: "#D60046",
+        delay: 3000,
+      });
+    } finally {
+      setExporting(false);
+    }
+  }, [date, exporting, alert]);
 
   // know if date is today, yesterday, or tomorrow
   const isToday = date.toDateString() === new Date().toDateString();
@@ -56,30 +89,37 @@ export const CalendarHeader = React.memo(({ date, onDateChange, onHeaderHeightCh
           />
         }
         trailing={
-          <ChipButton
-            icon="calendar"
-            chevron
-            actions={[
-              {
-                id: 'manage_calendars',
-                title: "Calendriers Android",
-                subtitle: "Afficher les événements de l'appareil",
-                imageColor: colors.text,
-                image: Platform.select({
-                  ios: 'calendar',
-                  android: 'ic_menu_add',
-                }),
-              }
-            ]}
-            onPressAction={({ nativeEvent }) => {
-              if (nativeEvent.event === 'manage_calendars' || nativeEvent.event === 'manage_icals') {
-                router.push({
-                  pathname: "/(tabs)/calendar/android-calendars" as any,
-                  params: {}
-                });
-              }
-            }}
-          />
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <ChipButton
+              single
+              icon="paper"
+              onPress={handleExportPdf}
+            />
+            <ChipButton
+              icon="calendar"
+              chevron
+              actions={[
+                {
+                  id: 'manage_calendars',
+                  title: "Calendriers Android",
+                  subtitle: "Afficher les événements de l'appareil",
+                  imageColor: colors.text,
+                  image: Platform.select({
+                    ios: 'calendar',
+                    android: 'ic_menu_add',
+                  }),
+                }
+              ]}
+              onPressAction={({ nativeEvent }) => {
+                if (nativeEvent.event === 'manage_calendars' || nativeEvent.event === 'manage_icals') {
+                  router.push({
+                    pathname: "/(tabs)/calendar/android-calendars" as any,
+                    params: {}
+                  });
+                }
+              }}
+            />
+          </View>
         }
       />
     </>

@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +15,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import OnboardingInput from "@/components/onboarding/OnboardingInput";
+import { getManager } from "@/services/shared";
+import type { StudentProfile } from "@/services/shared/profile";
 import { useAccountStore } from "@/stores/account";
 import { useAlert } from "@/ui/components/AlertProvider";
 import Avatar from "@/ui/components/Avatar";
@@ -37,6 +40,9 @@ export default function CustomProfileScreen() {
   const [firstName, setFirstName] = useState<string>(account?.firstName ?? "");
   const [lastName, setLastName] = useState<string>(account?.lastName ?? "");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(account?.customisation?.profilePicture ? `data:image/png;base64,${account.customisation.profilePicture}` : null);
+  const [pronoteProfile, setPronoteProfile] = useState<StudentProfile | null>(null);
+  const [pronoteLoading, setPronoteLoading] = useState(false);
+  const [fetchingPicture, setFetchingPicture] = useState(false);
 
   useEffect(() => {
     if (account) {
@@ -65,12 +71,66 @@ export default function CustomProfileScreen() {
 
   const alert = useAlert();
   const updateProfilePictureFromService = async () => {
-    alert.showAlert({
-      title: t("Feature_Soon"),
-      description: "Cette fonctionnalité n'est pas encore disponible, mais elle le sera dans une prochaine mise à jour.",
-      icon: "Info",
-    });
+    if (fetchingPicture) return;
+    setFetchingPicture(true);
+    try {
+      const manager = getManager();
+      if (!manager) {
+        alert.showAlert({
+          title: t("Profile_Picture_Service_Unavailable_Title", "Service indisponible"),
+          message: t("Profile_Picture_Service_Unavailable_Description", "Reconnecte-toi pour récupérer ta photo Pronote."),
+          description: t("Profile_Picture_Service_Unavailable_Description", "Reconnecte-toi pour récupérer ta photo Pronote."),
+          icon: "Info",
+        });
+        return;
+      }
+      await manager.getProfile().catch(() => null);
+      const res = await manager.getProfilePicture();
+      const picture = res?.picture ?? null;
+      if (picture) {
+        store.setAccountProfilePicture(lastUsedAccount, picture);
+      } else {
+        alert.showAlert({
+          title: t("Profile_Picture_Empty_Title", "Aucune photo"),
+          message: t("Profile_Picture_Empty_Description", "Pronote ne renvoie aucune photo pour ce compte."),
+          description: t("Profile_Picture_Empty_Description", "Pronote ne renvoie aucune photo pour ce compte."),
+          icon: "Info",
+        });
+      }
+    } catch (e) {
+      alert.showAlert({
+        title: t("Profile_Picture_Error_Title", "Récupération impossible"),
+        message: String((e as Error)?.message ?? e).slice(0, 160) || t("Profile_Picture_Error_Description", "La photo Pronote n'a pas pu être récupérée."),
+        description: String((e as Error)?.message ?? e).slice(0, 160) || t("Profile_Picture_Error_Description", "La photo Pronote n'a pas pu être récupérée."),
+        icon: "Info",
+      });
+    } finally {
+      setFetchingPicture(false);
+    }
   }
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setPronoteLoading(true);
+        const manager = getManager();
+        if (!manager) return;
+        const raw = await manager.getProfile().catch(() => null);
+        const profile = Array.isArray(raw)
+          ? ((raw as unknown[]).find(v => v != null) as StudentProfile | undefined) ?? null
+          : raw;
+        if (mounted && profile) setPronoteProfile(profile);
+      } catch {
+        // best-effort : on masque la section en cas d'échec
+      } finally {
+        if (mounted) setPronoteLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const { colors } = useTheme();
   const height = useHeaderHeight();
@@ -184,13 +244,13 @@ export default function CustomProfileScreen() {
                     gap={10}
                     style={{
                       padding: 20,
-                      backgroundColor: colors.text + "08",
+                      backgroundColor: String(colors.text) + "08",
                       borderRadius: 300,
                       borderWidth: 1,
                       borderColor: colors.border,
                     }}
                   >
-                    <Icon papicon size={24} fill={colors.text + "AF"}>
+                    <Icon papicon size={24} fill={String(colors.text) + "AF"}>
                       <Papicons name="User" />
                     </Icon>
                     <Typography variant="body1" style={{ flex: 1 }}>
@@ -209,13 +269,13 @@ export default function CustomProfileScreen() {
                     gap={10}
                     style={{
                       padding: 20,
-                      backgroundColor: colors.text + "08",
+                      backgroundColor: String(colors.text) + "08",
                       borderRadius: 300,
                       borderWidth: 1,
                       borderColor: colors.border,
                     }}
                   >
-                    <Icon papicon size={24} fill={colors.text + "AF"}>
+                    <Icon papicon size={24} fill={String(colors.text) + "AF"}>
                       <Papicons name="MapPin" />
                     </Icon>
                     <Typography variant="body1" style={{ flex: 1 }} numberOfLines={2}>
@@ -226,6 +286,145 @@ export default function CustomProfileScreen() {
               )}
             </View>
           )}
+          {pronoteLoading ? (
+            <View style={{ paddingVertical: 8, alignItems: "center" }}>
+              <ActivityIndicator size="small" color={String(colors.text) + "88"} />
+            </View>
+          ) : pronoteProfile &&
+            ((pronoteProfile.email?.trim()?.length ?? 0) > 0 ||
+              (pronoteProfile.phone?.trim()?.length ?? 0) > 0 ||
+              (pronoteProfile.ineNumber?.trim()?.length ?? 0) > 0 ||
+              (pronoteProfile.delegue?.length ?? 0) > 0 ||
+              (pronoteProfile.address?.length ?? 0) > 0) ? (
+            <View style={{ gap: 10 }}>
+              <Typography color="secondary">{t("Profile_PronoteInfos", "Infos Pronote")}</Typography>
+              {(pronoteProfile.email?.trim()?.length ?? 0) > 0 && (
+                <>
+                  <Typography color="secondary">{t("Profile_Pronote_Email", "E-mail")}</Typography>
+                  <Stack
+                    direction="horizontal"
+                    vAlign="center"
+                    hAlign="center"
+                    gap={10}
+                    style={{
+                      padding: 20,
+                      backgroundColor: String(colors.text) + "08",
+                      borderRadius: 300,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Icon papicon size={24} fill={String(colors.text) + "AF"}>
+                      <Papicons name="Mail" />
+                    </Icon>
+                    <Typography variant="body1" style={{ flex: 1 }} numberOfLines={2}>
+                      {pronoteProfile.email}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+              {(pronoteProfile.phone?.trim()?.length ?? 0) > 0 && (
+                <>
+                  <Typography color="secondary">{t("Profile_Pronote_Phone", "Téléphone")}</Typography>
+                  <Stack
+                    direction="horizontal"
+                    vAlign="center"
+                    hAlign="center"
+                    gap={10}
+                    style={{
+                      padding: 20,
+                      backgroundColor: String(colors.text) + "08",
+                      borderRadius: 300,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Icon papicon size={24} fill={String(colors.text) + "AF"}>
+                      <Papicons name="Phone" />
+                    </Icon>
+                    <Typography variant="body1" style={{ flex: 1 }}>
+                      {pronoteProfile.phone}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+              {(pronoteProfile.ineNumber?.trim()?.length ?? 0) > 0 && (
+                <>
+                  <Typography color="secondary">{t("Profile_Pronote_INE", "N° INE")}</Typography>
+                  <Stack
+                    direction="horizontal"
+                    vAlign="center"
+                    hAlign="center"
+                    gap={10}
+                    style={{
+                      padding: 20,
+                      backgroundColor: String(colors.text) + "08",
+                      borderRadius: 300,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Icon papicon size={24} fill={String(colors.text) + "AF"}>
+                      <Papicons name="Info" />
+                    </Icon>
+                    <Typography variant="body1" style={{ flex: 1 }}>
+                      {pronoteProfile.ineNumber}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+              {(pronoteProfile.delegue?.length ?? 0) > 0 && (
+                <>
+                  <Typography color="secondary">{t("Profile_Pronote_Delegue", "Délégué")}</Typography>
+                  <Stack
+                    direction="horizontal"
+                    vAlign="center"
+                    hAlign="center"
+                    gap={10}
+                    style={{
+                      padding: 20,
+                      backgroundColor: String(colors.text) + "08",
+                      borderRadius: 300,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Icon papicon size={24} fill={String(colors.text) + "AF"}>
+                      <Papicons name="User" />
+                    </Icon>
+                    <Typography variant="body1" style={{ flex: 1 }} numberOfLines={2}>
+                      {pronoteProfile.delegue.join(", ")}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+              {(pronoteProfile.address?.length ?? 0) > 0 && (
+                <>
+                  <Typography color="secondary">{t("Profile_Pronote_Address", "Adresse")}</Typography>
+                  <Stack
+                    direction="horizontal"
+                    vAlign="center"
+                    hAlign="center"
+                    gap={10}
+                    style={{
+                      padding: 20,
+                      backgroundColor: String(colors.text) + "08",
+                      borderRadius: 300,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Icon papicon size={24} fill={String(colors.text) + "AF"}>
+                      <Papicons name="MapPin" />
+                    </Icon>
+                    <Typography variant="body1" style={{ flex: 1 }} numberOfLines={3}>
+                      {pronoteProfile.address.join("\n")}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+            </View>
+          ) : null}
         </View>
         <NativeHeaderSide side="Left" key={`${firstName}-${lastName}`}>
           <NativeHeaderPressable

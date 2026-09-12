@@ -25,6 +25,9 @@ export async function addChatsToDatabase(chats: SharedChat[]) {
             recipient: item.recipient,
             creator: item.creator,
             date: item.date.getTime(),
+            unread: item.unread,
+            closed: item.closed,
+            labelsRaw: item.labels ? JSON.stringify(item.labels) : undefined,
             createdByAccount: item.createdByAccount
           })
         })
@@ -56,6 +59,10 @@ export async function addRecipientsToDatabase(chat: SharedChat, recipients: Shar
           recipientId: id,
           name: item.name,
           class: item.class,
+          type: item.type,
+          email: item.email,
+          functionsRaw: item.functions ? JSON.stringify(item.functions) : undefined,
+          withDiscussion: item.withDiscussion,
           chatId: chatId
         })
       })
@@ -88,6 +95,8 @@ export async function addMessagesToDatabase(chat: SharedChat, messages: SharedMe
           content: item.content,
           author: item.author,
           date: item.date.getTime(),
+          seen: item.seen,
+          replyingTo: item.replyingTo ?? undefined,
           attachments: JSON.stringify(item.attachments),
           chatId: chatId
         })

@@ -20,7 +20,7 @@ import { useTheme } from "expo-router/react-navigation"
 import { router } from 'expo-router'
 import { t } from 'i18next'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Platform, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { RefreshControl } from 'react-native-gesture-handler'
 import Reanimated, { LayoutAnimationConfig, useAnimatedStyle } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -45,11 +45,13 @@ const NewsView = () => {
 
   const news = useNews()
 
+  const [unreadOnly, setUnreadOnly] = useState(false)
+
   const sortedNews = useMemo(() => {
     return [...news].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }, [news])
 
-  const fetchNews = useCallback(async () => {
+  const fetchNews = useCallback(async (onlyUnread?: boolean) => {
     try {
       setIsLoading(true)
       const manager = getManager()
@@ -57,7 +59,7 @@ const NewsView = () => {
         warn('Manager is null, skipping news fetch')
         return
       }
-      await manager.getNews()
+      await manager.getNews(onlyUnread ? { onlyUnread: true } : undefined)
       // Nettoie les actus orphelines (anciennes démos) en tâche de fond
       purgeOrphanNews().catch(() => {})
     } catch (error) {
@@ -70,17 +72,21 @@ const NewsView = () => {
 
   useEffect(() => {
     const unsubscribe = subscribeManagerUpdate(() => {
-      void fetchNews()
+      void fetchNews(unreadOnly)
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [fetchNews, unreadOnly])
 
   const [searchText, setSearchText] = useState('')
 
   const filteredNews = useMemo(() => {
-    return sortedNews.filter((item) => (item.title ?? '').toLowerCase().includes(searchText.toLowerCase()))
-  }, [sortedNews, searchText])
+    const q = searchText.toLowerCase()
+    return sortedNews.filter((item) => {
+      if (unreadOnly && item.acknowledged) return false
+      return (item.title ?? '').toLowerCase().includes(q)
+    })
+  }, [sortedNews, searchText, unreadOnly])
 
   return (
     <>
@@ -119,10 +125,54 @@ const NewsView = () => {
               refreshing={isManuallyLoading}
               onRefresh={() => {
                 setIsManuallyLoading(true)
-                void fetchNews()
+                void fetchNews(unreadOnly)
               }}
               progressViewOffset={headerHeight}
             />
+          }
+          ListHeaderComponent={
+            <View style={styles.filterRow}>
+              <Pressable
+                onPress={() => setUnreadOnly(false)}
+                hitSlop={8}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: !unreadOnly
+                      ? theme.colors.primary
+                      : theme.colors.card,
+                  },
+                ]}
+              >
+                <Typography
+                  variant="caption"
+                  weight="bold"
+                  style={{ color: !unreadOnly ? "#FFFFFF" : theme.colors.text }}
+                >
+                  {t("Messages_Filter_All")}
+                </Typography>
+              </Pressable>
+              <Pressable
+                onPress={() => setUnreadOnly(true)}
+                hitSlop={8}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: unreadOnly
+                      ? theme.colors.primary
+                      : theme.colors.card,
+                  },
+                ]}
+              >
+                <Typography
+                  variant="caption"
+                  weight="bold"
+                  style={{ color: unreadOnly ? "#FFFFFF" : theme.colors.text }}
+                >
+                  {t("Messages_Filter_Unread")}
+                </Typography>
+              </Pressable>
+            </View>
           }
           ListFooterComponent={<Reanimated.View style={footerStyle} />}
           scrollIndicatorInsets={{ top: headerHeight - insets.top }}
@@ -168,12 +218,28 @@ const NewsView = () => {
                 <Typography variant='title' numberOfLines={2}>
                   {item.title}
                 </Typography>
-                {item.question && (
-                  <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                {(item.survey || item.question) && (
+                  <View style={{ flexDirection: 'row', marginTop: 4, gap: 6 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${String(colors.primary)}1A`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
                       <Papicons name='pie' size={12} color={String(colors.primary)} />
                       <Typography variant='caption' weight='bold' style={{ color: colors.primary }}>
                         {t('News_Type_Survey')}
+                      </Typography>
+                    </View>
+                    {item.anonymousResponse && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: `${String(colors.text)}0F` }}>
+                        <Typography variant='caption' color='textSecondary'>
+                          {t('News_Type_Anonymous', 'Anonyme')}
+                        </Typography>
+                      </View>
+                    )}
+                  </View>
+                )}
+                {!(item.survey || item.question) && item.anonymousResponse && (
+                  <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: `${String(colors.text)}0F` }}>
+                      <Typography variant='caption' color='textSecondary'>
+                        {t('News_Type_Anonymous', 'Anonyme')}
                       </Typography>
                     </View>
                   </View>
@@ -235,5 +301,22 @@ const NewsViewWithBoundary = () => (
     <NewsView />
   </MainTabErrorBoundary>
 )
+
+const styles = StyleSheet.create({
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+})
 
 export default NewsViewWithBoundary

@@ -14,7 +14,7 @@ import { Chat, Message, Recipient } from "@/services/shared/chat";
 import { Period, PeriodGrades, Report, Evaluation } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
-import { Course, CourseDay, CourseResource } from "@/services/shared/timetable";
+import { Course, CourseDay, CourseResource, WeekLessonContent } from "@/services/shared/timetable";
 import { Auth, Services } from "@/stores/account/types";
 
 import { Balance } from "./balance";
@@ -40,7 +40,7 @@ export interface SchoolServicePlugin {
   getKids?: () => Kid[];
   getCanteenKind?: () => CanteenKind;
   getHomeworks?: (weekNumber: number) => Promise<Homework[]>;
-  getNews?: () => Promise<News[]>;
+  getNews?: (opts?: { onlyUnread?: boolean }) => Promise<News[]>;
   getGradesForPeriod?: (period: Period, kid?: Kid) => Promise<PeriodGrades>;
   getGradesPeriods?: () => Promise<Period[]>;
   getEvaluationsForPeriod?: (period: Period, kid?: Kid) => Promise<Evaluation[]>;
@@ -49,13 +49,23 @@ export interface SchoolServicePlugin {
   getAttendanceForPeriod?: (period: string) => Promise<Attendance>;
   getAttendancePeriods?: () => Promise<Period[]>;
   getWeeklyCanteenMenu?: (startDate: Date) => Promise<CanteenMenu[]>;
-  getChats?: () => Promise<Chat[]>;
+  getChats?: (onlyUnread?: boolean) => Promise<Chat[]>;
   getChatRecipients?: (chat: Chat) => Promise<Recipient[]>;
   getChatMessages?: (chat: Chat) => Promise<Message[]>;
   getRecipientsAvailableForNewChat?: () => Promise<Recipient[]>;
   getCourseResources?: (course: Course) => Promise<CourseResource[]>;
+  getWeekContents?: (from: Date, to: Date) => Promise<WeekLessonContent[]>;
   getWeeklyTimetable?: (weekNumber: number, date: Date, kidName?: string) => Promise<CourseDay[]>;
-  sendMessageInChat?: (chat: Chat, content: string) => Promise<void>;
+  getTimetablePdf?: (day?: Date, portrait?: boolean, overflow?: number) => Promise<string | null>;
+  getProfile?: (kid?: Kid) => Promise<import("./profile").StudentProfile | null>;
+  getProfilePicture?: (kid?: Kid) => Promise<{ picture: string | null; mime?: string } | null>;
+  requestQrCode?: (pin: string, kid?: Kid) => Promise<{ qr: any }>;
+  getSessionInfo?: (kid?: Kid) => Promise<{ start_day: string; week: number; logged_in: boolean; last_connection: string | null }>;
+  getCurrentPeriod?: (kid?: Kid) => Promise<Period | null>;
+  getChatParticipants?: (chat: Chat) => Promise<string[]>;
+  markChatAsRead?: (chat: Chat, read?: boolean) => Promise<void>;
+  deleteChat?: (chat: Chat) => Promise<void>;
+  sendMessageInChat?: (chat: Chat, content: string, messageId?: string) => Promise<void>;
   setNewsAsAcknowledged?: (news: News) => Promise<News>;
   setHomeworkCompletion?: (
     homework: Homework,
@@ -100,6 +110,8 @@ export enum Capabilities {
   EVALUATIONS,
   REPORT,
   TEACHING_STAFF,
+  PROFILE,
+  TIMETABLE_PDF,
 }
 
 /**

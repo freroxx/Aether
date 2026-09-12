@@ -1,6 +1,7 @@
 import { useTheme } from "expo-router/react-navigation";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import type { NativeActionEvent } from "@react-native-menu/menu";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -20,8 +21,11 @@ import { getManager } from "@/services/shared";
 import { generateMockChats } from "@/services/mock/data";
 import { useAccountStore } from "@/stores/account";
 import { error } from "@/utils/logger/logger";
+import ActionMenu from "@/ui/components/ActionMenu";
 import ActivityIndicator from "@/ui/components/ActivityIndicator";
+import { useAlert } from "@/ui/components/AlertProvider";
 import Avatar from "@/ui/components/Avatar";
+import ConfirmModal from "@/ui/components/ConfirmModal";
 import Icon from "@/ui/components/Icon";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
@@ -29,10 +33,31 @@ import Typography from "@/ui/new/Typography";
 import List from "@/ui/new/List";
 import { getInitials } from "@/utils/chats/initials";
 
+const HIDDEN_CHAT_LABELS = new Set(["trash", "draft", "drafts", "corbeille", "brouillon", "brouillons"]);
+
+function getUnreadCount(chat: Chat): number {
+  return Number((chat as { unread?: unknown }).unread ?? 0);
+}
+
+function isHiddenByLabel(chat: Chat): boolean {
+  const labels = (chat as { labels?: unknown }).labels;
+  if (!Array.isArray(labels)) return false;
+  return labels.some(l => HIDDEN_CHAT_LABELS.has(String(l).toLowerCase().trim()));
+}
+
+function getVisibleLabels(chat: Chat): string[] {
+  const labels = (chat as { labels?: unknown }).labels;
+  if (!Array.isArray(labels)) return [];
+  return (labels as unknown[])
+    .map(l => String(l).trim())
+    .filter(l => l.length > 0 && !HIDDEN_CHAT_LABELS.has(l.toLowerCase()));
+}
+
 export default function MessagesView() {
   const theme = useTheme();
   const isDark = theme.dark;
   const insets = useSafeAreaInsets();
+  const { showAlert } = useAlert();
 
   const [headerHeight, setHeaderHeight] = useState(0);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -40,6 +65,8 @@ export default function MessagesView() {
   const [refreshing, setRefreshing] = useState(false);
   const [isUsingMock, setIsUsingMock] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Chat | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const account = useAccountStore(state =>
     state.accounts.find(a => a.id === state.lastUsedAccount)
@@ -51,7 +78,9 @@ export default function MessagesView() {
       // Mocks TUÉS sur vrai compte : uniquement compte démo/invité (aucun service lié)
       const isDemoAccount = !account || (account.services?.length ?? 0) === 0;
       if (isDemoAccount) {
-        setChats(generateMockChats(account?.id || "guest"));
+        const mocks = generateMockChats(account?.id || "guest");
+        const sorted = [...mocks].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setChats(unreadOnly ? sorted.filter(c => getUnreadCount(c) > 0) : sorted);
         setIsUsingMock(true);
         return;
       }
@@ -62,7 +91,7 @@ export default function MessagesView() {
         return;
       }
 
-      const data = await manager.getChats();
+      const data = await manager.getChats(unreadOnly);
       if (!data) {
         setChats([]);
         setIsUsingMock(false);
@@ -76,7 +105,7 @@ export default function MessagesView() {
       setChats([]);
       setIsUsingMock(false);
     }
-  }, [account]);
+  }, [account, unreadOnly]);
 
   useEffect(() => {
     setLoading(true);
@@ -88,6 +117,79 @@ export default function MessagesView() {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  const visibleChats = useMemo(() => {
+    // Filtre serveur déjà appliqué via getChats(unreadOnly) ; garde-fou client
+    // + exclusion des labels système (Trash/Drafts).
+    return chats
+      .filter(c => !isHiddenByLabel(c))
+      .filter(c => (unreadOnly ? getUnreadCount(c) > 0 : true));
+  }, [chats, unreadOnly]);
+
+  const handleToggleRead = useCallback(async (chat: Chat) => {
+    const isUnread = getUnreadCount(chat) > 0;
+    try {
+      if (isUsingMock) {
+        setChats(prev =>
+          prev.map(c => (c.id === chat.id ? { ...c, unread: isUnread ? 0 : 1 } : c))
+        );
+        return;
+      }
+      const manager = getManager();
+      if (!manager) return;
+      await manager.markChatAsRead(chat, isUnread);
+      await load();
+    } catch (e) {
+      error(String(e));
+      showAlert({
+        title: t("Messages_ToggleRead_Failed_Title", "Action impossible"),
+        message: t("Messages_ToggleRead_Failed_Description", "Impossible de mettre à jour cette discussion."),
+        icon: "Cross",
+        color: "#D60046",
+      });
+    }
+  }, [isUsingMock, load, showAlert]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      if (isUsingMock) {
+        setChats(prev => prev.filter(c => c.id !== pendingDelete.id));
+      } else {
+        const manager = getManager();
+        if (manager) {
+          await manager.deleteChat(pendingDelete);
+        }
+        await load();
+      }
+      setPendingDelete(null);
+      showAlert({
+        title: t("Messages_Deleted_Title", "Discussion supprimée"),
+        icon: "Check",
+        color: "#00C851",
+      });
+    } catch (e) {
+      error(String(e));
+      showAlert({
+        title: t("Messages_Delete_Failed_Title", "Suppression impossible"),
+        message: t("Messages_Delete_Failed_Description", "Impossible de supprimer cette discussion."),
+        icon: "Cross",
+        color: "#D60046",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }, [pendingDelete, isUsingMock, load, showAlert]);
+
+  const handleMenuAction = useCallback((chat: Chat) => (e: NativeActionEvent) => {
+    const id = e.nativeEvent.event;
+    if (id === "mark-read" || id === "mark-unread") {
+      void handleToggleRead(chat);
+    } else if (id === "delete") {
+      setPendingDelete(chat);
+    }
+  }, [handleToggleRead]);
 
   const mockNotice = isUsingMock ? (
     <View
@@ -120,7 +222,7 @@ export default function MessagesView() {
         title={
           <TabHeaderTitle
             leading="Messagerie"
-            subtitle={`${chats.length} conversation${chats.length > 1 ? "s" : ""}`}
+            subtitle={`${visibleChats.length} conversation${visibleChats.length > 1 ? "s" : ""}`}
             loading={loading}
           />
         }
@@ -148,7 +250,7 @@ export default function MessagesView() {
         <View style={styles.centerContainer}>
           <ActivityIndicator />
         </View>
-      ) : chats.length === 0 ? (
+      ) : visibleChats.length === 0 ? (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={{
@@ -235,7 +337,7 @@ export default function MessagesView() {
                   weight="bold"
                   style={{ color: !unreadOnly ? "#FFFFFF" : theme.colors.text }}
                 >
-                  {t("Messages_Filter_All")}
+                  {t("Messages_Filter_All", "Toutes")}
                 </Typography>
               </Pressable>
               <Pressable
@@ -255,17 +357,16 @@ export default function MessagesView() {
                   weight="bold"
                   style={{ color: unreadOnly ? "#FFFFFF" : theme.colors.text }}
                 >
-                  {t("Messages_Filter_Unread")}
+                  {t("Messages_Filter_Unread", "Non lues")}
                 </Typography>
               </Pressable>
             </View>
-            {(unreadOnly
-              ? chats.filter(c => Number((c as { unread?: unknown }).unread ?? 0) > 0)
-              : chats
-            ).map(chat => {
+            {visibleChats.map(chat => {
               const correspondent = (chat.recipient || chat.creator || "Enseignant").trim();
               const initials = getInitials(correspondent);
-              const unreadCount = Number((chat as { unread?: unknown }).unread ?? 0);
+              const unreadCount = getUnreadCount(chat);
+              const isClosed = Boolean((chat as { closed?: unknown }).closed);
+              const labels = getVisibleLabels(chat);
               const relativeTime = formatDistanceToNow(new Date(chat.date), {
                 addSuffix: true,
                 locale: fr,
@@ -303,6 +404,52 @@ export default function MessagesView() {
                   >
                     {correspondent} · {relativeTime}
                   </Typography>
+                  {(isClosed || labels.length > 0) && (
+                    <View style={styles.metaRow}>
+                      {isClosed && (
+                        <View
+                          style={[
+                            styles.statusPill,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(255,255,255,0.08)"
+                                : "rgba(0,0,0,0.06)",
+                            },
+                          ]}
+                        >
+                          <Typography
+                            variant="caption"
+                            color="textSecondary"
+                            style={{ fontSize: 11 }}
+                          >
+                            {t("Messages_Closed_Label", "Fermée")}
+                          </Typography>
+                        </View>
+                      )}
+                      {labels.slice(0, 2).map(label => (
+                        <View
+                          key={label}
+                          style={[
+                            styles.statusPill,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(255,255,255,0.08)"
+                                : "rgba(0,0,0,0.06)",
+                            },
+                          ]}
+                        >
+                          <Typography
+                            variant="caption"
+                            color="textSecondary"
+                            numberOfLines={1}
+                            style={{ fontSize: 11, maxWidth: 120 }}
+                          >
+                            {label}
+                          </Typography>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
                   <List.Trailing>
                     <View style={styles.trailingRow}>
@@ -322,6 +469,36 @@ export default function MessagesView() {
                           </Typography>
                         </View>
                       )}
+                      <ActionMenu
+                        actions={[
+                          {
+                            id: unreadCount > 0 ? "mark-read" : "mark-unread",
+                            title: unreadCount > 0
+                              ? String(t("Messages_Mark_Read", "Marquer comme lu"))
+                              : String(t("Messages_Mark_Unread", "Marquer comme non lu")),
+                            image: Platform.select({
+                              ios: unreadCount > 0 ? "envelope.open" : "envelope",
+                            }) as never,
+                          },
+                          {
+                            id: "delete",
+                            title: String(t("Messages_Delete", "Supprimer")),
+                            attributes: { destructive: true },
+                            image: Platform.select({
+                              ios: "trash",
+                            }) as never,
+                          },
+                        ]}
+                        onPressAction={handleMenuAction(chat)}
+                      >
+                        <View style={styles.dotsHitbox} collapsable={false}>
+                          <Papicons
+                            name="Dots"
+                            size={20}
+                            opacity={0.5}
+                          />
+                        </View>
+                      </ActionMenu>
                       <Papicons
                         name="ChevronRight"
                         size={20}
@@ -335,6 +512,25 @@ export default function MessagesView() {
           </List.Section>
         </List>
       )}
+
+      <ConfirmModal
+        visible={!!pendingDelete}
+        title={String(t("Messages_Delete_Title", "Supprimer la discussion ?"))}
+        description={
+          pendingDelete?.subject
+            ? String(pendingDelete.subject)
+            : String(t("Messages_Delete_Description", "Cette discussion sera supprimée de la messagerie."))
+        }
+        icon="Trash"
+        destructive
+        confirmLabel={String(t("Messages_Delete_Confirm", "Supprimer"))}
+        cancelLabel={String(t("Common_Cancel", "Annuler"))}
+        loading={deleting}
+        onConfirm={() => void handleConfirmDelete()}
+        onClose={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+      />
     </View>
   );
 }
@@ -389,10 +585,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+    flexWrap: "wrap",
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   trailingRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  dotsHitbox: {
+    padding: 6,
+    margin: -6,
+    alignItems: "center",
+    justifyContent: "center",
   },
   unreadBadge: {
     minWidth: 22,

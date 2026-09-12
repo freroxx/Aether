@@ -159,6 +159,15 @@ export default function Layout() {
             headerLargeTitle: false,
           }}
         />
+        <Stack.Screen
+          name="qr-share"
+          options={{
+            headerTitle: t("Settings_QrShare_Title", "Partager via QR"),
+            headerBackButtonDisplayMode: "minimal",
+            headerTransparent: false,
+            headerLargeTitle: false,
+          }}
+        />
       </Stack>
     </>
   );

@@ -65,6 +65,8 @@ export function CompactGradeList({
                 outOf={Number(grade.outOf?.value) > 0 ? Number(grade.outOf?.value) : 20}
                 disabled={grade.studentScore?.disabled}
                 status={grade.studentScore?.status}
+                statusCode={(grade as { statusCode?: string | null }).statusCode}
+                rawGrade={(grade as { rawGrade?: string | null }).rawGrade}
                 color={getSubjectColor(getSubjectById(grade.subjectId)?.name || "")}
                 date={grade.givenAt}
                 hasMaxScore={

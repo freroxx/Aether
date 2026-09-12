@@ -22,7 +22,8 @@ import Typography from '@/ui/new/Typography';
 import { useSettingsStore } from '@/stores/settings';
 import { formatAssumed20ForDisplay, formatDenominator, getGradeDisplayScale, getDisplayScaleMax } from '@/utils/grades/scale';
 import { SkillChip } from "@/ui/components/SkillChip";
-import { getCurrentPeriod } from "@/utils/grades/helper/period";
+import { getGradeStatusMeta, isZeroCountedStatus, resolveGradeStatusCode } from "@/utils/grades/status";
+import { resolveBackendCurrentPeriod } from "@/utils/grades/helper/period";
 import { useGradeInfluence } from "./hooks/useGradeInfluence";
 import { getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
@@ -112,7 +113,7 @@ export default function GradesModal() {
         if (!manager || !id) return;
 
         const periods = await manager.getGradesPeriods();
-        const currentPeriod = getCurrentPeriod(periods);
+        const currentPeriod = await resolveBackendCurrentPeriod(manager, periods);
         const orderedPeriods = currentPeriod
           ? [currentPeriod, ...periods.filter(period => period.id !== currentPeriod.id)]
           : periods;
@@ -195,6 +196,20 @@ export default function GradesModal() {
     emoji: getSubjectEmoji(subject.name),
     color: getSubjectColor(subject.name),
   };
+  const gradeStatusMeta = getGradeStatusMeta(
+    grade.statusCode,
+    grade.rawGrade,
+    grade.studentScore?.status
+  );
+  const gradeStatusCode = resolveGradeStatusCode(
+    grade.statusCode,
+    grade.rawGrade,
+    grade.studentScore?.status
+  );
+  const gradeStatusLabel = gradeStatusMeta?.label ?? grade.studentScore?.status;
+  const showZeroCaption = Boolean(
+    gradeStatusMeta && isZeroCountedStatus(gradeStatusCode) && !grade.studentScore?.disabled
+  );
   return (
     <>
       {Platform.OS !== "android" && (
@@ -245,7 +260,7 @@ export default function GradesModal() {
                     grade.studentScore?.disabled
                       ? (grade.skills?.length ?? 0 > 0)
                         ? subjectInfo.name
-                        : String(grade.studentScore?.status)
+                        : String(gradeStatusLabel ?? "—")
                       : grade.studentScore
                         ? String(grade.studentScore?.value.toFixed(2))
                         : undefined
@@ -255,6 +270,25 @@ export default function GradesModal() {
               }
               subjectVariant={grade.studentScore ? undefined : "h2"}
             />
+
+            {grade.studentScore?.disabled && gradeStatusMeta ? (
+              <GradeBadge
+                icon="info"
+                label={gradeStatusMeta.label}
+                color={gradeStatusMeta.color}
+                theme={theme}
+                is_outlined={true}
+              />
+            ) : null}
+            {showZeroCaption && gradeStatusMeta ? (
+              <GradeBadge
+                icon="info"
+                label={gradeStatusMeta.label}
+                color={gradeStatusMeta.color}
+                theme={theme}
+                is_outlined={true}
+              />
+            ) : null}
 
             {(grade.studentScore?.value ?? 0) ===
               (grade.maxScore?.value ?? 1) &&

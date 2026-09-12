@@ -17,16 +17,23 @@ export async function fetchPronoteCanteenMenu(
     const data = await PronoteApiClient.getCanteen(authToken, fromStr, toStr, childName);
 
     return (data.menus || []).map((m: any) => {
+      const mapFood = (f: any) => ({
+        id: typeof f?.id === "string" ? f.id : null,
+        name: typeof f === "string" ? f : (f?.name ?? ""),
+        allergens: Array.isArray(f?.labels) ? f.labels.map((l: any) => (typeof l === "string" ? l : l?.name ?? "")) : (f?.labels || []),
+        labels: Array.isArray(f?.labels) ? f.labels.map((l: any) => (typeof l === "string" ? { name: l } : { id: l?.id ?? null, name: l?.name ?? "", color: l?.color ?? null })) : undefined,
+      });
       let lunchMeal = undefined;
       let dinnerMeal = undefined;
 
       if (m.meal) {
         const mealObj = {
-          entry: (m.meal.entry || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
-          main: (m.meal.main || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
-          side: (m.meal.side || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
-          cheese: (m.meal.cheese || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
-          dessert: (m.meal.dessert || []).map((f: any) => ({ name: typeof f === "string" ? f : f.name, allergens: f.labels || [] })),
+          entry: (m.meal.entry || []).map(mapFood),
+          main: (m.meal.main || []).map(mapFood),
+          side: (m.meal.side || []).map(mapFood),
+          cheese: (m.meal.cheese || []).map(mapFood),
+          dessert: (m.meal.dessert || []).map(mapFood),
+          other: (m.meal.other || []).map(mapFood),
           drink: [],
         };
         if (m.is_lunch ?? true) lunchMeal = mealObj;

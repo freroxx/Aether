@@ -22,4 +22,5 @@ export default class Homework extends Model {
   @field('attachments') attachments: string;
   @field('evaluation') evaluation: boolean;
   @field('custom') custom: boolean;
+  @field('backgroundColor') backgroundColor?: string;
 }

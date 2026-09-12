@@ -21,7 +21,7 @@ import TabHeaderTitle from '@/ui/components/TabHeaderTitle';
 import LegacyTypography from '@/ui/components/Typography';
 import { useKeyboardHeight } from '@/ui/hooks/useKeyboardHeight';
 import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
-import { getCurrentPeriod } from '@/utils/grades/helper/period';
+import { resolveBackendCurrentPeriod } from '@/utils/grades/helper/period';
 import i18n from '@/utils/i18n';
 import { getPeriodName, getPeriodNumber, isPeriodWithNumber } from "@/utils/services/periods";
 import { getSubjectName } from "@/utils/subjects/name";
@@ -116,7 +116,8 @@ const GradesView: React.FC = () => {
     setPeriodsLoading(true);
 
     const result = await managerToUse.getGradesPeriods();
-    let currentPeriodFound = getCurrentPeriod(result);
+    // Backend d'abord (/periods/current), fallback heuristique locale — best-effort sans jank.
+    let currentPeriodFound = await resolveBackendCurrentPeriod(managerToUse, result);
 
     if (settings.gradesPeriodName) {
       const savedPeriod = result.find(p => p.name === settings.gradesPeriodName);

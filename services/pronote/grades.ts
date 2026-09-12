@@ -1,5 +1,6 @@
 import { PronoteApiClient } from "@/services/pronote/api-client";
 import { Grade, GradeScore, Period, PeriodGrades, Subject } from "@/services/shared/grade";
+import { isZeroCountedStatus, normalizeGradeStatus } from "@/utils/grades/status";
 import { error } from "@/utils/logger/logger";
 
 export async function fetchPronoteGrades(
@@ -14,7 +15,7 @@ export async function fetchPronoteGrades(
 
     for (const g of data.grades || []) {
       const subjectName = g.subject || "Matière";
-      const subjectId = subjectName.toLowerCase().replace(/\s+/g, "_");
+      const subjectId = g.subject_id || subjectName.toLowerCase().replace(/\s+/g, "_");
       const subjAvg = data.averages?.subjects?.[subjectName];
 
       if (!subjectsMap[subjectId]) {
@@ -27,6 +28,13 @@ export async function fetchPronoteGrades(
         };
       }
 
+      const hasValue = g.value !== null && g.value !== undefined;
+      const statusCode: string | null = (g.status_code as string | undefined) ?? null;
+      const rawGrade: string | null = (g.raw_grade as string | undefined) ?? null;
+      const rawStatus = statusCode || rawGrade || "NonNote";
+      const normalized = normalizeGradeStatus(statusCode) ?? normalizeGradeStatus(rawGrade);
+      // AbsentZero / NonRenduZero comptent comme 0 dans la moyenne Pronote.
+      const countsAsZero = !hasValue && isZeroCountedStatus(normalized);
       const mappedGrade: Grade = {
         id: g.id,
         subjectId,
@@ -41,7 +49,13 @@ export async function fetchPronoteGrades(
         optional: Boolean(g.is_optionnal ?? false),
         outOf: g.out_of !== undefined ? { value: g.out_of } : { value: 20 },
         coefficient: g.coefficient || 1,
-        studentScore: g.value !== null && g.value !== undefined ? { value: g.value } : { value: 0, disabled: true, status: "Abs/Non noté" },
+        statusCode,
+        rawGrade,
+        studentScore: hasValue
+          ? { value: g.value, outOf: g.out_of ?? 20 }
+          : countsAsZero
+            ? { value: 0, outOf: g.out_of ?? 20, status: rawStatus }
+            : { value: 0, disabled: true, status: rawStatus },
         averageScore: g.average !== null && g.average !== undefined ? { value: g.average } : undefined,
         maxScore: g.max !== null && g.max !== undefined ? { value: g.max } : undefined,
         minScore: g.min !== null && g.min !== undefined ? { value: g.min } : undefined,

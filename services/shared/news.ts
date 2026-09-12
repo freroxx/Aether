@@ -16,11 +16,17 @@ export interface News extends GenericInterface {
   id: string;
   title?: string;
   createdAt: Date;
+  creationDate?: Date;
+  endDate?: Date | null;
   acknowledged: boolean;
   attachments: Attachment[];
   content: string;
   author: string;
   category: string;
+  survey?: boolean;
+  anonymousResponse?: boolean;
+  template?: boolean;
+  sharedTemplate?: boolean;
   question?: boolean;
   ref?: any;
 }

@@ -26,6 +26,20 @@ export interface Subject {
   rank?: GradeScore;
 }
 
+/** Parité pronotepy Util.grade_translate (|1..|8). */
+export const GRADE_TRANSLATE = [
+  "Absent",
+  "Dispense",
+  "NonNote",
+  "Inapte",
+  "NonRendu",
+  "AbsentZero",
+  "NonRenduZero",
+  "Felicitations",
+] as const;
+
+export type GradeStatusCode = (typeof GRADE_TRANSLATE)[number] | string;
+
 export interface Grade extends GenericInterface {
   id: string;
   subjectId: string;
@@ -48,6 +62,10 @@ export interface Grade extends GenericInterface {
   maxScore?: GradeScore;
   rank?: GradeScore;
   skills?: SkillScore[];
+  /** Code backend brut (Absent/Dispense/NonNote/...) pour affichage localisé. */
+  statusCode?: string | null;
+  /** Valeur brute backend (ex. "|1", "Abs") quand status_code absent. */
+  rawGrade?: string | null;
 }
 
 export interface SkillScore {
@@ -71,18 +89,26 @@ export interface Period extends GenericInterface {
 }
 
 export interface Acquisition {
+  id?: string | null;
   name: string;
   abbreviation: string;
   level: string;
   coefficient: number;
   domain: string;
+  domainId?: string | null;
+  nameId?: string | null;
+  order?: number | null;
   pillar: string;
+  pillarId?: string | null;
+  pillarPrefix?: string | null;
 }
 
 export interface Evaluation extends GenericInterface {
   id: string;
   name: string;
   subject: string;
+  subjectId?: string | null;
+  domain?: string | null;
   teacher: string;
   coefficient: number;
   description: string;
@@ -92,6 +118,7 @@ export interface Evaluation extends GenericInterface {
 }
 
 export interface ReportSubject {
+  id?: string | null;
   name: string;
   color?: string | null;
   comments: string[];

@@ -18,6 +18,11 @@ import Divider from "@/ui/new/Divider";
 import Typography from "@/ui/new/Typography";
 import { GetIdentityFromPronoteUsername } from "@/utils/pronote/name";
 import uuid from "@/utils/uuid/uuid";
+import {
+  buildPronoteAdditionals,
+  isMfaRequiredError,
+  normalizeChildren,
+} from "./postLogin";
 
 import OnboardingWebView from "../../components/OnboardingWebView";
 import Button from "@/ui/new/Button";
@@ -27,7 +32,7 @@ export default function PronoteENTLogin() {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const { params } = useRoute<any>();
-  const { url: rawUrl = "", school, accountType = "eleve" } = (params as any) || {};
+  const { url: rawUrl = "", school, accountType = "eleve", accountPin, deviceName, clientIdentifier } = (params as any) || {};
 
   // Normalize: strip query/hash, then extract the base Pronote URL by removing any .html filename and trailing slashes.
   // Note: credentials.tsx provides a direct identifiant/mot de passe fallback (pronotepy Client) when ENT WebView login fails.
@@ -227,12 +232,23 @@ export default function PronoteENTLogin() {
       }
       setReceived(true);
       try {
+        const mfa =
+          accountPin || deviceName || clientIdentifier
+            ? {
+                ...(typeof accountPin === "string" && accountPin ? { accountPin } : {}),
+                ...(typeof deviceName === "string" && deviceName ? { deviceName } : {}),
+                ...(typeof clientIdentifier === "string" && clientIdentifier
+                  ? { clientIdentifier }
+                  : {}),
+              }
+            : undefined;
         const res = await PronoteApiClient.tokenLogin(
           url,
           message.data.login,
           message.data.mdp,
           deviceUUID,
-          isParent ? "parent" : "eleve"
+          isParent ? "parent" : "eleve",
+          mfa
         );
 
         if (!res.success) {
@@ -244,7 +260,7 @@ export default function PronoteENTLogin() {
         const { firstName, lastName } = GetIdentityFromPronoteUsername(res.user?.name || message.data.login);
         const finalIsParent = res.user?.account_type === "parent" || (res.children && res.children.length > 0);
         const finalAccountType = finalIsParent ? "parent" : "eleve";
-        const children = res.children || [];
+        const children = normalizeChildren(res.children);
         const selectedChild = children.length > 0 ? children[0].name : undefined;
 
         useAccountStore.getState().addAccount({
@@ -265,23 +281,30 @@ export default function PronoteENTLogin() {
             auth: {
               accessToken: res.auth_token,
               refreshToken: res.auth_token,
-              additionals: {
-                instanceURL: url,
-                url,
-                username: message.data.login,
-                deviceUUID,
-                uuid: deviceUUID,
-                // Token BRUT (mot de passe de session Pronote) : indispensable au
-                // refresh /auth/token. Le blob auth_token seul serait rejeté.
-                // Stocké aussi comme `password` : si le token est rejeté, le
-                // refresh bascule dessus (les routes data rejouent
-                // username+password via le backend).
-                token: message.data.mdp,
-                password: message.data.mdp,
-                authToken: res.auth_token,
-                accountType: finalAccountType,
-                account_type: finalAccountType,
-              },
+              additionals: buildPronoteAdditionals(
+                {
+                  instanceURL: url,
+                  url,
+                  username: message.data.login,
+                  deviceUUID,
+                  uuid: deviceUUID,
+                  // Token BRUT (mot de passe de session Pronote) : indispensable au
+                  // refresh /auth/token. Le blob auth_token seul serait rejeté.
+                  // Stocké aussi comme `password` : si le token est rejeté, le
+                  // refresh bascule dessus (les routes data rejouent
+                  // username+password via le backend).
+                  token: message.data.mdp,
+                  password: message.data.mdp,
+                  authToken: res.auth_token,
+                  auth_token: res.auth_token,
+                  accountType: finalAccountType,
+                  account_type: finalAccountType,
+                },
+                res,
+                mfa,
+                message.data.mdp,
+                deviceUUID
+              ),
             },
             serviceId: Services.PRONOTE,
             createdAt: (new Date()).toISOString(),
@@ -302,6 +325,25 @@ export default function PronoteENTLogin() {
         finishAuthNavigation();
         return;
       } catch (error: any) {
+        // 428 MFAError : bascule vers l'écran 2FA en conservant le jeton ENT.
+        if (isMfaRequiredError(error) && message?.data?.login && message?.data?.mdp) {
+          setReceived(false);
+          router.push({
+            pathname: "/(onboarding)/services/pronote/2fa",
+            params: {
+              mode: "token",
+              url,
+              username: String(message.data.login),
+              token: String(message.data.mdp),
+              uuid: deviceUUID,
+              accountType: isParent ? "parent" : "eleve",
+              ...(typeof clientIdentifier === "string" && clientIdentifier
+                ? { clientIdentifier }
+                : {}),
+            },
+          } as any);
+          return;
+        }
         alert.showAlert({
           title: "Erreur",
           description: error?.message || "Une erreur est survenue lors de la connexion à Pronote. Veuillez réessayer.",
