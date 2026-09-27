@@ -5,7 +5,6 @@ import { Pressable, Text, View } from "react-native";
 import { useTheme } from "expo-router/react-navigation";
 
 import { hapticFor } from "@/utils/haptics";
-import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
 
 import type {
@@ -24,8 +23,6 @@ interface SessionCardProps {
   onOpenHomework: (routeId: string) => void;
 }
 
-const BODY_PREVIEW_LINES = 3;
-
 const ChapterBlock = React.memo(
   ({
     content,
@@ -39,35 +36,11 @@ const ChapterBlock = React.memo(
     onOpenFile: SessionCardProps["onOpenFile"];
   }) => {
     const [expanded, setExpanded] = useState(false);
-    const longBody =
-      content.body.length > 220 || content.attachments.length > 2;
+    const [filesOpen, setFilesOpen] = useState(false);
+    const longBody = content.body.length > 180;
+    const fileCount = content.attachments.length;
     return (
       <View style={{ gap: 6 }}>
-        {content.theme ? (
-          <View style={{ flexDirection: "row" }}>
-            <View
-              style={{
-                backgroundColor: `${RESSOURCES_ACCENT}1A`,
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                borderRadius: 300,
-              }}
-            >
-              <Typography
-                variant="caption"
-                weight="bold"
-                style={{
-                  color: RESSOURCES_ACCENT,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.6,
-                }}
-                numberOfLines={1}
-              >
-                {content.theme}
-              </Typography>
-            </View>
-          </View>
-        ) : null}
         {content.title ? (
           <Typography variant="title" weight="bold" numberOfLines={2}>
             {content.title}
@@ -78,7 +51,7 @@ const ChapterBlock = React.memo(
             <Typography
               variant="body1"
               color="secondary"
-              numberOfLines={expanded ? undefined : BODY_PREVIEW_LINES}
+              numberOfLines={expanded ? undefined : 2}
             >
               {content.body}
             </Typography>
@@ -99,19 +72,58 @@ const ChapterBlock = React.memo(
             )}
           </>
         ) : null}
-        {content.attachments.length > 0 && (
+        {fileCount > 0 && (
           <View style={{ gap: 2 }}>
-            {content.attachments.map((a, aIdx) => {
-              const key = `${a.name ?? ""}-${a.url ?? ""}`;
-              return (
-                <AttachmentRow
-                  key={`${key}-${aIdx}`}
-                  attachment={a}
-                  downloading={downloadingKey === key}
-                  onOpen={(att) => onOpenFile(att, sessionFrom)}
+            <Pressable
+              onPress={() => {
+                void hapticFor("selection");
+                setFilesOpen((v) => !v);
+              }}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingVertical: 8,
+                  opacity: pressed ? 0.6 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+            >
+              <Typography
+                variant="body1"
+                weight="bold"
+                style={{ color: RESSOURCES_ACCENT, flex: 1 }}
+                numberOfLines={1}
+              >
+                {t("Ressources_Attachments", "{{count}} pièces jointes", {
+                  count: fileCount,
+                })}
+              </Typography>
+              <View
+                style={{
+                  transform: [{ rotate: filesOpen ? "90deg" : "0deg" }],
+                }}
+              >
+                <Papicons
+                  name="chevronright"
+                  size={16}
+                  color={String(RESSOURCES_ACCENT)}
                 />
-              );
-            })}
+              </View>
+            </Pressable>
+            {filesOpen &&
+              content.attachments.map((a, aIdx) => {
+                const key = `${a.name ?? ""}-${a.url ?? ""}`;
+                return (
+                  <AttachmentRow
+                    key={`${key}-${aIdx}`}
+                    attachment={a}
+                    downloading={downloadingKey === key}
+                    onOpen={(att) => onOpenFile(att, sessionFrom)}
+                  />
+                );
+              })}
           </View>
         )}
       </View>
@@ -129,7 +141,7 @@ const SessionCard = React.memo(
     onOpenHomework,
   }: SessionCardProps) => {
     const { colors } = useTheme();
-    const metaLine = [session.slot, session.room, session.teacher]
+    const subLine = [session.room, session.teacher]
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
       .join(" · ");
@@ -138,62 +150,48 @@ const SessionCard = React.memo(
         style={{
           backgroundColor: colors.card,
           borderRadius: 16,
-          padding: 14,
-          paddingLeft: 16,
+          padding: 16,
           gap: 10,
-          overflow: "hidden",
         }}
       >
         <View
           style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 4,
-            backgroundColor: session.color,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
           }}
-        />
-        <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+        >
           <View
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
+              width: 30,
+              height: 30,
+              borderRadius: 15,
               backgroundColor: `${session.color}1F`,
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Text style={{ fontSize: 24 }}>{session.emoji}</Text>
+            <Text style={{ fontSize: 16 }}>{session.emoji}</Text>
           </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Typography variant="title" weight="bold" numberOfLines={1}>
-              {session.pretty}
+          <Typography
+            variant="title"
+            weight="bold"
+            numberOfLines={1}
+            style={{ flex: 1 }}
+          >
+            {session.pretty}
+          </Typography>
+          {session.slot ? (
+            <Typography variant="caption" color="secondary" numberOfLines={1}>
+              {session.slot}
             </Typography>
-            {session.meta ? (
-              <Typography variant="caption" color="secondary" numberOfLines={1}>
-                {session.meta}
-              </Typography>
-            ) : null}
-          </View>
-          {session.fileCount > 0 && (
-            <View
-              style={{
-                backgroundColor: `${session.color}1A`,
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-                borderRadius: 20,
-              }}
-            >
-              <Typography variant="caption" weight="bold">
-                {t("Home_LessonContent_Files", "{{count}} fichiers", {
-                  count: session.fileCount,
-                })}
-              </Typography>
-            </View>
-          )}
-        </Stack>
+          ) : null}
+        </View>
+        {subLine ? (
+          <Typography variant="caption" color="secondary" numberOfLines={1}>
+            {subLine}
+          </Typography>
+        ) : null}
         {session.contents.map((content, cIdx) => (
           <ChapterBlock
             key={cIdx}
@@ -209,39 +207,21 @@ const SessionCard = React.memo(
               void hapticFor("selection");
               onOpenHomework(session.homeworkRouteId as string);
             }}
-            style={({ pressed }) => [
-              {
-                marginTop: 2,
-                paddingVertical: 10,
-                paddingHorizontal: 12,
-                borderRadius: 12,
-                backgroundColor: `${RESSOURCES_ACCENT}1A`,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                opacity: pressed ? 0.7 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              },
-            ]}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
             accessibilityRole="button"
             accessibilityLabel={t(
               "Ressources_SeeHomework",
               "Voir le travail à faire"
             )}
           >
-            <Papicons name="tasks" size={18} color={RESSOURCES_ACCENT} />
             <Typography
-              variant="button"
-              style={{ color: RESSOURCES_ACCENT, flex: 1 }}
+              variant="body1"
+              weight="bold"
+              color="primary"
               numberOfLines={1}
             >
-              {t("Ressources_SeeHomework", "Voir le travail à faire")}
+              {t("Ressources_SeeHomeworkArrow", "Voir le travail à faire →")}
             </Typography>
-            <Papicons
-              name="chevronright"
-              size={18}
-              color={RESSOURCES_ACCENT}
-            />
           </Pressable>
         ) : null}
       </View>

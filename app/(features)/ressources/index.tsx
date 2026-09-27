@@ -394,25 +394,22 @@ function RessourcesView() {
                 </Pressable>
               );
             })}
+            <ChipButton
+              icon="filter"
+              chevron
+              onPressAction={({ nativeEvent }) => {
+                const id = String(nativeEvent.event ?? "");
+                if (id.startsWith("theme:"))
+                  setSelectedTheme(id.replace("theme:", ""));
+              }}
+              actions={themeActions as never}
+            >
+              {selectedTheme === "all"
+                ? t("Ressources_AllThemes", "Tous les thèmes")
+                : selectedTheme}
+            </ChipButton>
           </ScrollView>
         )}
-
-        <Stack direction="horizontal" gap={8} vAlign="center">
-          <ChipButton
-            icon="filter"
-            chevron
-            onPressAction={({ nativeEvent }) => {
-              const id = String(nativeEvent.event ?? "");
-              if (id.startsWith("theme:"))
-                setSelectedTheme(id.replace("theme:", ""));
-            }}
-            actions={themeActions as never}
-          >
-            {selectedTheme === "all"
-              ? t("Ressources_AllThemes", "Tous les thèmes")
-              : selectedTheme}
-          </ChipButton>
-        </Stack>
       </View>
     ),
     [

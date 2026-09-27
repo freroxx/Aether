@@ -3,7 +3,6 @@ import { Link } from "expo-router";
 import { t } from "i18next";
 import React, { useEffect, useMemo } from "react";
 import { Text, View } from "react-native";
-import { useTheme } from "expo-router/react-navigation";
 
 import { getCourseRouteId } from "@/database/useTimetable";
 import Icon from "@/ui/components/Icon";
@@ -12,7 +11,6 @@ import Typography from "@/ui/components/Typography";
 import { getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectName } from "@/utils/subjects/name";
-import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 import { useTimetableWidgetData } from "../hooks/useTimetableWidgetData";
 import { LessonContentSkeleton } from "@/app/(features)/ressources/components/Skeleton";
 
@@ -87,13 +85,30 @@ function findRecentCoursesWithContent(
  *  (qui affichait un « mon cours » sans contenu = confusion cours/contenu). */
 const RESSOURCES_HREF = "/(features)/ressources" as const;
 
-function fmtCourseDate(from: unknown): string {
+/** Date relative courte : « Hier · 10h15 », « Aujourd'hui · 08h00 ». */
+function relDateTime(from: unknown): string {
   try {
     const d = new Date(from as never);
-    const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    const day = new Date(d);
+    day.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((day.getTime() - today.getTime()) / 86400000);
+    const rel =
+      diff === 0
+        ? t("Ressources_Today", "Aujourd'hui")
+        : diff === -1
+          ? t("Ressources_Yesterday", "Hier")
+          : diff === 1
+            ? t("Ressources_Tomorrow", "Demain")
+            : d.toLocaleDateString(undefined, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+              });
     const hh = String(d.getHours()).padStart(2, "0");
     const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${day} · ${hh}h${mm}`;
+    return `${rel} · ${hh}h${mm}`;
   } catch {
     return "";
   }
@@ -106,15 +121,14 @@ function stripHtml(s: unknown): string {
     .trim();
 }
 
-/** Coquille unique de la carte : même feedback visuel partout. */
-function CardShell({
+/** Carte hero : une seule idée, de l'air, zéro boîte imbriquée. */
+function HeroShell({
   accent,
   emoji,
   title,
   subtitle,
   badge,
   children,
-  footer,
 }: {
   accent: string;
   emoji?: string;
@@ -122,38 +136,25 @@ function CardShell({
   subtitle?: string;
   badge?: string;
   children?: React.ReactNode;
-  footer: string;
 }) {
-  const theme = useTheme();
   return (
     <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
       <Link href={RESSOURCES_HREF} asChild>
         <Link.AppleZoom>
-          <Stack gap={10} padding={[14, 14]} radius={18} card style={{ paddingLeft: 24 }}>
-            <View
-              style={{
-                position: "absolute",
-                left: 10,
-                top: 14,
-                bottom: 14,
-                width: 6,
-                backgroundColor: accent,
-                borderRadius: 300,
-              }}
-            />
-            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+          <Stack gap={12} padding={[16, 16]} radius={18} card>
+            <Stack direction="horizontal" vAlign="center" gap={10}>
               <View
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
                   backgroundColor: `${accent}1F`,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
                 {emoji ? (
-                  <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                  <Text style={{ fontSize: 22 }}>{emoji}</Text>
                 ) : (
                   <Icon papicon opacity={0.7}>
                     <Papicons name="Info" />
@@ -186,9 +187,10 @@ function CardShell({
               ) : null}
             </Stack>
             {children}
-            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
-              <Typography variant="caption" weight="bold" color="primary" style={{ flex: 1 }} numberOfLines={1}>
-                {footer}
+            <Stack direction="horizontal" vAlign="center" gap={6}>
+              <View style={{ flex: 1 }} />
+              <Typography variant="caption" weight="bold" color="primary" numberOfLines={1}>
+                {t("Home_LessonContent_CTA_Ressources", "Tout voir")}
               </Typography>
               <Icon papicon opacity={0.5} size={16}>
                 <Papicons name="ArrowRightUp" />
@@ -201,72 +203,10 @@ function CardShell({
   );
 }
 
-function ChapterPreview({ chapter }: { chapter: any }) {
-  const theme = useTheme();
-  const attachments = Array.isArray(chapter.attachments) ? chapter.attachments : [];
-  return (
-    <View
-      style={{
-        gap: 2,
-        backgroundColor: `${String(theme.colors.text)}0A`,
-        borderRadius: 14,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-      }}
-    >
-      {!!chapter.title && (
-        <Typography variant="body1" weight="bold" numberOfLines={1}>
-          {chapter.title}
-        </Typography>
-      )}
-      {!!chapter.description && (
-        <Typography variant="body2" color="secondary" numberOfLines={2}>
-          {stripHtml(chapter.description)}
-        </Typography>
-      )}
-      {attachments.length > 0 && (
-        <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
-          <Icon papicon opacity={0.5} size={14}>
-            <Papicons name={getAttachmentIcon(attachments[0]) as any} />
-          </Icon>
-          <Typography variant="caption" color="secondary" style={{ flex: 1 }} numberOfLines={1}>
-            {attachments
-              .slice(0, 2)
-              .map((a: any) => a?.name ?? "Fichier")
-              .join(" · ")}
-            {attachments.length > 2 ? ` (+${attachments.length - 2})` : ""}
-          </Typography>
-        </Stack>
-      )}
-    </View>
-  );
-}
-
-function PlainMessage({ text }: { text: string }) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        gap: 2,
-        backgroundColor: `${String(theme.colors.text)}0A`,
-        borderRadius: 14,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-      }}
-    >
-      <Typography variant="body2" color="secondary" numberOfLines={2}>
-        {text}
-      </Typography>
-    </View>
-  );
-}
-
 const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: LessonContentWidgetProps) => {
   const { courses } = useTimetableWidgetData();
-  const theme = useTheme();
   const [prefetched, setPrefetched] = React.useState<Record<string, any[]>>({});
-  // Chargé = le batch contenus est revenu (même vide) : on peut alors
-  // distinguer « chargement » de « rien publié » (skeleton vs vide honnête).
+  // Chargé = le batch contenus est revenu (même vide) : skeleton vs vide honnête.
   const [settled, setSettled] = React.useState(false);
 
   // Pré-charge les contenus en UNE requête batchée (GET /timetable/contents :
@@ -356,8 +296,11 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
     return <LessonContentSkeleton />;
   }
 
-  // 2) Mini-feed des dernières séances avec contenu.
+  // 2) Hero : dernière séance avec contenu (+2e en ligne compacte).
   if (recent.length > 0) {
+    const first = recent[0];
+    const color = getSubjectColor(first.subject);
+    const chapter = (first.content ?? [])[0];
     const totalFiles = recent.reduce(
       (n: number, c: any) =>
         n +
@@ -369,21 +312,13 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
           : 0),
       0
     );
-    const first = recent[0];
-    const color = getSubjectColor(first.subject);
-    const subtitle =
-      recent.length > 1
-        ? t("Home_LessonContent_Recent_Subtitle", "{{count}} dernières séances", {
-            count: recent.length,
-          })
-        : fmtCourseDate(first.from) ||
-          t("Home_LessonContent_Title", "Contenu du prochain cours");
+    const second = recent[1];
     return (
-      <CardShell
+      <HeroShell
         accent={color}
         emoji={getSubjectEmoji(first.subject)}
         title={getSubjectName(first.subject)}
-        subtitle={subtitle}
+        subtitle={relDateTime(first.from)}
         badge={
           totalFiles > 0
             ? t("Home_LessonContent_Files", "{{count}} fichiers", {
@@ -391,57 +326,62 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
               })
             : undefined
         }
-        footer={t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
       >
-        {recent.map((c: any, i: number) => {
-          const chapter = (c.content ?? [])[0];
-          if (!chapter) return null;
-          return (
-            <View key={`${c.subject ?? ""}-${i}`} style={{ gap: 4 }}>
-              {recent.length > 1 && (
-                <Typography variant="caption" color="secondary" numberOfLines={1}>
-                  {getSubjectName(c.subject)} · {fmtCourseDate(c.from)}
-                </Typography>
-              )}
-              <ChapterPreview chapter={chapter} />
-            </View>
-          );
-        })}
-      </CardShell>
+        {!!chapter?.title && (
+          <Typography variant="body1" weight="bold" numberOfLines={1}>
+            {chapter.title}
+          </Typography>
+        )}
+        {!!chapter?.description && (
+          <Typography variant="body2" color="secondary" numberOfLines={2}>
+            {stripHtml(chapter.description)}
+          </Typography>
+        )}
+        {second && (
+          <Stack direction="horizontal" vAlign="center" gap={8}>
+            <Text style={{ fontSize: 16 }}>
+              {getSubjectEmoji(second.subject)}
+            </Text>
+            <Typography variant="body2" weight="bold" numberOfLines={1} style={{ flex: 1 }}>
+              {getSubjectName(second.subject)}
+            </Typography>
+            <Typography variant="caption" color="secondary" numberOfLines={1}>
+              {relDateTime(second.from)}
+            </Typography>
+          </Stack>
+        )}
+      </HeroShell>
     );
   }
 
-  // 3) Cours futurs mais rien publié : vide honnête (batch revenu).
+  // 3) Cours futurs mais rien publié : vide honnête.
   if (nextCourse) {
-    const ncColor = getSubjectColor((nextCourse as any).subject);
     return (
-      <CardShell
-        accent={ncColor}
+      <HeroShell
+        accent={getSubjectColor((nextCourse as any).subject)}
         emoji={getSubjectEmoji((nextCourse as any).subject)}
         title={getSubjectName((nextCourse as any).subject)}
-        subtitle={fmtCourseDate((nextCourse as any).from)}
-        footer={t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
+        subtitle={relDateTime((nextCourse as any).from)}
       >
-        <PlainMessage
-          text={t(
+        <Typography variant="body2" color="secondary" numberOfLines={2}>
+          {t(
             "Home_LessonContent_NoContent_Desc",
-            "Aucun contenu publié pour ce cours — ouvre les ressources pour tout voir."
+            "Aucun contenu publié pour ce cours."
           )}
-        />
-      </CardShell>
+        </Typography>
+      </HeroShell>
     );
   }
 
   // 4) Vrai vide : aucun cours futur.
   return (
-    <CardShell
-      accent={String(theme.colors.primary)}
+    <HeroShell
+      accent="#29947A"
       title={t("Home_LessonContent_Empty_Title", "Rien pour l'instant")}
       subtitle={t(
         "Home_LessonContent_Empty_Desc",
-        "Aucun contenu publié pour tes prochains cours."
+        "Les contenus publiés par tes profs apparaîtront ici."
       )}
-      footer={t("Home_LessonContent_Empty_CTA", "Voir les contenus et ressources")}
     />
   );
 });

@@ -9,7 +9,6 @@ import { hapticFor } from "@/utils/haptics";
 import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
 import List from "@/ui/new/List";
-import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 import useResizable from "@/ui/utils/Resizable";
 
 import type {
@@ -90,11 +89,9 @@ const RessourcesList: React.FC<RessourcesListProps> = ({
 
   const renderSession = useCallback(
     (session: SessionItem) => (
-      <Reanimated.View
-        layout={LinearTransition}
-        entering={AetherAppearIn}
-        exiting={AetherAppearOut}
-      >
+      // Cartes : transitions de layout uniquement (les entrées rejouées
+      // à chaque filtre = saccades). Headers animés via DayHeader.
+      <Reanimated.View layout={LinearTransition}>
         <SessionCard
           session={session}
           downloadingKey={downloadingKey}
@@ -238,7 +235,11 @@ const RessourcesList: React.FC<RessourcesListProps> = ({
           .filter((s) => (s ?? "").length > 0)
           .join(" · ");
         return (
-          <Reanimated.View key={section.key} layout={LinearTransition}>
+          <Reanimated.View
+            key={section.key}
+            layout={LinearTransition}
+            style={{ gap: 14, marginBottom: 22 }}
+          >
             <DayHeader
               title={rel.title}
               subtitle={summary}
