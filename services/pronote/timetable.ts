@@ -150,7 +150,39 @@ export function matchContentForCourse(
       bestDist = dist;
     }
   }
-  return best && Array.isArray(best.resources) && best.resources.length > 0 ? best.resources : null;
+  if (best) return best && Array.isArray(best.resources) && best.resources.length > 0 ? best.resources : null;
+  // Passe 3 : contenus FUZZY uniquement (secours brut du cahier, heure non
+  // vérifiée) : même jour civil + matière. Les contenus vérifiés restent
+  // stricts (test garde-fou : décalage 2h rejeté).
+  try {
+    const fromD = course.from instanceof Date ? course.from : new Date(course.from as never);
+    const dayKey = `${fromD.getFullYear()}-${fromD.getMonth()}-${fromD.getDate()}`;
+    let dayBest: WeekLessonContent | null = null;
+    let dayDist = Number.POSITIVE_INFINITY;
+    for (const c of contents) {
+      if (!c || c.lessonStart === null) continue;
+      if ((c as { fuzzy?: unknown }).fuzzy !== true) continue;
+      const startMs = toTimeSafe(c.lessonStart);
+      if (!Number.isFinite(startMs)) continue;
+      const sd = new Date(startMs);
+      if (`${sd.getFullYear()}-${sd.getMonth()}-${sd.getDate()}` !== dayKey) continue;
+      const got = normSubject(c.subject);
+      if (!want || !got || subjectsMatch(want, got)) {
+        if (!Array.isArray(c.resources) || c.resources.length === 0) continue;
+        const dist = Math.abs(startMs - fromMs);
+        if (dist < dayDist) {
+          dayDist = dist;
+          dayBest = c;
+        }
+      }
+    }
+    if (dayBest && Array.isArray(dayBest.resources) && dayBest.resources.length > 0) {
+      return dayBest.resources;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 export async function fetchPronoteWeekTimetable(
@@ -352,6 +384,7 @@ export async function fetchPronoteWeekContents(
         lessonStart: start,
         subject: String(c?.subject ?? ""),
         resources,
+        fuzzy: (c as { fuzzy?: unknown })?.fuzzy === true,
       });
     }
     return out;

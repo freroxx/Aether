@@ -52,6 +52,9 @@ export interface WeekLessonContent {
   lessonStart: Date | null;
   subject: string;
   resources: CourseResource[];
+  /** Heure non vérifiée (secours brut du cahier, ids tournants) : rattachement
+   *  même-jour + matière uniquement (passe 3), jamais heure exacte. */
+  fuzzy?: boolean;
 }
 
 export enum CourseType {

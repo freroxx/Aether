@@ -6,6 +6,7 @@ import { Calendar, Palette, Sparkles, User, ShieldCheck, Bell } from "lucide-rea
 import React, { useCallback, useMemo, useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Reanimated, { LinearTransition } from "react-native-reanimated";
 
 import { useAccountStore } from "@/stores/account";
 import { useSettingsStore } from "@/stores/settings";
@@ -20,6 +21,7 @@ import { formatSchoolName } from '@/utils/format/formatSchoolName';
 import List, { ListTouchable } from '@/ui/new/List';
 import Typography from '@/ui/new/Typography';
 import ConfirmModal from '@/ui/components/ConfirmModal';
+import { AetherAppearIn, AetherAppearOut } from '@/ui/utils/Transition';
 
 export default function SettingsIndex() {
   const router = useRouter();
@@ -166,6 +168,11 @@ export default function SettingsIndex() {
       ListHeaderComponent={
         <View style={{ marginVertical: 12, gap: 14 }}>
           {/* Profile card */}
+          <Reanimated.View
+            layout={LinearTransition}
+            entering={AetherAppearIn}
+            exiting={AetherAppearOut}
+          >
           <Stack
             flex
             direction="vertical"
@@ -209,8 +216,14 @@ export default function SettingsIndex() {
               </Typography>
             </View>
           </Stack>
+          </Reanimated.View>
 
           {/* Quick access grid */}
+          <Reanimated.View
+            layout={LinearTransition}
+            entering={AetherAppearIn}
+            exiting={AetherAppearOut}
+          >
           <View style={{ gap: 10 }}>
             {Array.from({ length: Math.ceil(BigButtons.length / 2) }).map((_, rowIndex) => (
               <View key={rowIndex} style={{ flexDirection: "row", gap: 10 }}>
@@ -269,6 +282,7 @@ export default function SettingsIndex() {
               </View>
             ))}
           </View>
+          </Reanimated.View>
         </View>
       }
       contentContainerStyle={{

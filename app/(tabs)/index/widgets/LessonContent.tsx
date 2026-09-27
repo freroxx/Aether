@@ -37,7 +37,7 @@ export function findNextCourseWithContent(courses: any[] | undefined) {
     )[0];
 }
 
-/** Prochain cours futur, avec ou sans contenu (pour la redirection "Afficher plus"). */
+/** Prochain cours futur, avec ou sans contenu (conservé pour compat, non utilisé pour la navigation). */
 export function findNextCourse(courses: any[] | undefined) {
   const now = Date.now();
   return (courses ?? [])
@@ -45,10 +45,20 @@ export function findNextCourse(courses: any[] | undefined) {
     .sort((a, b) => new Date(a.from).getTime() - new Date(b.from).getTime())[0];
 }
 
+/** La carte Contenu et ressources mène TOUJOURS au flux complet
+ *  `/(features)/ressources` (journal de classe : leçons, fichiers, liens),
+ *  jamais à la fiche d'un cours isolé `/(modals)/course/[id]`
+ *  (qui affichait un « mon cours » sans contenu = confusion cours/contenu). */
+const RESSOURCES_HREF = "/(features)/ressources" as const;
+
 const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: LessonContentWidgetProps) => {
   const { courses } = useTimetableWidgetData();
   const theme = useTheme();
   const [prefetched, setPrefetched] = React.useState<Record<string, any[]>>({});
+  // Chargé = le batch contenus est revenu (même vide) : on peut alors
+  // distinguer « chargement » de « rien publié » au lieu d'un
+  // « Contenu en cours de chargement » infini.
+  const [settled, setSettled] = React.useState(false);
 
   const nextWithContent = useMemo(() => {
     const direct = findNextCourseWithContent(courses as any[]);
@@ -91,14 +101,20 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
       .sort((a, b) => new Date(a.from).getTime() - new Date(b.from).getTime())
       .slice(0, 10)
       .filter(c => !Array.isArray(c.content) || c.content.length === 0);
-    if (upcoming.length === 0) return;
+    if (upcoming.length === 0) {
+      setSettled(true);
+      return;
+    }
     (async () => {
       try {
         const { getManager } = await import("@/services/shared");
         const { matchContentForCourse } = await import("@/services/pronote/timetable");
         const { getCourseRouteId: routeIdOf, saveCourseContentRaw } = await import("@/database/useTimetable");
         const manager = getManager();
-        if (!manager || cancelled) return;
+        if (!manager || cancelled) {
+          if (!cancelled) setSettled(true);
+          return;
+        }
         const first = new Date(upcoming[0].from);
         const last = new Date(upcoming[upcoming.length - 1].from);
         const from = new Date(first.getTime() - 86400000);
@@ -107,7 +123,11 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
         const spanDays = Math.round((to.getTime() - from.getTime()) / 86400000);
         if (spanDays > 60) to.setTime(from.getTime() + 60 * 86400000);
         const batch = await (manager as any).getWeekContents(from, to);
-        if (cancelled || !Array.isArray(batch) || batch.length === 0) return;
+        if (cancelled) return;
+        if (!Array.isArray(batch) || batch.length === 0) {
+          setSettled(true);
+          return;
+        }
         const filled: Record<string, any[]> = {};
         for (const c of upcoming) {
           if (cancelled) break;
@@ -121,10 +141,15 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
             }
           } catch {}
         }
-        if (!cancelled && Object.keys(filled).length > 0) {
-          setPrefetched(prev => ({ ...prev, ...filled }));
+        if (!cancelled) {
+          if (Object.keys(filled).length > 0) {
+            setPrefetched(prev => ({ ...prev, ...filled }));
+          }
+          setSettled(true);
         }
-      } catch {}
+      } catch {
+        if (!cancelled) setSettled(true);
+      }
     })();
     return () => {
       cancelled = true;
@@ -138,28 +163,15 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
 
   useEffect(() => {
     if (!onTargetChange) return;
-    // "Afficher plus" -> fiche du prochain cours (avec contenu si possible),
-    // jamais un simple renvoi vers l'EDT quand un cours existe.
-    const target = nextWithContent ?? nextCourse;
-    if (target) {
-      try {
-        onTargetChange({
-          pathname: "/(modals)/course/[id]",
-          params: { id: getCourseRouteId(target as any) },
-        });
-      } catch {
-        onTargetChange("/(tabs)/calendar");
-      }
-    } else {
-      onTargetChange("/(tabs)/calendar");
-    }
-  }, [nextWithContent, nextCourse, onTargetChange]);
+    // « Afficher plus » -> flux Contenus et ressources complet.
+    onTargetChange(RESSOURCES_HREF);
+  }, [onTargetChange]);
 
-  // Aucun cours futur du tout -> renvoi EDT (vrai vide).
+  // Aucun cours futur du tout -> flux ressources (archives des contenus passés).
   if (!nextWithContent && !nextCourse) {
     return (
       <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
-        <Link href="/(tabs)/calendar" asChild>
+        <Link href={RESSOURCES_HREF} asChild>
           <Link.AppleZoom>
             <Stack gap={10} padding={[16, 14]} radius={18} card>
               <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
@@ -187,7 +199,7 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
                 </View>
               </Stack>
               <Typography variant="caption" color="primary">
-                {t("Home_LessonContent_Empty_CTA", "Voir l'emploi du temps")}
+                {t("Home_LessonContent_Empty_CTA", "Voir les contenus et ressources")}
               </Typography>
             </Stack>
           </Link.AppleZoom>
@@ -196,8 +208,8 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
     );
   }
 
-  // Prochain cours sans contenu (chargement en cours ou rien publié) :
-  // on affiche quand même la fiche cours (jamais un simple renvoi EDT).
+  // Prochain cours SANS contenu retrouvé : chargement encore en cours ?
+  // Si le batch est revenu (settled) -> « rien publié », pas un chargement infini.
   const effectiveCourse = nextWithContent ?? nextCourse;
   if (!nextWithContent && nextCourse) {
     const ncSubject = getSubjectName((nextCourse as any).subject);
@@ -211,15 +223,10 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
       const mm = String(d.getMinutes()).padStart(2, "0");
       ncDate = `${day} · ${hh}h${mm}`;
     } catch {}
+    const pending = !settled;
     return (
       <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
-        <Link
-          href={{
-            pathname: "/(modals)/course/[id]",
-            params: { id: getCourseRouteId(nextCourse as any) },
-          }}
-          asChild
-        >
+        <Link href={RESSOURCES_HREF} asChild>
           <Link.AppleZoom>
             <Stack gap={10} padding={[14, 14]} radius={18} card style={{ paddingLeft: 24 }}>
               <View
@@ -265,12 +272,14 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
                 }}
               >
                 <Typography variant="body2" color="secondary" numberOfLines={2}>
-                  {t("Home_LessonContent_Pending_Desc", "Contenu en cours de chargement — ouvre la fiche pour voir les ressources.")}
+                  {pending
+                    ? t("Home_LessonContent_Pending_Desc", "Contenu en cours de chargement…")
+                    : t("Home_LessonContent_NoContent_Desc", "Aucun contenu publié pour ce cours — ouvre les ressources pour tout voir.")}
                 </Typography>
               </View>
               <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
                 <Typography variant="caption" weight="bold" color="primary" style={{ flex: 1 }} numberOfLines={1}>
-                  {t("Home_LessonContent_CTA", "Ouvrir le cours")}
+                  {t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
                 </Typography>
                 <Icon papicon opacity={0.5} size={16}>
                   <Papicons name="ArrowRightUp" />
@@ -305,13 +314,7 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
 
   return (
     <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
-      <Link
-        href={{
-          pathname: "/(modals)/course/[id]",
-          params: { id: getCourseRouteId(effectiveCourse as any) },
-        }}
-        asChild
-      >
+      <Link href={RESSOURCES_HREF} asChild>
         <Link.AppleZoom>
           <Stack gap={10} padding={[14, 14]} radius={18} card style={{ paddingLeft: 24 }}>
             <View
@@ -400,7 +403,7 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
             ))}
             <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
               <Typography variant="caption" weight="bold" color="primary" style={{ flex: 1 }} numberOfLines={1}>
-                {t("Home_LessonContent_CTA", "Ouvrir le cours")}
+                {t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
               </Typography>
               <Icon papicon opacity={0.5} size={16}>
                 <Papicons name="ArrowRightUp" />

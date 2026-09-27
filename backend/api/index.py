@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import mimetypes
+import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timedelta
 
@@ -908,12 +909,134 @@ def _serialize_lesson_content(c) -> Dict[str, Any]:
     }
 
 
+def _unwrap_pronote_value(v: Any, depth: int = 0) -> Any:
+    """Déballe un niveau de wrapper PRONOTE {"V": ...} / {"L": ...} (défensif)."""
+    if depth > 2:
+        return v
+    if isinstance(v, dict):
+        for k in ("V", "L"):
+            if k in v:
+                return _unwrap_pronote_value(v[k], depth + 1)
+    return v
+
+
+def _parse_loose_date(v: Any) -> Optional[str]:
+    """Parse défensif d'une valeur date inconnue -> ISO locale (jamais d'exception)."""
+    try:
+        v = _unwrap_pronote_value(v)
+        if v is None or isinstance(v, bool):
+            return None
+        if isinstance(v, datetime):
+            return v.replace(tzinfo=None).isoformat()
+        if isinstance(v, date):
+            return datetime(v.year, v.month, v.day, 12, 0, 0).isoformat()
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            # Timestamp MS PRONOTE (/Date(1727...)/ déjà géré ci-dessous) :
+            # n'accepte que des ordres de grandeur plausibles (ms depuis 2000).
+            try:
+                ms = float(v)
+                if 946684800000 <= ms <= 4102444800000:
+                    return datetime.fromtimestamp(ms / 1000).isoformat()
+            except Exception:
+                pass
+            return None
+        s = str(v or "").strip()
+        if not s:
+            return None
+        # /Date(1727227200000)/
+        m = re.search(r"/Date\((-?\d+)([+-]\d{4})?\)/", s)
+        if m:
+            try:
+                return datetime.fromtimestamp(int(m.group(1)) / 1000).isoformat()
+            except Exception:
+                pass
+        # ISO (avec ou sans heure/offset)
+        try:
+            iso = s.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(iso)
+            return dt.replace(tzinfo=None).isoformat()
+        except Exception:
+            pass
+        # FR JJ/MM/AAAA [HH:mm]
+        m2 = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$", s)
+        if m2:
+            try:
+                dd, mm, yy = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
+                hh = int(m2.group(4) or 12)
+                mi = int(m2.group(5) or 0)
+                ss = int(m2.group(6) or 0)
+                return datetime(yy, mm, dd, hh, mi, ss).isoformat()
+            except Exception:
+                return None
+        return None
+    except Exception:
+        return None
+
+
+def _norm_key(s: Any) -> str:
+    try:
+        import unicodedata as _ud2
+        t = _ud2.normalize("NFD", str(s or ""))
+        t = "".join(ch for ch in t if _ud2.category(ch) != "Mn")
+        return t.lower()
+    except Exception:
+        return str(s or "").lower()
+
+
+def _extract_cours_fallback(entry: Any) -> Dict[str, Any]:
+    """Secours quand les ids tournants empêchent la jointure lessons() :
+    extrait (date ISO, matière) depuis l'entrée brute PageCahierDeTextes
+    (clés défensives, jamais d'exception)."""
+    out: Dict[str, Any] = {"date": None, "subject": ""}
+    try:
+        if not isinstance(entry, dict):
+            return out
+        cours = entry.get("cours")
+        candidates: list = []
+        if isinstance(cours, dict):
+            inner = cours.get("V")
+            candidates.append(inner if isinstance(inner, dict) else cours)
+        candidates.append(entry)
+        date_keys = ("date", "dateducours", "datecours", "debut", "datedebut", "start", "jour", "seance")
+        subj_keys = ("matiere", "subject", "discipline", "libelle", "matierename", "nommatiere")
+        for cand in candidates:
+            if not isinstance(cand, dict):
+                continue
+            for k, v in cand.items():
+                nk = _norm_key(k).replace(" ", "").replace("_", "")
+                if out["date"] is None and any(dk in nk for dk in date_keys):
+                    parsed = _parse_loose_date(v)
+                    if parsed:
+                        out["date"] = parsed
+                if not out["subject"] and any(sk in nk for sk in subj_keys):
+                    try:
+                        sv = _unwrap_pronote_value(v)
+                        if isinstance(sv, dict):
+                            for kk in ("L", "name", "nom", "libelle"):
+                                if isinstance(sv.get(kk), str) and sv.get(kk).strip():
+                                    out["subject"] = str(sv.get(kk)).strip()
+                                    break
+                        elif isinstance(sv, str) and sv.strip():
+                            out["subject"] = sv.strip()
+                    except Exception:
+                        pass
+            if out["date"] is not None and out["subject"]:
+                break
+    except Exception:
+        pass
+    return out
+
+
 def _fetch_contents_for_school_week(client, week: int) -> Dict[str, Any]:
-    """Un seul PageCahierDeTexte par semaine scolaire -> map lesson_id -> liste de contenus bruts.
+    """Un seul PageCahierDeTexte par semaine scolaire -> map lesson_id -> {
+    "contents": [bruts...], "date": ISO|None, "subject": str }.
 
     pronotepy docs : une séance peut avoir plusieurs chapitres (listeContenus.V
     à N éléments). On garde TOUTE la liste au lieu de conts[0] pour ne pas
     tronquer le cahier de textes dans la vue Contenus et ressources.
+    Le couple (date, matière) est un SECOURS pour la jointure : les ids
+    Pronote tournant à chaque session, lessons() ne retrouve pas toujours
+    l'id du cahier (lesson_start null -> aucun rattachement côté app).
     """
     try:
         resp = client.post("PageCahierDeTexte", 89, {"domaine": {"_T": 8, "V": f"[{week}..{week}]"}})
@@ -924,7 +1047,8 @@ def _fetch_contents_for_school_week(client, week: int) -> Dict[str, Any]:
                 lid = ((entry.get("cours") or {}).get("V") or {}).get("N")
                 conts = ((entry.get("listeContenus") or {}).get("V") or [])
                 if lid and conts:
-                    out[str(lid)] = list(conts)
+                    fb = _extract_cours_fallback(entry)
+                    out[str(lid)] = {"contents": list(conts), "date": fb.get("date"), "subject": fb.get("subject") or ""}
             except Exception:
                 continue
         return out
@@ -999,7 +1123,9 @@ def get_lesson_content(
         for w in weeks:
             raw_map = _fetch_contents_for_school_week(client, w)
             if str(req.lesson_id) in raw_map:
-                raws = raw_map[str(req.lesson_id)]
+                entry = raw_map[str(req.lesson_id)]
+                # Compat : ancien shape liste brute ou nouveau {contents,date,subject}.
+                raws = entry.get("contents") if isinstance(entry, dict) and "contents" in entry else entry
                 if not isinstance(raws, list):
                     raws = [raws]
                 out_contents = []
@@ -1141,10 +1267,21 @@ def get_timetable_contents(
             pass
         cur += timedelta(days=1)
     by_lesson: Dict[str, Any] = {}
+    fallback_meta: Dict[str, Dict[str, Any]] = {}
     for w in sorted(weeks):
         raw_map = _fetch_contents_for_school_week(client, w)
-        for lid, raws in raw_map.items():
-            items = raws if isinstance(raws, list) else [raws]
+        for lid, entry in raw_map.items():
+            # Compat : ancien shape liste brute ou nouveau {contents,date,subject}.
+            if isinstance(entry, dict) and "contents" in entry:
+                items = entry.get("contents")
+                if not isinstance(items, list):
+                    items = [items]
+                fallback_meta[str(lid)] = {
+                    "lesson_start": entry.get("date"),
+                    "subject": entry.get("subject") or "",
+                }
+            else:
+                items = entry if isinstance(entry, list) else [entry]
             merged = []
             for raw in items:
                 try:
@@ -1178,13 +1315,23 @@ def get_timetable_contents(
             continue
     flat = []
     for k, v in by_lesson.items():
-        meta = _meta.get(k, {})
+        # Jointure lessons() d'abord (heure exacte), secours brut du cahier
+        # (ids tournants : lessons() ne retrouve pas toujours l'id).
+        meta = _meta.get(k) or {}
+        fb = fallback_meta.get(k) or {}
+        from_lessons = bool(meta.get("lesson_start"))
+        start = meta.get("lesson_start") or fb.get("lesson_start")
+        subj = meta.get("subject") or fb.get("subject") or ""
+        # fuzzy=True : heure non vérifiée (secours cahier) -> l'app ne
+        # l'utilise qu'en passe 3 (même jour + matière), jamais en passe 1/2
+        # (test garde-fou : un contenu décalé de 2h reste rejeté).
+        fuzzy = not from_lessons
         if isinstance(v, list):
             for item in v:
                 if isinstance(item, dict):
-                    flat.append({"lesson_id": k, "lesson_start": meta.get("lesson_start"), "subject": meta.get("subject"), **item})
+                    flat.append({"lesson_id": k, "lesson_start": start, "subject": subj, "fuzzy": fuzzy, **item})
         elif isinstance(v, dict):
-            flat.append({"lesson_id": k, "lesson_start": meta.get("lesson_start"), "subject": meta.get("subject"), **v})
+            flat.append({"lesson_id": k, "lesson_start": start, "subject": subj, "fuzzy": fuzzy, **v})
     payload = {"contents": flat}
     cache_set(key, payload, 180)
     _set_cache_header(response, False)

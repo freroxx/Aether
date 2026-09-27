@@ -26,11 +26,7 @@ import HomeTimeTableWidget from "./widgets/timetable";
 import GradesWidget from "./widgets/Grades";
 import EvaluationsWidget from "./widgets/evaluations";
 import SanctionsWidget from "./widgets/sanctions";
-import LessonContentWidget, {
-  findNextCourse,
-  findNextCourseWithContent,
-} from "./widgets/LessonContent";
-import { getCourseRouteId } from "@/database/useTimetable";
+import LessonContentWidget from "./widgets/LessonContent";
 import SyncingCard from "./widgets/SyncingCard";
 import { useSyncStore } from "@/stores/sync";
 import MaskedView from "@react-native-masked-view/masked-view";
@@ -87,24 +83,10 @@ const HomeScreen = () => {
     () => <GradesWidget onEmptyStateChange={setGradesWidgetHidden} />,
     []
   );
-  // Cible du header calculée ici même (source unique : `courses`),
-  // sans attendre l'effet enfant — pas de décalage d'un render.
-  // `undefined` tant que les cours chargent : pas de lien header hasardeux.
-  // "Afficher plus" -> fiche du prochain cours (avec contenu si possible),
-  // jamais un simple renvoi EDT quand un cours existe.
-  const lessonRedirect = React.useMemo(() => {
-    if (!courses || courses.length === 0) return "/(tabs)/calendar";
-    const next = findNextCourseWithContent(courses as any[]) ?? findNextCourse(courses as any[]);
-    if (!next) return "/(tabs)/calendar";
-    try {
-      return {
-        pathname: "/(modals)/course/[id]",
-        params: { id: getCourseRouteId(next as any) },
-      };
-    } catch {
-      return "/(tabs)/calendar";
-    }
-  }, [courses]);
+  // « Afficher plus » du widget Contenu et ressources -> flux complet
+  // `/(features)/ressources` (jamais la fiche d'un cours isolé : c'était
+  // la confusion cours/contenu — « mon cours » sans info).
+  const lessonRedirect = "/(features)/ressources" as const;
   const renderLessonContent = React.useCallback(
     () => <LessonContentWidget onEmptyStateChange={setLessonContentHidden} />,
     []

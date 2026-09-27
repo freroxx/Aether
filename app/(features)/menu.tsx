@@ -17,6 +17,7 @@ import {
   Sparkles,
   UtensilsCrossed,
 } from "lucide-react-native";
+import Reanimated, { LinearTransition } from "react-native-reanimated";
 
 import { CanteenMenu, Food, Meal } from "@/services/shared/canteen";
 import { getManager } from "@/services/shared";
@@ -28,6 +29,7 @@ import MaterialIcon from "@/ui/components/MaterialIcon";
 import TabHeader from "@/ui/components/TabHeader";
 import TabHeaderTitle from "@/ui/components/TabHeaderTitle";
 import Typography from "@/ui/new/Typography";
+import { AetherAppearIn, AetherAppearOut } from "@/ui/utils/Transition";
 
 interface MealCategoryConfig {
   key: keyof Meal;
@@ -353,6 +355,7 @@ export default function CanteenMenuView() {
             leading="Menu de la cantine"
             subtitle={weekLabel}
             loading={loading}
+            color="#29947A"
           />
         }
       />
@@ -375,7 +378,8 @@ export default function CanteenMenuView() {
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={theme.colors.primary}
-              colors={[theme.colors.primary]}
+              colors={[String(theme.colors.primary)]}
+              progressViewOffset={headerHeight}
             />
           }
         >
@@ -524,6 +528,13 @@ export default function CanteenMenuView() {
             )}
           </View>
 
+          {/* Transition douce au changement de jour (même langage que Tâches/Calendrier). */}
+          <Reanimated.View
+            key={`${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`}
+            layout={LinearTransition}
+            entering={AetherAppearIn}
+            exiting={AetherAppearOut}
+          >
           {currentDayMenu?.lunch || currentDayMenu?.dinner ? (
             <View style={{ gap: 14 }}>
               {currentDayMenu.lunch && (
@@ -579,6 +590,7 @@ export default function CanteenMenuView() {
               </Typography>
             </View>
           )}
+          </Reanimated.View>
         </ScrollView>
       )}
     </View>

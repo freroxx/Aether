@@ -75,6 +75,51 @@ describe("matchContentForCourse", () => {
     expect(matchContentForCourse(contents, course)).toBeNull();
   });
 
+  it("rattache un contenu fuzzy le même jour (secours ids tournants)", () => {
+    const course: any = {
+      from: new Date(2026, 8, 12, 8, 0, 0),
+      subject: "Mathématiques",
+    };
+    const contents: any[] = [
+      {
+        lessonId: "rotating-unknown",
+        // Heure du cahier non vérifiée (midi par défaut côté backend).
+        lessonStart: new Date(2026, 8, 12, 12, 0, 0),
+        subject: "MATHEMATIQUES",
+        fuzzy: true,
+        resources,
+      },
+    ];
+    expect(matchContentForCourse(contents, course)).toBe(resources);
+  });
+
+  it("rejette un contenu fuzzy un autre jour ou une autre matière", () => {
+    const course: any = {
+      from: new Date(2026, 8, 12, 8, 0, 0),
+      subject: "Mathématiques",
+    };
+    const otherDay: any[] = [
+      {
+        lessonId: "x",
+        lessonStart: new Date(2026, 8, 13, 12, 0, 0),
+        subject: "MATHEMATIQUES",
+        fuzzy: true,
+        resources,
+      },
+    ];
+    expect(matchContentForCourse(otherDay, course)).toBeNull();
+    const otherSubject: any[] = [
+      {
+        lessonId: "y",
+        lessonStart: new Date(2026, 8, 12, 12, 0, 0),
+        subject: "FRANCAIS",
+        fuzzy: true,
+        resources,
+      },
+    ];
+    expect(matchContentForCourse(otherSubject, course)).toBeNull();
+  });
+
   it("rejette une matière différente à la même heure", () => {
     const course: any = {
       from: new Date(2026, 8, 12, 8, 0, 0),
