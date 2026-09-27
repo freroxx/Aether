@@ -112,10 +112,10 @@ export class Punishment extends Model {
   }
 
   get homeworkDocuments(): Attachment[] {
-    return JSON.parse(this.homeworkDocumentsRaw);
+    try { return JSON.parse(this.homeworkDocumentsRaw || '[]'); } catch { return []; }
   }
 
   get reasonDocuments(): Attachment[] {
-    return JSON.parse(this.reasonDocumentsRaw);
+    try { return JSON.parse(this.reasonDocumentsRaw || '[]'); } catch { return []; }
   }
 }

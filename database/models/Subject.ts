@@ -28,22 +28,22 @@ export default class Subject extends Model {
   @children('grades') grades: Grade[];
 
   get studentAverage(): GradeScore {
-    return JSON.parse(this.studentAverageRaw || '{}');
+    try { return JSON.parse(this.studentAverageRaw || '{}'); } catch { return {} as GradeScore; }
   }
 
   get classAverage(): GradeScore {
-    return JSON.parse(this.classAverageRaw || '{}');
+    try { return JSON.parse(this.classAverageRaw || '{}'); } catch { return {} as GradeScore; }
   }
 
   get maximum(): GradeScore {
-    return JSON.parse(this.maximumRaw || '{}');
+    try { return JSON.parse(this.maximumRaw || '{}'); } catch { return {} as GradeScore; }
   }
 
   get minimum(): GradeScore {
-    return JSON.parse(this.minimumRaw || '{}');
+    try { return JSON.parse(this.minimumRaw || '{}'); } catch { return {} as GradeScore; }
   }
 
   get outOf(): GradeScore {
-    return JSON.parse(this.outOfRaw || '{}');
+    try { return JSON.parse(this.outOfRaw || '{}'); } catch { return {} as GradeScore; }
   }
 }

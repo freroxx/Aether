@@ -26,14 +26,27 @@ except Exception:
 
 
 def _cache_key(prefix: str, auth: Dict[str, Any], *parts: Any) -> str:
-    """Clé de cache stable (jamais de token/mot de passe dedans)."""
+    """Clé de cache stable (jamais de token/mot de passe dedans).
+
+    Normalise les parties (strip, collapse espaces, lower) pour éviter
+    les doublons « Enzo DUPONT » vs « enzo dupont » qui tuaient le hit-rate.
+    """
+    def _norm_part(p: Any) -> str:
+        if p is None:
+            return ""
+        try:
+            s = str(p).strip()
+            s = " ".join(s.split())
+            return s.lower()
+        except Exception:
+            return str(p)
     raw = "|".join([
         prefix,
-        str(auth.get("url", "")),
-        str(auth.get("username", "")),
-        str(auth.get("uuid", "")),
-        str(auth.get("account_type", "eleve")),
-        *[str(p) for p in parts],
+        str(auth.get("url", "")).strip(),
+        str(auth.get("username", "")).strip(),
+        str(auth.get("uuid", "")).strip(),
+        str(auth.get("account_type", "eleve")).strip().lower(),
+        *[_norm_part(p) for p in parts],
     ])
     return "aether:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -98,6 +111,7 @@ app.add_middleware(
     allow_credentials=_use_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Aether-Cache"],
 )
 
 # ----------------- Models -----------------
@@ -198,7 +212,7 @@ def _classify_pronote_error(e: Exception) -> HTTPException:
         return HTTPException(status_code=401, detail=f"Code PIN incorrect (QR indéchiffrable): {msg}")
     if tname == "MFAError" or "doubleauth" in low or "2fa" in low or "pin is required" in low or "invalid pin" in low:
         return HTTPException(status_code=428, detail=f"Double authentification requise (code PIN / appareil à valider): {msg}")
-    if tname == "ChildNotFound" or "child" in tname.lower() and "not found" in low:
+    if tname == "ChildNotFound" or ("child" in tname.lower() and "not found" in low):
         return HTTPException(status_code=404, detail=f"Enfant introuvable: {msg}")
     if tname == "ExpiredObject" or "unknown object reference" in low or "error 22" in low:
         return HTTPException(status_code=409, detail=f"Objet Pronote expiré (session renouvelée, rouvrez la liste): {msg}")
@@ -363,7 +377,7 @@ def read_root():
     return {
         "status": "online",
         "service": "Aether Pronotepy Bridge",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "redis_cached": redis_client is not None
     }
 
@@ -651,6 +665,7 @@ def request_qr_code(req: QrCodeRequestData, auth: Dict[str, Any] = Depends(get_s
 
 @app.get("/periods/current")
 def get_current_period(
+    response: Response,
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header),
 ):
@@ -658,6 +673,7 @@ def get_current_period(
     key = _cache_key("current_period", auth, child)
     hit = cache_get(key)
     if hit is not None:
+        _set_cache_header(response, True)
         return hit
     client = init_client(auth, child_name=child)
     try:
@@ -673,6 +689,7 @@ def get_current_period(
     except Exception as e:
         raise _classify_pronote_error(e)
     cache_set(key, payload, 300)
+    _set_cache_header(response, False)
     return payload
 
 
@@ -725,16 +742,27 @@ def get_session_info(
 
 
 @app.get("/parent/children")
-def get_parent_children(auth: Dict[str, Any] = Depends(get_session_header)):
+def get_parent_children(response: Response, auth: Dict[str, Any] = Depends(get_session_header)):
+    ckey = _cache_key("parent_children", auth)
+    chit = cache_get(ckey)
+    if chit is not None:
+        _set_cache_header(response, True)
+        return chit
     client = init_client(auth)
     if not hasattr(client, "children"):
-        return {"children": []}
-    return {
+        payload = {"children": []}
+        cache_set(ckey, payload, 120)
+        _set_cache_header(response, False)
+        return payload
+    payload = {
         "children": [
-            {"id": getattr(c, "id", c.name), "name": c.name, "grade": getattr(c, "grade", getattr(c, "class_name", ""))}
+            {"id": getattr(c, "id", getattr(c, "name", "?")), "name": getattr(c, "name", "?"), "grade": getattr(c, "grade", getattr(c, "class_name", ""))}
             for c in client.children
         ]
     }
+    cache_set(ckey, payload, 120)
+    _set_cache_header(response, False)
+    return payload
 
 @app.get("/timetable")
 def get_timetable(
@@ -752,7 +780,10 @@ def get_timetable(
         return hit
     client = init_client(auth, child_name=child)
 
-    lessons = client.lessons(start_d, end_d)
+    try:
+        lessons = client.lessons(start_d, end_d)
+    except Exception as e:
+        raise _classify_pronote_error(e)
     result = []
     for l in lessons:
         status_str = None
@@ -878,7 +909,12 @@ def _serialize_lesson_content(c) -> Dict[str, Any]:
 
 
 def _fetch_contents_for_school_week(client, week: int) -> Dict[str, Any]:
-    """Un seul PageCahierDeTexte par semaine scolaire -> map lesson_id -> content brut."""
+    """Un seul PageCahierDeTexte par semaine scolaire -> map lesson_id -> liste de contenus bruts.
+
+    pronotepy docs : une séance peut avoir plusieurs chapitres (listeContenus.V
+    à N éléments). On garde TOUTE la liste au lieu de conts[0] pour ne pas
+    tronquer le cahier de textes dans la vue Contenus et ressources.
+    """
     try:
         resp = client.post("PageCahierDeTexte", 89, {"domaine": {"_T": 8, "V": f"[{week}..{week}]"}})
         items = resp.get("dataSec", {}).get("data", {}).get("ListeCahierDeTextes", {}).get("V", []) or []
@@ -888,7 +924,7 @@ def _fetch_contents_for_school_week(client, week: int) -> Dict[str, Any]:
                 lid = ((entry.get("cours") or {}).get("V") or {}).get("N")
                 conts = ((entry.get("listeContenus") or {}).get("V") or [])
                 if lid and conts:
-                    out[str(lid)] = conts[0]
+                    out[str(lid)] = list(conts)
             except Exception:
                 continue
         return out
@@ -920,7 +956,9 @@ def get_lesson_content(
     if req.lesson_start:
         try:
             raw_ls = str(req.lesson_start)
-            if raw_ls.endswith("Z") or ("+" in raw_ls[10:] or raw_ls[10:].count("-") > 2):
+            # Offset avec dash : +02:00 (1 tiret) ou -05:00 — ancien test
+            # count("-")>2 manquait ces cas -> aware traité en naive -> TypeError.
+            if raw_ls.endswith("Z") or ("+" in raw_ls[10:] or raw_ls[10:].count("-") >= 1):
                 aware = datetime.fromisoformat(raw_ls.replace("Z", "+00:00"))
                 if aware.tzinfo is not None:
                     pivot = aware.replace(tzinfo=None)
@@ -939,10 +977,9 @@ def get_lesson_content(
     if pivot is not None:
         anchor_d = pivot.date()
     elif req.date:
-        try:
-            anchor_d = parse_ymd(req.date, "date")
-        except Exception:
-            anchor_d = None
+        # Date invalide -> 422 explicite (pas de fallback silencieux vers today
+        # qui scannait la mauvaise semaine).
+        anchor_d = parse_ymd(req.date, "date")
     if anchor_d is None:
         anchor_d = date.today()
 
@@ -957,26 +994,34 @@ def get_lesson_content(
         return {"contents": []}
 
     # 1) Chemin direct par lesson_id (le plus fiable quand l'id est frais).
+    # Une séance peut avoir N chapitres : on sérialise toute la liste.
     if req.lesson_id:
         for w in weeks:
             raw_map = _fetch_contents_for_school_week(client, w)
             if str(req.lesson_id) in raw_map:
-                try:
-                    import pronotepy as _pn
-                    lc = _pn.LessonContent(client, raw_map[str(req.lesson_id)])
-                    return {"contents": [_serialize_lesson_content(lc)]}
-                except Exception:
-                    raw = raw_map[str(req.lesson_id)]
+                raws = raw_map[str(req.lesson_id)]
+                if not isinstance(raws, list):
+                    raws = [raws]
+                out_contents = []
+                for raw_item in raws:
                     try:
-                        files = [{"name": f.get("L", "Fichier"), "url": f.get("url"), "type": f.get("G", 1)} for f in (raw.get("ListePieceJointe", {}) or {}).get("V", [])]
+                        import pronotepy as _pn
+                        lc = _pn.LessonContent(client, raw_item)
+                        out_contents.append(_serialize_lesson_content(lc))
                     except Exception:
-                        files = []
-                    return {"contents": [{
-                        "title": raw.get("L"),
-                        "description": raw.get("descriptif", {}).get("V") if isinstance(raw.get("descriptif"), dict) else raw.get("descriptif"),
-                        "category": (raw.get("categorie", {}) or {}).get("V") if isinstance(raw.get("categorie"), dict) else raw.get("categorie"),
-                        "files": files,
-                    }]}
+                        raw = raw_item
+                        try:
+                            files = [{"name": f.get("L", "Fichier"), "url": f.get("url"), "type": f.get("G", 1)} for f in (raw.get("ListePieceJointe", {}) or {}).get("V", [])]
+                        except Exception:
+                            files = []
+                        out_contents.append({
+                            "title": raw.get("L"),
+                            "description": raw.get("descriptif", {}).get("V") if isinstance(raw.get("descriptif"), dict) else raw.get("descriptif"),
+                            "category": (raw.get("categorie", {}) or {}).get("V") if isinstance(raw.get("categorie"), dict) else raw.get("categorie"),
+                            "files": files,
+                        })
+                if out_contents:
+                    return {"contents": out_contents}
 
     # 2) Fallback par date/heure : retrouve le cours dans ±2j puis lit son contenu.
     try:
@@ -1045,7 +1090,10 @@ def get_lesson_content(
                         continue
                 if target is not None:
                     break
-    if target is None and lessons:
+    # Dernier recours : uniquement si on a un pivot temporel fiable.
+    # Sans lesson_start ni date précise, retourner un cours arbitraire
+    # serait un mauvais rattachement (mauvaise séance affichée).
+    if target is None and lessons and pivot is not None:
         # Dernier recours : cours le plus proche du pivot.
         try:
             def _dist(l):
@@ -1095,12 +1143,19 @@ def get_timetable_contents(
     by_lesson: Dict[str, Any] = {}
     for w in sorted(weeks):
         raw_map = _fetch_contents_for_school_week(client, w)
-        for lid, raw in raw_map.items():
-            try:
-                import pronotepy as _pn
-                by_lesson[str(lid)] = _serialize_lesson_content(_pn.LessonContent(client, raw))
-            except Exception:
-                continue
+        for lid, raws in raw_map.items():
+            items = raws if isinstance(raws, list) else [raws]
+            merged = []
+            for raw in items:
+                try:
+                    import pronotepy as _pn
+                    merged.append(_serialize_lesson_content(_pn.LessonContent(client, raw)))
+                except Exception:
+                    continue
+            if merged:
+                # N chapitres -> on concatène en une ressource par chapitre,
+                # le frontend éclate en cartes (titre/description/fichiers).
+                by_lesson[str(lid)] = merged if len(merged) > 1 else merged[0]
     # Les ids Pronote tournent à chaque session : le frontend ne peut pas les
     # recroiser avec son EDT. On joint donc heure de début + matière (1 seul
     # appel lessons() sur la fenêtre) pour un matching par date/matière.
@@ -1121,11 +1176,17 @@ def get_timetable_contents(
                 }
         except Exception:
             continue
-    payload = {"contents": [
-        {"lesson_id": k, "lesson_start": _meta.get(k, {}).get("lesson_start"), "subject": _meta.get(k, {}).get("subject"), **v}
-        for k, v in by_lesson.items()
-    ]}
-    cache_set(key, payload, 60)
+    flat = []
+    for k, v in by_lesson.items():
+        meta = _meta.get(k, {})
+        if isinstance(v, list):
+            for item in v:
+                if isinstance(item, dict):
+                    flat.append({"lesson_id": k, "lesson_start": meta.get("lesson_start"), "subject": meta.get("subject"), **item})
+        elif isinstance(v, dict):
+            flat.append({"lesson_id": k, "lesson_start": meta.get("lesson_start"), "subject": meta.get("subject"), **v})
+    payload = {"contents": flat}
+    cache_set(key, payload, 180)
     _set_cache_header(response, False)
     return payload
 
@@ -1147,6 +1208,9 @@ def get_grades(
     target_period = None
     if period:
         target_period = next((p for p in periods if p.name == period), None)
+        if target_period is None:
+            names = [getattr(p, "name", "?") for p in (periods or [])]
+            raise HTTPException(status_code=404, detail=f"Période « {period} » introuvable. Disponibles : {', '.join(names)}")
     if not target_period and periods:
         target_period = periods[-1] # Default to latest period
 
@@ -1230,12 +1294,14 @@ def get_grades(
 
 @app.get("/grades/periods")
 def get_grade_periods(
+    response: Response,
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
     key = _cache_key("grade_periods", auth, child)
     hit = cache_get(key)
     if hit is not None:
+        _set_cache_header(response, True)
         return hit
     client = init_client(auth, child_name=child)
     result = []
@@ -1248,6 +1314,7 @@ def get_grade_periods(
         })
     payload = {"periods": result}
     cache_set(key, payload, 300)
+    _set_cache_header(response, False)
     return payload
 
 @app.get("/homework")
@@ -1608,6 +1675,12 @@ def get_canteen(
     child: Optional[str] = Query(None),
     auth: Dict[str, Any] = Depends(get_session_header)
 ):
+    # Valide AVANT le login Pronote (1-3s économisées sur date invalide)
+    # + clamp 62j anti-DoS (fenêtre illimitée avant).
+    start_d, end_d = clamp_window(
+        parse_ymd(from_date, "from_date"),
+        parse_ymd(to_date, "to_date") if to_date else parse_ymd(from_date, "from_date"),
+    )
     # Phase 6 quick win: short cache 60s (menus change peu dans la journée).
     ckey = _cache_key("canteen", auth, from_date, to_date, child)
     chit = cache_get(ckey)
@@ -1615,14 +1688,13 @@ def get_canteen(
         _set_cache_header(response, True)
         return chit
     client = init_client(auth, child_name=child)
-    start_d = parse_ymd(from_date, "from_date")
-    end_d = parse_ymd(to_date, "to_date") if to_date else start_d
-    if end_d < start_d:
-        raise HTTPException(status_code=422, detail="to_date antérieur à from_date")
 
     menus = []
     if hasattr(client, "menus"):
-        menus_list = client.menus(start_d, end_d) if callable(client.menus) else client.menus
+        try:
+            menus_list = client.menus(start_d, end_d) if callable(client.menus) else client.menus
+        except Exception as e:
+            raise _classify_pronote_error(e)
         for m in menus_list:
             def extract_foods(food_list):
                 if not food_list:
@@ -1698,7 +1770,11 @@ def get_chats(
                     msgs = getattr(d, "messages", [])
                 except Exception:
                     msgs = []
-                latest_date = msgs[-1].created.isoformat() if msgs and hasattr(msgs[-1], "created") else datetime.now().isoformat()
+                try:
+                    latest = msgs[-1] if msgs else None
+                    latest_date = latest.created.isoformat() if latest is not None and getattr(latest, "created", None) is not None and hasattr(latest.created, "isoformat") else None
+                except Exception:
+                    latest_date = None
                 discussions.append({
                     "id": getattr(d, "id", f"disc_{getattr(d, 'subject', '')}"),
                     "subject": getattr(d, "subject", "Discussion"),
@@ -2430,6 +2506,8 @@ def download_file(
                 continue
 
     # 3) Fallback : GET authentifié direct de file_url avec les cookies de session.
+    # SSRF guard : n'autorise que le host Pronote du compte (même netloc),
+    # jamais d'URL arbitraire avec les cookies de session.
     if found_bytes is None:
         if not target_url:
             detail = "[files/download] Fichier introuvable ou session Pronote expirée."
@@ -2437,10 +2515,19 @@ def download_file(
                 detail += f" (enfant : {req.child_name})"
             raise HTTPException(status_code=404, detail=detail)
         try:
+            from urllib.parse import urlsplit as _urlsplit
+            allowed_host = ""
+            try:
+                allowed_host = (_urlsplit(str(auth.get("url", ""))).netloc or "").lower()
+            except Exception:
+                allowed_host = ""
+            target_host = (_urlsplit(target_url).netloc or "").lower()
+            if not target_host or (allowed_host and target_host != allowed_host):
+                raise HTTPException(status_code=403, detail="[files/download] URL hors établissement refusée.")
             sess = getattr(getattr(client, "communication", None), "session", None)
             if sess is None:
-                raise HTTPException(status_code=500, detail="Session Pronote indisponible.")
-            resp = sess.get(target_url, timeout=20)
+                raise HTTPException(status_code=502, detail="Session Pronote indisponible.")
+            resp = sess.get(target_url, timeout=12)
             if getattr(resp, "status_code", 500) != 200:
                 raise HTTPException(
                     status_code=404,

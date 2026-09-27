@@ -90,11 +90,24 @@ async function request<T>(
   };
 
   const isGet = !options.method || options.method.toUpperCase() === "GET";
-  // Clé de dédup incluant le compte (hash du token) : sans ça, deux comptes
+  // Clé de dédup incluant le compte (hash long du token) : sans ça, deux comptes
   // interrogeant la même semaine partageaient la même promesse (fuite inter-comptes).
-  const tokenHash = options.authToken
-    ? String(options.authToken.length) + ":" + String(options.authToken.slice(0, 12))
-    : "noauth";
+  // Ancien slice(0,12) collisionnait sur préfixe commun -> hash simple 32 bits sur 64 chars.
+  const tokenHash = (() => {
+    try {
+      const t = String(options.authToken ?? "noauth");
+      if (t === "noauth") return "noauth";
+      let h1 = 0x811c9dc5;
+      const s = t.slice(0, 64);
+      for (let i = 0; i < s.length; i++) {
+        h1 ^= s.charCodeAt(i);
+        h1 = Math.imul(h1, 0x01000193) >>> 0;
+      }
+      return `${t.length}:${h1.toString(16)}`;
+    } catch {
+      return "noauth";
+    }
+  })();
   const dedupKey = isGet ? `${options.method ?? "GET"} ${url} ${tokenHash}` : null;
   if (dedupKey && inFlightGets.has(dedupKey)) {
     return inFlightGets.get(dedupKey) as Promise<T>;
@@ -103,7 +116,9 @@ async function request<T>(
   const exec = (async (): Promise<T> => {
     const retriable = (e: unknown, status?: number): boolean => {
       if (options.retry === false) return false;
-      if (status !== undefined) return status === 502 || status === 503 || status === 504;
+      // 429 rate-limit Pronote : retry backoff comme 502/503/504 (le backend
+      // mappe déjà ces cas, le client ne doit pas échouer sec sur throttle).
+      if (status !== undefined) return status === 429 || status === 502 || status === 503 || status === 504;
       return isNetworkFailure(e);
     };
 
@@ -153,7 +168,13 @@ async function request<T>(
         throw new PronoteHttpError(response.status, errDetail);
       }
 
-      return response.json();
+      // JSON guard : backend froid / 502 HTML / body vide -> SyntaxError wrappée
+      // en PronoteHttpError(502) au lieu de crasher les callers en substring-match.
+      try {
+        return await response.json();
+      } catch {
+        throw new PronoteHttpError(502, "Réponse serveur illisible (redémarrage établissement ?). Réessaie dans un instant.");
+      }
     }
   })();
 
@@ -309,6 +330,7 @@ export const PronoteApiClient = {
     return request("/timetable/lesson-content", {
       method: "POST",
       authToken,
+      retry: false,
       body: {
         lesson_id: opts.lessonId,
         lesson_start: opts.lessonStart,
@@ -438,6 +460,7 @@ export const PronoteApiClient = {
     return request(`/chats/${chatId}/read`, {
       method: "POST",
       authToken,
+      retry: false,
       body: { chat_id: chatId, read, child_name: child },
     });
   },
@@ -446,6 +469,7 @@ export const PronoteApiClient = {
     return request(`/chats/${chatId}/delete`, {
       method: "POST",
       authToken,
+      retry: false,
       body: { chat_id: chatId, child_name: child },
     });
   },
@@ -460,6 +484,7 @@ export const PronoteApiClient = {
     return request("/chats/send", {
       method: "POST",
       authToken,
+      retry: false,
       body: {
         chat_id: chatId,
         content,
@@ -486,6 +511,7 @@ export const PronoteApiClient = {
     return request("/chats/new", {
       method: "POST",
       authToken,
+      retry: false,
       body: {
         subject,
         content,
@@ -499,6 +525,7 @@ export const PronoteApiClient = {
     return request("/news/read", {
       method: "POST",
       authToken,
+      retry: false,
       body: {
         news_id: newsId,
         child_name: child,

@@ -14,8 +14,12 @@ export async function fetchPronoteHomeworks(
     // Année ISO inférée (proximité à aujourd'hui) : `weekNumber` seul est
     // ambigu (semaine 1 en décembre = janvier suivant, pas janvier passé).
     const { start, end } = getWeekRangeForWeekNumber(weekNumberRaw, new Date());
-    const fromStr = start.toISOString().split("T")[0];
-    const toStr = end.toISOString().split("T")[0];
+    // Dates locales (pas toISOString/UTC) : 00:00 local = veille 22-23h UTC
+    // -> semaine décalée -1j en Europe. Même fix que timetable/cantine.
+    const fmtLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const fromStr = fmtLocal(start);
+    const toStr = fmtLocal(end);
 
     const data = await PronoteApiClient.getHomework(authToken, fromStr, toStr, childName);
     return (data.homework || []).map((h: any) => ({
@@ -24,7 +28,10 @@ export async function fetchPronoteHomeworks(
       kidName: childName,
       subject: h.subject || "Matière",
       content: h.description || "",
-      dueDate: new Date(h.date),
+      dueDate: (() => {
+        const d = new Date(h.date);
+        return isNaN(d.getTime()) ? new Date() : d;
+      })(),
       isDone: h.done ?? false,
       returnFormat: ReturnFormat.PAPER,
       attachments: (h.files || []).map((f: any) => {

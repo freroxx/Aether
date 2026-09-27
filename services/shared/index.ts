@@ -401,9 +401,12 @@ export class AccountManager {
       },
       {
         multiple: true,
-        fallback: async () => [await getAttendanceFromCache(period)],
+        fallback: async () => {
+          const cached = await getAttendanceFromCache(period);
+          return cached ? [cached] : [];
+        },
         saveToCache: async (data: Attendance[]) => {
-          await addAttendanceToDatabase(data, period);
+          await addAttendanceToDatabase(data.filter(Boolean) as Attendance[], period);
         },
       }
     );
@@ -906,7 +909,11 @@ export class AccountManager {
         }
         const result = await callback(client);
         if (options.saveToCache) {
-          await options.saveToCache(result);
+          try {
+            await options.saveToCache(result);
+          } catch (e) {
+            warn(`saveToCache failed (single): ${String(e)}`);
+          }
         }
         return result;
       }
@@ -934,13 +941,26 @@ export class AccountManager {
       }
 
       if (options?.multiple) {
-        const results = await Promise.all(
+        // allSettled : 1 compte mort ne tue plus tous les comptes.
+        const settled = await Promise.allSettled(
           availableClients.map(client => callback(client) as Promise<T[]>)
         );
+        const results: T[][] = [];
+        for (const s of settled) {
+          if (s.status === "fulfilled" && Array.isArray(s.value)) {
+            results.push(s.value);
+          } else if (s.status === "rejected") {
+            warn(`fetchData client failed: ${String((s as PromiseRejectedResult).reason)}`);
+          }
+        }
         const combinedResult = results.flat();
 
         if (options?.saveToCache) {
-          await options.saveToCache(combinedResult);
+          try {
+            await options.saveToCache(combinedResult);
+          } catch (e) {
+            warn(`saveToCache failed (multiple): ${String(e)}`);
+          }
         }
 
         return combinedResult;

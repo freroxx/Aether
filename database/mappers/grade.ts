@@ -19,6 +19,14 @@ export function mapPeriodToShared(period: Period): SharedPeriod {
 }
 
 export function mapGradeToShared(grade: Grade): SharedGrade {
+  const safeParseAttachment = (raw: unknown): Attachment => {
+    try {
+      if (!raw || typeof raw !== "string" || raw.trim().length === 0) return undefined as unknown as Attachment;
+      return JSON.parse(raw) as Attachment;
+    } catch {
+      return undefined as unknown as Attachment;
+    }
+  };
   return {
     id: grade.gradeId,
     subjectName: grade.subjectName,
@@ -29,8 +37,8 @@ export function mapGradeToShared(grade: Grade): SharedGrade {
     isOptional: grade.optional,
     isOutOf20: undefined,
     givenAt: new Date(grade.givenAt),
-    subjectFile: JSON.parse(grade.subjectFile ?? "") as Attachment,
-    correctionFile: JSON.parse(grade.correctionFile ?? "") as Attachment,
+    subjectFile: safeParseAttachment(grade.subjectFile),
+    correctionFile: safeParseAttachment(grade.correctionFile),
     bonus: grade.bonus,
     optional: grade.optional,
     outOf: grade.outOf,

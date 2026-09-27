@@ -53,27 +53,27 @@ export class Grade extends Model {
   @field('skills') skillsRaw?: string;
 
 	get outOf(): GradeScore {
-	  return JSON.parse(this.outOfRaw || '{}');
+	  try { return JSON.parse(this.outOfRaw || '{}'); } catch { return {} as GradeScore; }
 	}
 
 	get studentScore(): GradeScore {
-	  return JSON.parse(this.studentScoreRaw || '{}');
+	  try { return JSON.parse(this.studentScoreRaw || '{}'); } catch { return {} as GradeScore; }
 	}
 
 	get averageScore(): GradeScore {
-	  return JSON.parse(this.averageScoreRaw || '{}');
+	  try { return JSON.parse(this.averageScoreRaw || '{}'); } catch { return {} as GradeScore; }
 	}
 
 	get minScore(): GradeScore {
-	  return JSON.parse(this.minScoreRaw || '{}');
+	  try { return JSON.parse(this.minScoreRaw || '{}'); } catch { return {} as GradeScore; }
 	}
 
 	get maxScore(): GradeScore {
-	  return JSON.parse(this.maxScoreRaw || '{}');
+	  try { return JSON.parse(this.maxScoreRaw || '{}'); } catch { return {} as GradeScore; }
 	}
 
   get skills(): SkillScore[] {
-    return JSON.parse(this.skillsRaw || '[]');
+    try { return JSON.parse(this.skillsRaw || '[]'); } catch { return []; }
   }
 }
 
@@ -95,10 +95,10 @@ export class PeriodGrades extends Model {
   @children('subjects') subjects: Subject[];
 
   get studentOverall(): GradeScore {
-    return JSON.parse(this.studentOverallRaw || '{}');
+    try { return JSON.parse(this.studentOverallRaw || '{}'); } catch { return {} as GradeScore; }
   }
 
   get classAverage(): GradeScore {
-    return JSON.parse(this.classAverageRaw || '{}');
+    try { return JSON.parse(this.classAverageRaw || '{}'); } catch { return {} as GradeScore; }
   }
 }

@@ -2,6 +2,8 @@ import { t } from "i18next";
 
 
 export const getPeriodName = (name: string) => {
+  // Guard backend null (sinon .replace crashe tout l'écran notes).
+  if (typeof name !== "string" || name.length === 0) return "";
   // Clean up the string: remove digits and trim
   // Remove common prefixes that might be leftover (like "er" from "1er") 
   let newName = name.replace(/^\d{1,4}[a-zÀ-ù]{0,4}/, '').replace(/\d/g, '').trim();
@@ -36,10 +38,15 @@ export const isPeriodWithNumber = (name: string) => {
 
 export const getPeriodNumber = (name: string) => {
   // return only digits
+  if (typeof name !== "string" || name.length === 0) return "";
   let newName = name.replace(/\D/g, '').trim();
 
   if (newName.length === 0) {
-    newName = name[0].toUpperCase();
+    try {
+      newName = name[0].toUpperCase();
+    } catch {
+      return "";
+    }
   }
 
   return newName.toString()[0];
@@ -85,6 +92,13 @@ export function getWeekRange(
     w = iso.week;
     y = iso.year;
   }
+  // Clamp anti-DoS : weekNumber corrompu (1e9) bouclait 19M fois.
+  if (!Number.isFinite(w) || !Number.isFinite(y)) {
+    w = 1;
+    y = new Date().getFullYear();
+  }
+  w = Math.max(-53, Math.min(106, Math.trunc(w)));
+  y = Math.max(1970, Math.min(2100, Math.trunc(y)));
   // Normalise les débordements (semaine 0 = dernière semaine année-1, etc.)
   while (w < 1) {
     y -= 1;
