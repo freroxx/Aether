@@ -1,11 +1,11 @@
-import { Papicons } from "@getpapillon/papicons";
 import { t } from "i18next";
 import React, { useCallback } from "react";
-import { Platform, Pressable, RefreshControl, View } from "react-native";
+import { Pressable, RefreshControl, View } from "react-native";
 import Reanimated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "expo-router/react-navigation";
 
+import { hapticFor } from "@/utils/haptics";
 import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
 import List from "@/ui/new/List";
@@ -17,7 +17,8 @@ import type {
   DaySection,
   SessionItem,
 } from "../hooks/useRessourcesData";
-import SessionCard from "./SessionCard";
+import DayHeader from "./DayHeader";
+import SessionCard, { RESSOURCES_ACCENT } from "./SessionCard";
 
 interface RessourcesListProps {
   sections: DaySection[];
@@ -26,11 +27,45 @@ interface RessourcesListProps {
   isRefreshing: boolean;
   onRefresh: () => void;
   isFiltering: boolean;
+  loadError: boolean;
+  offline: boolean;
   collapsedGroups: string[];
   onToggleGroup: (id: string) => void;
   downloadingKey: string | null;
   onOpenFile: (attachment: BuiltAttachment, dueDate: Date) => void;
   onOpenHomework: (routeId: string) => void;
+}
+
+/** Libellé relatif honnête : Aujourd'hui / Hier / Demain, sinon date complète. */
+function relativeTitle(key: string, fallback: string): {
+  title: string;
+  subtitle?: string;
+} {
+  try {
+    const parts = key.split("-").map((n) => Number(n));
+    if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
+      return { title: fallback };
+    }
+    const day = new Date(parts[0], parts[1], parts[2]);
+    day.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round(
+      (day.getTime() - today.getTime()) / 86400000
+    );
+    if (diff === 0)
+      return {
+        title: t("Ressources_Today", "Aujourd'hui"),
+        subtitle: fallback,
+      };
+    if (diff === -1)
+      return { title: t("Ressources_Yesterday", "Hier"), subtitle: fallback };
+    if (diff === 1)
+      return { title: t("Ressources_Tomorrow", "Demain"), subtitle: fallback };
+    return { title: fallback };
+  } catch {
+    return { title: fallback };
+  }
 }
 
 const RessourcesList: React.FC<RessourcesListProps> = ({
@@ -40,6 +75,8 @@ const RessourcesList: React.FC<RessourcesListProps> = ({
   isRefreshing,
   onRefresh,
   isFiltering,
+  loadError,
+  offline,
   collapsedGroups,
   onToggleGroup,
   downloadingKey,
@@ -69,6 +106,8 @@ const RessourcesList: React.FC<RessourcesListProps> = ({
     [downloadingKey, onOpenFile, onOpenHomework]
   );
 
+  const showError = loadError && sections.length === 0;
+
   return (
     <List
       key={`ressources-list-${numColumns}`}
@@ -86,24 +125,91 @@ const RessourcesList: React.FC<RessourcesListProps> = ({
         top: headerHeight - insets.top,
       }}
       ListEmptyComponent={
-        <Stack gap={8} vAlign="center" hAlign="center" padding={32}>
-          <Typography variant="h4" align="center">
-            {t("Ressources_Empty_Title", "Aucune ressource")}
-          </Typography>
-          <Typography variant="body1" color="secondary" align="center">
-            {isFiltering
-              ? t(
-                  "Ressources_Empty_Filter",
-                  "Essaie d'élargir les filtres ou la période."
-                )
-              : t(
-                  "Ressources_Empty_Details",
-                  "Les contenus de cours et pièces jointes apparaîtront ici."
-                )}
-          </Typography>
-        </Stack>
+        showError ? (
+          <Stack gap={10} vAlign="center" hAlign="center" padding={32}>
+            <Typography variant="h4" align="center">
+              {t("Ressources_Error_Title", "Chargement impossible")}
+            </Typography>
+            <Typography variant="body1" color="secondary" align="center">
+              {t(
+                "Ressources_Error_Details",
+                "Vérifie ta connexion puis réessaie."
+              )}
+            </Typography>
+            <Pressable
+              onPress={() => {
+                void hapticFor("selection");
+                onRefresh();
+              }}
+              style={({ pressed }) => [
+                {
+                  paddingVertical: 10,
+                  paddingHorizontal: 18,
+                  borderRadius: 300,
+                  backgroundColor: `${RESSOURCES_ACCENT}1A`,
+                  opacity: pressed ? 0.7 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                },
+              ]}
+              accessibilityRole="button"
+            >
+              <Typography
+                variant="button"
+                style={{ color: RESSOURCES_ACCENT }}
+              >
+                {t("Ressources_Retry", "Réessayer")}
+              </Typography>
+            </Pressable>
+          </Stack>
+        ) : (
+          <Stack gap={8} vAlign="center" hAlign="center" padding={32}>
+            <Typography variant="h4" align="center">
+              {t("Ressources_Empty_Title", "Aucune ressource")}
+            </Typography>
+            <Typography variant="body1" color="secondary" align="center">
+              {isFiltering
+                ? t(
+                    "Ressources_Empty_Filter",
+                    "Essaie d'élargir les filtres ou la période."
+                  )
+                : t(
+                    "Ressources_Empty_Details",
+                    "Les contenus de cours et pièces jointes apparaîtront ici."
+                  )}
+            </Typography>
+          </Stack>
+        )
       }
-      ListHeaderComponent={<>{headerExtra}</>}
+      ListHeaderComponent={
+        <>
+          {offline && (
+            <View
+              style={{
+                marginTop: headerHeight,
+                flexDirection: "row",
+                justifyContent: "center",
+              }}
+            >
+              <View
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 300,
+                  backgroundColor: `${String(colors.text)}0A`,
+                }}
+              >
+                <Typography variant="caption" color="secondary">
+                  {t(
+                    "Ressources_Offline",
+                    "Hors-ligne — données en cache"
+                  )}
+                </Typography>
+              </View>
+            </View>
+          )}
+          {headerExtra}
+        </>
+      }
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -115,36 +221,33 @@ const RessourcesList: React.FC<RessourcesListProps> = ({
     >
       {sections.map((section) => {
         const isCollapsed = collapsedGroups.includes(section.key);
+        const chapters = section.lessons.reduce(
+          (n, l) => n + l.contents.length,
+          0
+        );
+        const files = section.lessons.reduce((n, l) => n + l.fileCount, 0);
+        const rel = relativeTitle(section.key, section.dateLabel);
+        const summary = [
+          rel.subtitle,
+          `${section.lessons.length} ${t("Ressources_Sessions", "séances")}`,
+          `${chapters} ${t("Ressources_Chapters", "chapitres")}`,
+          files > 0
+            ? `${files} ${t("Ressources_FilesSuffix", "fichiers")}`
+            : "",
+        ]
+          .filter((s) => (s ?? "").length > 0)
+          .join(" · ");
         return (
           <Reanimated.View key={section.key} layout={LinearTransition}>
-            <Pressable
-              onPress={() => onToggleGroup(section.key)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                paddingVertical: 6,
+            <DayHeader
+              title={rel.title}
+              subtitle={summary}
+              isCollapsed={isCollapsed}
+              onToggle={() => {
+                void hapticFor("selection");
+                onToggleGroup(section.key);
               }}
-            >
-              <Typography variant="h4" style={{ flex: 1 }}>
-                {section.dateLabel}
-              </Typography>
-              <Typography variant="caption" color="secondary">
-                {section.lessons.length}
-              </Typography>
-              <View
-                style={{
-                  opacity: 0.5,
-                  transform: [{ rotate: isCollapsed ? "0deg" : "90deg" }],
-                }}
-              >
-                <Papicons
-                  name="chevronright"
-                  size={18}
-                  color={String(colors.text)}
-                />
-              </View>
-            </Pressable>
+            />
             {!isCollapsed &&
               section.lessons.map((session) => (
                 <React.Fragment key={session.key}>

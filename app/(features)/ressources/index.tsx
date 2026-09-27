@@ -13,7 +13,6 @@ import {
   resolvePronoteFileAuth,
 } from "@/services/pronote/files";
 import { useAlert } from "@/ui/components/AlertProvider";
-import ActivityIndicator from "@/ui/components/ActivityIndicator";
 import ChipButton from "@/ui/components/ChipButton";
 import MainTabErrorBoundary from "@/ui/components/MainTabErrorBoundary";
 import Stack from "@/ui/components/Stack";
@@ -22,6 +21,7 @@ import useResizable from "@/ui/utils/Resizable";
 
 import RessourcesHeader from "./components/RessourcesHeader";
 import RessourcesList from "./components/RessourcesList";
+import { RessourcesSkeleton } from "./components/Skeleton";
 import { RESSOURCES_ACCENT } from "./components/SessionCard";
 import {
   useRessourcesData,
@@ -64,6 +64,8 @@ function RessourcesView() {
     totalResources,
     loading,
     refreshing,
+    loadError,
+    offline,
     refresh,
   } = useRessourcesData(viewMode, selectedWeek, fromDate);
 
@@ -221,10 +223,12 @@ function RessourcesView() {
               </Pressable>
               <Pressable
                 onPress={() => setSelectedWeek((w) => w + 1)}
+                disabled={selectedWeek >= defaultWeek + 1}
                 style={{
                   padding: 10,
                   borderRadius: 12,
                   backgroundColor: colors.card,
+                  opacity: selectedWeek >= defaultWeek + 1 ? 0.4 : 1,
                 }}
                 accessibilityLabel={t(
                   "Ressources_NextWeek",
@@ -244,7 +248,10 @@ function RessourcesView() {
                 onPress={() => {
                   const d = new Date(fromDate);
                   d.setDate(d.getDate() - 7);
-                  setFromDate(d);
+                  const min = new Date();
+                  min.setDate(min.getDate() - 62);
+                  min.setHours(0, 0, 0, 0);
+                  if (d.getTime() >= min.getTime()) setFromDate(d);
                 }}
                 style={{
                   padding: 10,
@@ -446,12 +453,10 @@ function RessourcesView() {
         <View
           style={{
             flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
             paddingTop: headerHeight,
           }}
         >
-          <ActivityIndicator />
+          <RessourcesSkeleton />
         </View>
       ) : (
         <RessourcesList
@@ -461,6 +466,8 @@ function RessourcesView() {
           isRefreshing={refreshing}
           onRefresh={refresh}
           isFiltering={isFiltering}
+          loadError={loadError}
+          offline={offline}
           collapsedGroups={collapsedGroups}
           onToggleGroup={toggleGroup}
           downloadingKey={downloading}

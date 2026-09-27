@@ -14,6 +14,7 @@ import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectName } from "@/utils/subjects/name";
 import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 import { useTimetableWidgetData } from "../hooks/useTimetableWidgetData";
+import { LessonContentSkeleton } from "@/app/(features)/ressources/components/Skeleton";
 
 type LessonContentWidgetProps = {
   onEmptyStateChange?: (isEmpty: boolean) => void;
@@ -45,51 +46,228 @@ export function findNextCourse(courses: any[] | undefined) {
     .sort((a, b) => new Date(a.from).getTime() - new Date(b.from).getTime())[0];
 }
 
+/** Dernières séances avec contenu (passées ou futures), les plus récentes d'abord. */
+function findRecentCoursesWithContent(
+  courses: any[] | undefined,
+  prefetched: Record<string, any[]>,
+  limit = 2
+) {
+  const withContent = (courses ?? []).filter((c) => {
+    if (!c) return false;
+    if (Array.isArray(c.content) && c.content.length > 0) return true;
+    try {
+      const id = getCourseRouteId(c as any);
+      return Array.isArray(prefetched[id]) && prefetched[id].length > 0;
+    } catch {
+      return false;
+    }
+  });
+  withContent.sort(
+    (a, b) => new Date(b.from).getTime() - new Date(a.from).getTime()
+  );
+  return withContent.slice(0, limit).map((c) => {
+    try {
+      const id = getCourseRouteId(c as any);
+      if (
+        (!Array.isArray(c.content) || c.content.length === 0) &&
+        Array.isArray(prefetched[id])
+      ) {
+        return { ...c, content: prefetched[id] };
+      }
+    } catch {
+      /* ignore */
+    }
+    return c;
+  });
+}
+
 /** La carte Contenu et ressources mène TOUJOURS au flux complet
  *  `/(features)/ressources` (journal de classe : leçons, fichiers, liens),
  *  jamais à la fiche d'un cours isolé `/(modals)/course/[id]`
  *  (qui affichait un « mon cours » sans contenu = confusion cours/contenu). */
 const RESSOURCES_HREF = "/(features)/ressources" as const;
 
+function fmtCourseDate(from: unknown): string {
+  try {
+    const d = new Date(from as never);
+    const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${day} · ${hh}h${mm}`;
+  } catch {
+    return "";
+  }
+}
+
+function stripHtml(s: unknown): string {
+  return String(s ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Coquille unique de la carte : même feedback visuel partout. */
+function CardShell({
+  accent,
+  emoji,
+  title,
+  subtitle,
+  badge,
+  children,
+  footer,
+}: {
+  accent: string;
+  emoji?: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  children?: React.ReactNode;
+  footer: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
+      <Link href={RESSOURCES_HREF} asChild>
+        <Link.AppleZoom>
+          <Stack gap={10} padding={[14, 14]} radius={18} card style={{ paddingLeft: 24 }}>
+            <View
+              style={{
+                position: "absolute",
+                left: 10,
+                top: 14,
+                bottom: 14,
+                width: 6,
+                backgroundColor: accent,
+                borderRadius: 300,
+              }}
+            />
+            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: `${accent}1F`,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {emoji ? (
+                  <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                ) : (
+                  <Icon papicon opacity={0.7}>
+                    <Papicons name="Info" />
+                  </Icon>
+                )}
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Typography variant="title" weight="bold" numberOfLines={1}>
+                  {title}
+                </Typography>
+                {subtitle ? (
+                  <Typography variant="body2" color="secondary" numberOfLines={1}>
+                    {subtitle}
+                  </Typography>
+                ) : null}
+              </View>
+              {badge ? (
+                <View
+                  style={{
+                    backgroundColor: `${accent}1A`,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 20,
+                  }}
+                >
+                  <Typography variant="caption" weight="bold">
+                    {badge}
+                  </Typography>
+                </View>
+              ) : null}
+            </Stack>
+            {children}
+            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
+              <Typography variant="caption" weight="bold" color="primary" style={{ flex: 1 }} numberOfLines={1}>
+                {footer}
+              </Typography>
+              <Icon papicon opacity={0.5} size={16}>
+                <Papicons name="ArrowRightUp" />
+              </Icon>
+            </Stack>
+          </Stack>
+        </Link.AppleZoom>
+      </Link>
+    </View>
+  );
+}
+
+function ChapterPreview({ chapter }: { chapter: any }) {
+  const theme = useTheme();
+  const attachments = Array.isArray(chapter.attachments) ? chapter.attachments : [];
+  return (
+    <View
+      style={{
+        gap: 2,
+        backgroundColor: `${String(theme.colors.text)}0A`,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+      }}
+    >
+      {!!chapter.title && (
+        <Typography variant="body1" weight="bold" numberOfLines={1}>
+          {chapter.title}
+        </Typography>
+      )}
+      {!!chapter.description && (
+        <Typography variant="body2" color="secondary" numberOfLines={2}>
+          {stripHtml(chapter.description)}
+        </Typography>
+      )}
+      {attachments.length > 0 && (
+        <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
+          <Icon papicon opacity={0.5} size={14}>
+            <Papicons name={getAttachmentIcon(attachments[0]) as any} />
+          </Icon>
+          <Typography variant="caption" color="secondary" style={{ flex: 1 }} numberOfLines={1}>
+            {attachments
+              .slice(0, 2)
+              .map((a: any) => a?.name ?? "Fichier")
+              .join(" · ")}
+            {attachments.length > 2 ? ` (+${attachments.length - 2})` : ""}
+          </Typography>
+        </Stack>
+      )}
+    </View>
+  );
+}
+
+function PlainMessage({ text }: { text: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        gap: 2,
+        backgroundColor: `${String(theme.colors.text)}0A`,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+      }}
+    >
+      <Typography variant="body2" color="secondary" numberOfLines={2}>
+        {text}
+      </Typography>
+    </View>
+  );
+}
+
 const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: LessonContentWidgetProps) => {
   const { courses } = useTimetableWidgetData();
   const theme = useTheme();
   const [prefetched, setPrefetched] = React.useState<Record<string, any[]>>({});
   // Chargé = le batch contenus est revenu (même vide) : on peut alors
-  // distinguer « chargement » de « rien publié » au lieu d'un
-  // « Contenu en cours de chargement » infini.
+  // distinguer « chargement » de « rien publié » (skeleton vs vide honnête).
   const [settled, setSettled] = React.useState(false);
-
-  const nextWithContent = useMemo(() => {
-    const direct = findNextCourseWithContent(courses as any[]);
-    if (direct) return direct;
-    // Contenu pré-chargé en arrière-plan (EDT rapide sans contenu) :
-    // si le prochain cours a un contenu fetché, l'afficher sans attendre la DB.
-    try {
-      const now = Date.now();
-      const withPre = (courses as any[] ?? [])
-        .filter(c => c && new Date(c.to ?? c.from).getTime() > now)
-        .sort((a, b) => new Date(a.from).getTime() - new Date(b.from).getTime())
-        .find(c => {
-          try {
-            const id = getCourseRouteId(c as any);
-            return Array.isArray(prefetched[id]) && prefetched[id].length > 0;
-          } catch {
-            return false;
-          }
-        });
-      if (withPre) {
-        try {
-          const id = getCourseRouteId(withPre as any);
-          return { ...withPre, content: prefetched[id] };
-        } catch {
-          return withPre;
-        }
-      }
-    } catch {}
-    return direct;
-  }, [courses, prefetched]);
-  const nextCourse = useMemo(() => findNextCourse(courses as any[]), [courses]);
 
   // Pré-charge les contenus en UNE requête batchée (GET /timetable/contents :
   // 1 PageCahierDeTexte / semaine) au lieu de N POST /timetable/lesson-content
@@ -167,252 +345,104 @@ const LessonContentWidget = React.memo(({ onEmptyStateChange, onTargetChange }: 
     onTargetChange(RESSOURCES_HREF);
   }, [onTargetChange]);
 
-  // Aucun cours futur du tout -> flux ressources (archives des contenus passés).
-  if (!nextWithContent && !nextCourse) {
-    return (
-      <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
-        <Link href={RESSOURCES_HREF} asChild>
-          <Link.AppleZoom>
-            <Stack gap={10} padding={[16, 14]} radius={18} card>
-              <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
-                <View
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: `${String(theme.colors.primary)}14`,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon papicon opacity={0.7}>
-                    <Papicons name="Info" />
-                  </Icon>
-                </View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Typography variant="title" weight="bold" numberOfLines={1}>
-                    {t("Home_LessonContent_Empty_Title", "Rien pour l'instant")}
-                  </Typography>
-                  <Typography variant="body2" color="secondary" numberOfLines={2}>
-                    {t("Home_LessonContent_Empty_Desc", "Aucun contenu publié pour tes prochains cours.")}
-                  </Typography>
-                </View>
-              </Stack>
-              <Typography variant="caption" color="primary">
-                {t("Home_LessonContent_Empty_CTA", "Voir les contenus et ressources")}
-              </Typography>
-            </Stack>
-          </Link.AppleZoom>
-        </Link>
-      </View>
-    );
-  }
-
-  // Prochain cours SANS contenu retrouvé : chargement encore en cours ?
-  // Si le batch est revenu (settled) -> « rien publié », pas un chargement infini.
-  const effectiveCourse = nextWithContent ?? nextCourse;
-  if (!nextWithContent && nextCourse) {
-    const ncSubject = getSubjectName((nextCourse as any).subject);
-    const ncColor = getSubjectColor((nextCourse as any).subject);
-    const ncEmoji = getSubjectEmoji((nextCourse as any).subject);
-    let ncDate = "";
-    try {
-      const d = new Date((nextCourse as any).from);
-      const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      ncDate = `${day} · ${hh}h${mm}`;
-    } catch {}
-    const pending = !settled;
-    return (
-      <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
-        <Link href={RESSOURCES_HREF} asChild>
-          <Link.AppleZoom>
-            <Stack gap={10} padding={[14, 14]} radius={18} card style={{ paddingLeft: 24 }}>
-              <View
-                style={{
-                  position: "absolute",
-                  left: 10,
-                  top: 14,
-                  bottom: 14,
-                  width: 6,
-                  backgroundColor: ncColor,
-                  borderRadius: 300,
-                }}
-              />
-              <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
-                <View
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: `${ncColor}1F`,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 24 }}>{ncEmoji}</Text>
-                </View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Typography variant="title" weight="bold" numberOfLines={1}>
-                    {ncSubject}
-                  </Typography>
-                  <Typography variant="body2" color="secondary" numberOfLines={1}>
-                    {ncDate}
-                  </Typography>
-                </View>
-              </Stack>
-              <View
-                style={{
-                  gap: 2,
-                  backgroundColor: `${String(theme.colors.text)}0A`,
-                  borderRadius: 14,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                }}
-              >
-                <Typography variant="body2" color="secondary" numberOfLines={2}>
-                  {pending
-                    ? t("Home_LessonContent_Pending_Desc", "Contenu en cours de chargement…")
-                    : t("Home_LessonContent_NoContent_Desc", "Aucun contenu publié pour ce cours — ouvre les ressources pour tout voir.")}
-                </Typography>
-              </View>
-              <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
-                <Typography variant="caption" weight="bold" color="primary" style={{ flex: 1 }} numberOfLines={1}>
-                  {t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
-                </Typography>
-                <Icon papicon opacity={0.5} size={16}>
-                  <Papicons name="ArrowRightUp" />
-                </Icon>
-              </Stack>
-            </Stack>
-          </Link.AppleZoom>
-        </Link>
-      </View>
-    );
-  }
-
-  const items = (effectiveCourse.content ?? []).slice(0, 2);
-  const fileCount = (effectiveCourse.content ?? []).reduce(
-    (n: number, c: any) => n + (c.attachments?.length ?? 0),
-    0
+  const recent = useMemo(
+    () => findRecentCoursesWithContent(courses as any[], prefetched, 2),
+    [courses, prefetched]
   );
-  const subject = getSubjectName(effectiveCourse.subject);
-  const color = getSubjectColor(effectiveCourse.subject);
-  const emoji = getSubjectEmoji(effectiveCourse.subject);
-  const courseDate = useMemo(() => {
-    try {
-      const d = new Date((effectiveCourse as any).from);
-      const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      return `${day} · ${hh}h${mm}`;
-    } catch {
-      return "";
-    }
-  }, [effectiveCourse]);
+  const nextCourse = useMemo(() => findNextCourse(courses as any[]), [courses]);
 
-  return (
-    <View style={{ width: "100%", paddingHorizontal: 10, paddingBottom: 12 }}>
-      <Link href={RESSOURCES_HREF} asChild>
-        <Link.AppleZoom>
-          <Stack gap={10} padding={[14, 14]} radius={18} card style={{ paddingLeft: 24 }}>
-            <View
-              style={{
-                position: "absolute",
-                left: 10,
-                top: 14,
-                bottom: 14,
-                width: 6,
-                backgroundColor: color,
-                borderRadius: 300,
-              }}
-            />
-            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: `${color}1F`,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 24 }}>{emoji}</Text>
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Typography variant="title" weight="bold" numberOfLines={1}>
-                  {subject}
+  // 1) Chargement : skeleton (jamais de vide éclair ni de texte figé).
+  if (!settled && recent.length === 0) {
+    return <LessonContentSkeleton />;
+  }
+
+  // 2) Mini-feed des dernières séances avec contenu.
+  if (recent.length > 0) {
+    const totalFiles = recent.reduce(
+      (n: number, c: any) =>
+        n +
+        (Array.isArray(c.content)
+          ? c.content.reduce(
+              (m: number, ch: any) => m + (ch.attachments?.length ?? 0),
+              0
+            )
+          : 0),
+      0
+    );
+    const first = recent[0];
+    const color = getSubjectColor(first.subject);
+    const subtitle =
+      recent.length > 1
+        ? t("Home_LessonContent_Recent_Subtitle", "{{count}} dernières séances", {
+            count: recent.length,
+          })
+        : fmtCourseDate(first.from) ||
+          t("Home_LessonContent_Title", "Contenu du prochain cours");
+    return (
+      <CardShell
+        accent={color}
+        emoji={getSubjectEmoji(first.subject)}
+        title={getSubjectName(first.subject)}
+        subtitle={subtitle}
+        badge={
+          totalFiles > 0
+            ? t("Home_LessonContent_Files", "{{count}} fichiers", {
+                count: totalFiles,
+              })
+            : undefined
+        }
+        footer={t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
+      >
+        {recent.map((c: any, i: number) => {
+          const chapter = (c.content ?? [])[0];
+          if (!chapter) return null;
+          return (
+            <View key={`${c.subject ?? ""}-${i}`} style={{ gap: 4 }}>
+              {recent.length > 1 && (
+                <Typography variant="caption" color="secondary" numberOfLines={1}>
+                  {getSubjectName(c.subject)} · {fmtCourseDate(c.from)}
                 </Typography>
-                <Typography variant="body2" color="secondary" numberOfLines={1}>
-                  {courseDate || t("Home_LessonContent_Title", "Contenu du prochain cours")}
-                </Typography>
-              </View>
-              {fileCount > 0 && (
-                <View
-                  style={{
-                    backgroundColor: `${color}1A`,
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderRadius: 20,
-                  }}
-                >
-                  <Typography variant="caption" weight="bold">
-                    {t("Home_LessonContent_Files", "{{count}} fichiers", { count: fileCount })}
-                  </Typography>
-                </View>
               )}
-            </Stack>
-            {items.map((c: any, i: number) => (
-              <View
-                key={`${c.title ?? ""}-${i}`}
-                style={{
-                  gap: 2,
-                  backgroundColor: `${String(theme.colors.text)}0A`,
-                  borderRadius: 14,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                }}
-              >
-                {!!c.title && (
-                  <Typography variant="body1" weight="bold" numberOfLines={1}>
-                    {c.title}
-                  </Typography>
-                )}
-                {!!c.description && (
-                  <Typography variant="body2" color="secondary" numberOfLines={2}>
-                    {String(c.description).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
-                  </Typography>
-                )}
-                {Array.isArray(c.attachments) && c.attachments.length > 0 && (
-                  <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
-                    <Icon papicon opacity={0.5} size={14}>
-                      <Papicons name={getAttachmentIcon(c.attachments[0]) as any} />
-                    </Icon>
-                    <Typography variant="caption" color="secondary" style={{ flex: 1 }} numberOfLines={1}>
-                      {c.attachments
-                        .slice(0, 2)
-                        .map((a: any) => a?.name ?? "Fichier")
-                        .join(" · ")}
-                      {c.attachments.length > 2 ? ` (+${c.attachments.length - 2})` : ""}
-                    </Typography>
-                  </Stack>
-                )}
-              </View>
-            ))}
-            <Stack direction="horizontal" vAlign="center" hAlign="center" gap={6}>
-              <Typography variant="caption" weight="bold" color="primary" style={{ flex: 1 }} numberOfLines={1}>
-                {t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
-              </Typography>
-              <Icon papicon opacity={0.5} size={16}>
-                <Papicons name="ArrowRightUp" />
-              </Icon>
-            </Stack>
-          </Stack>
-        </Link.AppleZoom>
-      </Link>
-    </View>
+              <ChapterPreview chapter={chapter} />
+            </View>
+          );
+        })}
+      </CardShell>
+    );
+  }
+
+  // 3) Cours futurs mais rien publié : vide honnête (batch revenu).
+  if (nextCourse) {
+    const ncColor = getSubjectColor((nextCourse as any).subject);
+    return (
+      <CardShell
+        accent={ncColor}
+        emoji={getSubjectEmoji((nextCourse as any).subject)}
+        title={getSubjectName((nextCourse as any).subject)}
+        subtitle={fmtCourseDate((nextCourse as any).from)}
+        footer={t("Home_LessonContent_CTA_Ressources", "Voir les ressources")}
+      >
+        <PlainMessage
+          text={t(
+            "Home_LessonContent_NoContent_Desc",
+            "Aucun contenu publié pour ce cours — ouvre les ressources pour tout voir."
+          )}
+        />
+      </CardShell>
+    );
+  }
+
+  // 4) Vrai vide : aucun cours futur.
+  return (
+    <CardShell
+      accent={String(theme.colors.primary)}
+      title={t("Home_LessonContent_Empty_Title", "Rien pour l'instant")}
+      subtitle={t(
+        "Home_LessonContent_Empty_Desc",
+        "Aucun contenu publié pour tes prochains cours."
+      )}
+      footer={t("Home_LessonContent_Empty_CTA", "Voir les contenus et ressources")}
+    />
   );
 });
 

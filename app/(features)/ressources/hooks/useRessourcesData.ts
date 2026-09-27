@@ -50,6 +50,8 @@ export interface SessionItem {
   teacher: string;
   room: string;
   slot: string;
+  /** Ligne “10h15 – 12h15 · Salle · Prof” pré-assemblée (sans séparateur fantôme). */
+  meta: string;
   from: Date;
   contents: BuiltContent[];
   fileCount: number;
@@ -194,10 +196,14 @@ function buildSections(
       const teacher =
         course.teacher || teacherNames || "";
       const room = course.room || "";
-      const slot =
-        fmtTime(fromD) && fmtTime(toD)
-          ? `${fmtTime(fromD)} – ${fmtTime(toD)}`
-          : "";
+      const slot = [fmtTime(fromD), fmtTime(toD)]
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+        .join(" – ");
+      const metaLine = [slot, room, teacher]
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+        .join(" · ");
 
       const contents: BuiltContent[] = merged.map((c) => {
         const body = String(
@@ -271,6 +277,7 @@ function buildSections(
         teacher,
         room,
         slot,
+        meta: metaLine,
         from: fromD,
         contents,
         fileCount,
@@ -307,6 +314,9 @@ export function useRessourcesData(
 ) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  /** Données en cache affichées, refresh réseau en échec (bandeau hors-ligne). */
+  const [offline, setOffline] = useState(false);
   const [sections, setSections] = useState<DaySection[]>([]);
   const [subjects, setSubjects] = useState<SubjectInfo[]>([]);
   const [themes, setThemes] = useState<string[]>([]);
@@ -318,6 +328,7 @@ export function useRessourcesData(
       const myId = ++loadId.current;
       if (!isRefresh) setLoading(true);
       else setRefreshing(true);
+      setOffline(false);
       try {
         const now = new Date();
         let rangeStart: Date;
@@ -410,6 +421,7 @@ export function useRessourcesData(
           setSubjects(r.subjectList);
           setThemes(r.themeList);
           setTotalResources(r.count);
+          setLoadError(false);
         };
 
         // 1) Peinture instantanée : Watermelon + MMKV.
@@ -435,11 +447,9 @@ export function useRessourcesData(
               (await manager
                 .getWeekContents(rangeStart, rangeEnd)
                 .catch(() => [])) ?? [];
-            if (
-              loadId.current === myId &&
-              Array.isArray(freshContents) &&
-              freshContents.length > 0
-            ) {
+            const networkOk =
+              Array.isArray(freshContents) && freshContents.length > 0;
+            if (loadId.current === myId && networkOk) {
               try {
                 await setSimpleCache(
                   cacheKey,
@@ -463,13 +473,22 @@ export function useRessourcesData(
               (freshDays ?? []).flatMap((d) => d.courses ?? []),
               (((freshHw ?? []).length > 0 ? freshHw : cachedHw) ??
                 []) as HomeworkLike[],
-              Array.isArray(freshContents) && freshContents.length > 0
-                ? freshContents
-                : cachedContents
+              networkOk ? freshContents : cachedContents
             );
+            if (loadId.current === myId) {
+              // Réseau vide + cache existant = hors-ligne probable.
+              const hadCache =
+                (cachedDays ?? []).some(
+                  (d) => (d.courses ?? []).length > 0
+                ) || cachedContents.length > 0;
+              setOffline(!networkOk && hadCache);
+            }
+          } else if (loadId.current === myId) {
+            setOffline(true);
           }
         } catch {
           /* offline : on garde le cache */
+          if (loadId.current === myId) setOffline(true);
         }
       } catch {
         if (loadId.current !== myId) return;
@@ -477,6 +496,8 @@ export function useRessourcesData(
         setSubjects([]);
         setThemes([]);
         setTotalResources(0);
+        setLoadError(true);
+        setOffline(false);
       } finally {
         if (loadId.current !== myId) return;
         setLoading(false);
@@ -499,6 +520,8 @@ export function useRessourcesData(
     totalResources,
     loading,
     refreshing,
+    loadError,
+    offline,
     refresh,
   };
 }

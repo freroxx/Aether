@@ -1,15 +1,19 @@
 import { Papicons } from "@getpapillon/papicons";
 import { t } from "i18next";
-import React from "react";
-import { Pressable, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { useTheme } from "expo-router/react-navigation";
 
-import ActivityIndicator from "@/ui/components/ActivityIndicator";
-import Icon from "@/ui/components/Icon";
+import { hapticFor } from "@/utils/haptics";
+import Stack from "@/ui/components/Stack";
 import Typography from "@/ui/components/Typography";
-import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 
-import type { BuiltAttachment, SessionItem } from "../hooks/useRessourcesData";
+import type {
+  BuiltAttachment,
+  BuiltContent,
+  SessionItem,
+} from "../hooks/useRessourcesData";
+import AttachmentRow from "./AttachmentRow";
 
 export const RESSOURCES_ACCENT = "#29947A";
 
@@ -20,16 +24,123 @@ interface SessionCardProps {
   onOpenHomework: (routeId: string) => void;
 }
 
+const BODY_PREVIEW_LINES = 3;
+
+const ChapterBlock = React.memo(
+  ({
+    content,
+    sessionFrom,
+    downloadingKey,
+    onOpenFile,
+  }: {
+    content: BuiltContent;
+    sessionFrom: Date;
+    downloadingKey: string | null;
+    onOpenFile: SessionCardProps["onOpenFile"];
+  }) => {
+    const [expanded, setExpanded] = useState(false);
+    const longBody =
+      content.body.length > 220 || content.attachments.length > 2;
+    return (
+      <View style={{ gap: 6 }}>
+        {content.theme ? (
+          <View style={{ flexDirection: "row" }}>
+            <View
+              style={{
+                backgroundColor: `${RESSOURCES_ACCENT}1A`,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 300,
+              }}
+            >
+              <Typography
+                variant="caption"
+                weight="bold"
+                style={{
+                  color: RESSOURCES_ACCENT,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.6,
+                }}
+                numberOfLines={1}
+              >
+                {content.theme}
+              </Typography>
+            </View>
+          </View>
+        ) : null}
+        {content.title ? (
+          <Typography variant="title" weight="bold" numberOfLines={2}>
+            {content.title}
+          </Typography>
+        ) : null}
+        {content.body ? (
+          <>
+            <Typography
+              variant="body1"
+              color="secondary"
+              numberOfLines={expanded ? undefined : BODY_PREVIEW_LINES}
+            >
+              {content.body}
+            </Typography>
+            {longBody && (
+              <Pressable
+                onPress={() => {
+                  void hapticFor("selection");
+                  setExpanded((v) => !v);
+                }}
+                style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+              >
+                <Typography variant="caption" weight="bold" color="primary">
+                  {expanded
+                    ? t("Ressources_ReadLess", "Lire moins")
+                    : t("Ressources_ReadMore", "Lire plus")}
+                </Typography>
+              </Pressable>
+            )}
+          </>
+        ) : null}
+        {content.attachments.length > 0 && (
+          <View style={{ gap: 2 }}>
+            {content.attachments.map((a, aIdx) => {
+              const key = `${a.name ?? ""}-${a.url ?? ""}`;
+              return (
+                <AttachmentRow
+                  key={`${key}-${aIdx}`}
+                  attachment={a}
+                  downloading={downloadingKey === key}
+                  onOpen={(att) => onOpenFile(att, sessionFrom)}
+                />
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  }
+);
+
+ChapterBlock.displayName = "ChapterBlock";
+
 const SessionCard = React.memo(
-  ({ session, downloadingKey, onOpenFile, onOpenHomework }: SessionCardProps) => {
+  ({
+    session,
+    downloadingKey,
+    onOpenFile,
+    onOpenHomework,
+  }: SessionCardProps) => {
     const { colors } = useTheme();
+    const metaLine = [session.slot, session.room, session.teacher]
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .join(" · ");
     return (
       <View
         style={{
           backgroundColor: colors.card,
           borderRadius: 16,
           padding: 14,
-          gap: 8,
+          paddingLeft: 16,
+          gap: 10,
           overflow: "hidden",
         }}
       >
@@ -43,83 +154,82 @@ const SessionCard = React.memo(
             backgroundColor: session.color,
           }}
         />
-        <Typography variant="title" weight="bold" numberOfLines={1}>
-          {session.emoji} {session.pretty}
-        </Typography>
-        <Typography variant="caption" color="secondary" numberOfLines={1}>
-          {session.slot}
-          {session.room ? ` · ${session.room}` : ""}
-          {session.teacher ? ` · ${session.teacher}` : ""}
-        </Typography>
-        {session.contents.map((content, cIdx) => (
-          <View key={cIdx} style={{ gap: 4 }}>
-            {content.theme ? (
-              <Typography variant="caption" color="secondary">
-                {content.theme}
-              </Typography>
-            ) : null}
-            {content.title ? (
-              <Typography variant="title" numberOfLines={2}>
-                {content.title}
-              </Typography>
-            ) : null}
-            {content.body ? (
-              <Typography variant="body1" color="secondary" numberOfLines={4}>
-                {content.body}
-              </Typography>
-            ) : null}
-            {content.attachments.map((a, aIdx) => {
-              const key = `${a.name ?? ""}-${a.url ?? ""}`;
-              return (
-                <Pressable
-                  key={aIdx}
-                  onPress={() => onOpenFile(a, session.from)}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                    paddingVertical: 6,
-                  }}
-                >
-                  <Icon>
-                    <Papicons name={getAttachmentIcon(a as never)} />
-                  </Icon>
-                  <Typography
-                    variant="body1"
-                    numberOfLines={1}
-                    style={{ flex: 1 }}
-                  >
-                    {a.name || a.url}
-                  </Typography>
-                  {downloadingKey === key && <ActivityIndicator size={18} />}
-                </Pressable>
-              );
-            })}
+        <Stack direction="horizontal" vAlign="center" hAlign="center" gap={12}>
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: `${session.color}1F`,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 24 }}>{session.emoji}</Text>
           </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Typography variant="title" weight="bold" numberOfLines={1}>
+              {session.pretty}
+            </Typography>
+            {session.meta ? (
+              <Typography variant="caption" color="secondary" numberOfLines={1}>
+                {session.meta}
+              </Typography>
+            ) : null}
+          </View>
+          {session.fileCount > 0 && (
+            <View
+              style={{
+                backgroundColor: `${session.color}1A`,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 20,
+              }}
+            >
+              <Typography variant="caption" weight="bold">
+                {t("Home_LessonContent_Files", "{{count}} fichiers", {
+                  count: session.fileCount,
+                })}
+              </Typography>
+            </View>
+          )}
+        </Stack>
+        {session.contents.map((content, cIdx) => (
+          <ChapterBlock
+            key={cIdx}
+            content={content}
+            sessionFrom={session.from}
+            downloadingKey={downloadingKey}
+            onOpenFile={onOpenFile}
+          />
         ))}
         {session.homeworkRouteId ? (
           <Pressable
-            onPress={() => onOpenHomework(session.homeworkRouteId as string)}
-            style={{
-              marginTop: 4,
-              paddingVertical: 10,
-              paddingHorizontal: 12,
-              borderRadius: 12,
-              backgroundColor: `${RESSOURCES_ACCENT}1A`,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
+            onPress={() => {
+              void hapticFor("selection");
+              onOpenHomework(session.homeworkRouteId as string);
             }}
+            style={({ pressed }) => [
+              {
+                marginTop: 2,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 12,
+                backgroundColor: `${RESSOURCES_ACCENT}1A`,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              },
+            ]}
+            accessibilityRole="button"
             accessibilityLabel={t(
               "Ressources_SeeHomework",
               "Voir le travail à faire"
             )}
           >
-            <Papicons
-              name="tasks"
-              size={18}
-              color={RESSOURCES_ACCENT}
-            />
+            <Papicons name="tasks" size={18} color={RESSOURCES_ACCENT} />
             <Typography
               variant="button"
               style={{ color: RESSOURCES_ACCENT, flex: 1 }}
